@@ -6,7 +6,7 @@ A browser UI and CLI share a Python/SQLite coordinator. Typed changes work witho
 an LLM; optional subscription harnesses interpret conversation and suggest next steps.
 The model cannot write directly to the task store.
 
-## Requirements
+## Required versus optional tools
 
 - Python **3.11+**, including standard-library `sqlite3` and `zoneinfo`.
   The export is checked on Python 3.11.2 / SQLite 3.40.1; use SQLite **3.35+**.
@@ -27,12 +27,24 @@ The model cannot write directly to the task store.
   `osascript` and launchd. Missing delivery/scheduler tools are reported; tasks
   and manual backups keep working. No scheduler is installed on first run.
 
-The following checks report the Python and SQLite versions and verify zone data:
+From the source root, run this read-only inventory using already approved tools:
 
 ```sh
-python3 --version
-python3 -c "import sqlite3; from zoneinfo import ZoneInfo; print(sqlite3.sqlite_version); print(ZoneInfo('UTC'))"
+python3 -B scripts/check_tools.py
 ```
+
+If `python3` itself is absent, the shell reports that before the check can run.
+The READY result covers required core capabilities only; optional features and
+selected timezone data need separate verification. Tool versions may be unknown.
+
+## macOS
+
+Linux is verified. macOS is supported by design but is not accepted until the
+inventory and documented tests have run on the target Mac. Native permissions,
+notifications, scheduling and sleep/resume require separate Mac checks. Use only
+already approved tools; no root or new dependencies are required for core use.
+Temporary files use the standard temporary directory and respect `TMPDIR` when
+it names a writable directory. The Linux system suite below is Linux-only.
 
 ## Install and start
 
