@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "day-attendant"
+version = "0.4.0"
+description = "A local personal assistant for human responsibilities"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+day-attendant = "day_attendant.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["day_attendant*"]
+
+[tool.setuptools.package-data]
+day_attendant = ["ui/*.html", "ui/*.js"]

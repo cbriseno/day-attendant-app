@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.runtime/
+.venv/
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.log
+dist/
+build/
+*.egg-info/
+private-profile/
+private-restored/
+private-backups/
