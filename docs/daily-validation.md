@@ -20,3 +20,13 @@ There are no distributed screenshots or historical PR attachments. Any future
 image needs synthetic provenance and a human visual review before publication.
 Linux core checks do not establish macOS notification permissions, sleep behavior,
 remote exposure, live-model semantics or physical-device usability.
+
+## Historical browser checks
+
+`scripts/test_daily_regressions.mjs` retains the pre-v5 controlled-DOM contracts.
+The current v5 entry is `scripts/test_v5_ui.py`, using real SQLite and Chrome AXI.
+`test_connected_browser.mjs` and `test_ui_contract.mjs` are historical Taskwarrior
+pilot checks, not current SQLite acceptance tests. They require an explicit synthetic
+profile, an existing CDP session on port 9337 and the optional legacy Taskwarrior
+executable (`DAY_ATTENDANT_LEGACY_TASK_BIN`, or `task` on PATH). Keep their report
+and screenshot output in a private directory supplied on the command line.
