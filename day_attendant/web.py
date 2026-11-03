@@ -17,6 +17,7 @@ from urllib.request import Request, urlopen
 from urllib.parse import parse_qs
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from . import fm_diagnostics as diagnostics
 from .archives import upgrade_tasks
 from .harnesses import create_harness,discover_catalog
 from .connected import Connected, FOLLOWUP_DELAY
@@ -164,9 +165,15 @@ class Handler(BaseHTTPRequestHandler):
                         data=self.server.board.view()
                         # A poll that already holds this content receives only the clock.
                         if options.get('since')==[data['tag']]:data={'unchanged':True,'tag':data['tag'],'now':data['now']}
+                if route=='/api/state' and 'tasks' in data:
+                    logger=diagnostics.Logger('day-attendant','unknown','unknown')
+                    logger.emit('snapshot.read',tasks=len(data['tasks']))
+                    logger.flush()
                 self.reply(200,{'data':data})
             except AssistantError as error:self.reply(409,{'error':{'code':error.code,'message':str(error)}})
             return
+        if route=='/api/diagnostics/preview':
+            self.reply(200,{'data':{'preview':diagnostics.export(['day-attendant'],preview=True)}});return
         if route=='/api/zone-rules':
             try:self.reply(200,{'data':self.server.board.zone_year(int(parse_qs(query)['year'][0]))})
             except (KeyError,ValueError):self.reply(400,{'error':{'code':'invalid_time','message':'Choose a calendar year.'}})
@@ -197,7 +204,9 @@ class Handler(BaseHTTPRequestHandler):
         board=self.server.board
         review=False  # The later review is scheduled after the reply, never before it.
         try:
-            if self.path=='/api/attachments':
+            if self.path=='/api/diagnostics/export':
+                result={'file':str(diagnostics.export(['day-attendant']))}
+            elif self.path=='/api/attachments':
                 if set(body)!={'name','mime','base64','key'}:raise ValueError('fields')
                 from .attachments import save
                 result=save(board.app,body['name'],body['mime'],body['base64'],body['key'])
@@ -264,6 +273,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,{'data':result})
             if review:self.server.schedule(result)
         except AssistantError as error:self.reply(409,{'error':{'code':error.code,'message':str(error),'details':error.details}})
+        except OSError:self.reply(500,{'error':{'code':'export_failed','message':'Could not export diagnostics.'}})
         except (KeyError,ValueError,TypeError,AttributeError):self.reply(400,{'error':{'code':'invalid_request','message':'Invalid action or fields.'}})
 
 

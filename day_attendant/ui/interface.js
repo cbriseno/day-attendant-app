@@ -1090,4 +1090,16 @@ function poll(){safely(()=>flow.poll()).finally(()=>setTimeout(poll,document.hid
 setTimeout(poll,900);document.addEventListener('visibilitychange',()=>{if(!document.hidden)safely(()=>flow.poll())});
 globalThis.daySnapshot=()=>structuredClone(flow.snapshot());
 globalThis.dayUI={taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
+const diagnosticsDialog = document.querySelector('#diagnostics-dialog');
+document.querySelector('#diagnostics-open').addEventListener('click', async () => {
+  diagnosticsDialog.showModal();
+  try { document.querySelector('#diagnostics-preview').textContent = (await api('/api/diagnostics/preview')).preview; }
+  catch (error) { document.querySelector('#diagnostics-preview').textContent = error.message; }
+});
+document.querySelector('#diagnostics-close').addEventListener('click', () => diagnosticsDialog.close());
+document.querySelector('#diagnostics-export').addEventListener('click', async () => {
+  try { const result = await api('/api/diagnostics/export', {}); document.querySelector('#diagnostics-preview').textContent = `Saved: ${result.file}`; }
+  catch (error) { document.querySelector('#diagnostics-preview').textContent = error.message; }
+});
+
 })();
