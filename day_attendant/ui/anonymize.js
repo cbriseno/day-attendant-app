@@ -5,16 +5,19 @@ const root=document.documentElement, key='day-attendant-anonymize';
 const attrs=['title','aria-label','alt','placeholder','value'];
 const originals=new WeakMap(), runs=new WeakMap(), textOriginals=new WeakMap(), candidates=new Map();
 const generated=new WeakSet(), controls=new WeakMap(), observed=new Set(),buttons=new WeakMap();
-const words={en:['amber','beam','cube','delta','echo','glow','halo','isle','loop','mist','orbit','tile'],es:['ámbar','bruma','cubo','delta','eco','giro','hilo','isla','marea','nube','onda','vela']};
+const words={en:['i','a','of','in','the','sky','blue','amber','garden','meadow','sunshine'],es:['i','a','de','en','sol','azul','nube','bruma','jardín','mañana','horizonte']};
 const candidateWidths=new Map();
 const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
 let generation=0,ready=Promise.resolve(),timing={},active=false,busy=false,queued=false,dirty=new Set(),known=new Set(),templates=[],lang='en';
 const hash=s=>{let h=2166136261;for(const c of s){h=Math.imul(h^c.codePointAt(0),16777619)}return h>>>0};
-function fake(s){
- const n=Math.min(64,Array.from(s).length),k=lang+':'+n;let list=candidates.get(k);
- if(!list){list=words[lang].map(w=>Array.from(w.repeat(Math.ceil(n/w.length)+1)).slice(0,n).join(''));candidates.set(k,list)}
- const h=hash(s),v=list[h%list.length];return v===s?list[(h+1)%list.length]:v;
+function fake(s){const list=words[lang],i=hash(s)%list.length;return list[i]===s?list[(i+1)%list.length]:list[i]}
+function fittedWord(s,target,style){
+ const list=words[lang], start=hash(s)%list.length;let result='', used=0, previous='';
+ for(let n=0;n<64;n++){let best='',bestWidth=0;for(let i=0;i<list.length;i++){const word=list[(start+i+n)%list.length],w=width((result?' ':'')+word,style);if(word!==previous&&w<=target-used+.01&&w>bestWidth){best=word;bestWidth=w}}if(!best)break;result+=(result?' ':'')+best;used+=bestWidth;previous=best}
+ if(result===s)result=list.find(word=>word!==s&&width(word,style)<=target)||list.find(word=>word!==s);
+ return result||list[0];
 }
+
 function catalog(){
  if(candidateWidths.size>4096)candidateWidths.clear();
  lang=root.lang==='es'?'es':'en';known=new Set();templates=[];
@@ -84,17 +87,12 @@ function maskNode(node,cache,writes){
  const style=styleFor(el,cache),host=document.createElement('span');generated.add(host);runs.set(host,node);
  host.style.cssText='display:inline;min-width:0';
  for(const p of parts){if(p.safe){host.append(document.createTextNode(p.s));continue}
-  // Keep whitespace and break opportunities, including hyphens and paths. Long words are split
-  // into graphemes only when necessary, keeping work linear and candidate storage bounded.
-  for(const chunk of p.s.split(/(\s+|(?<=[\/-]))/u)){if(!chunk)continue;if(/^\s+$/u.test(chunk)){host.append(document.createTextNode(chunk));continue}
-   const chunkWidth=width(chunk,style),pieces=style.width&&chunkWidth>style.width?Array.from(chunk):[chunk];
-   for(const word of pieces){const outer=document.createElement('span'),v=fake(word),w=pieces.length===1?chunkWidth:width(word,style),ck=lang+':'+v+':'+style.font;
-    let vw=candidateWidths.get(ck);if(vw===undefined){if(ctx.font!==style.font)ctx.font=style.font;vw=ctx.measureText(v).width;candidateWidths.set(ck,vw)}
-    if(Math.abs(w-vw)<.05){host.append(document.createTextNode(v));continue}
-    // One inline box per word: spacing fits its glyphs to the measured width without another DOM layer.
-    outer.style.cssText='display:inline-block;white-space:pre;width:'+w+'px;letter-spacing:'+((w-vw)/Array.from(v).length)+'px';
-    outer.textContent=v;host.append(outer);
-   }
+  // Preserve measured word boxes and their natural break points without stretching glyphs.
+  for(const chunk of p.s.split(/(\s+)/u)){if(!chunk)continue;if(/^\s+$/u.test(chunk)){host.append(document.createTextNode(chunk));continue}
+   const chunkWidth=width(chunk,style), limit=style.width||chunkWidth;
+   if(chunkWidth>limit){host.append(document.createTextNode(fittedWord(chunk,chunkWidth,style)));continue}
+   const outer=document.createElement('span');outer.style.cssText='display:inline-block;white-space:nowrap;width:'+chunkWidth+'px';
+   outer.textContent=fittedWord(chunk,chunkWidth,style);host.append(outer);
   }
  }
  writes.push(()=>{if(node.data===source)node.replaceWith(host)});
@@ -165,11 +163,13 @@ function restore(container){
 }
 
 async function refresh(notify=false){
+ const focused=document.activeElement;
  generation++;busy=true;pauseObserver();root.setAttribute('data-anon-loading','');
  restore(document.body);dirty.clear();catalog();
  if(notify)document.dispatchEvent(new Event('day-anonymize-change'));
  if(active){observed.clear();watch(document.body);watch(root);await sweep([document.body])}
  else{busy=false;root.removeAttribute('data-anon-loading')}
+ if(focused?.isConnected&&document.activeElement===document.body)focused.focus({preventScroll:true});
 }
 function setActive(on){
  active=!!on;try{sessionStorage.setItem(key,active?'1':'0')}catch{}

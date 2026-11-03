@@ -18,7 +18,7 @@ function submit(label){return `<button type="submit" class="btn primary">${esc(l
 function open(el,origin){ui.openDialog(el,origin);el.querySelector('input,select,button')?.focus()}
 let eventId=null,captureRevision=null,settingsRevision=null,lastProfile=null,lastDailyDigest='',lastDiagnostics='',lastCalendar='',selectedImages=[];
 const toolbar=document.querySelector('.toolbar-right');toolbar.insertAdjacentHTML('afterbegin',button('capture-open','daily_54e17efed4'));
-document.querySelector('.app-controls').insertAdjacentHTML('beforeend','<button type="button" class="btn" id="settings-open" aria-label="Settings">⚙ <span>Settings</span></button>');
+document.querySelector('.app-controls').insertAdjacentHTML('beforeend','<button type="button" class="btn" id="settings-open" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/></svg> <span>Settings</span></button>');
 const diagnostic=document.createElement('div');diagnostic.className='diagnostic-banner';diagnostic.hidden=true;diagnostic.id='daily-diagnostics';$('tasks-area').insertBefore(diagnostic,document.querySelector('.toolbar'));
 const calendar=document.createElement('section');calendar.className='calendar-area';calendar.id='calendar-area';$('tasks-area').append(calendar);
 

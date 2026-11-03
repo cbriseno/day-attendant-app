@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix='day-anonymize-') as state:
     def apply(action, payload, key):
         return board.request(action, payload, key, expected_revision=board.snapshot()['revision'])
     for i in range(4):
-        uid = apply('task_add', {'title': f'CANARY_TITLE_{i}', 'group': 'CANARY_GROUP_7', 'priority': 'high', 'due': '2026-12-09T14:30:00Z', 'source': 'chat', 'person': 'CANARY_PERSON_201', 'reference': 'CANARY_REFERENCE_202', 'observed_at': '2026-11-01T12:00:00Z'}, f'add-{i}')['result']['uuid']
+        uid = apply('task_add', {'title': f'CANARY_TITLE_{i} ' + ['Prepare a detailed project update for tomorrow', 'Review the quarterly notes with the team', 'Call the repair shop about the appointment', 'Organize remaining items'][i], 'group': 'CANARY_GROUP_7', 'priority': ['high', 'medium', 'low', 'high'][i], 'due': '2026-12-09T14:30:00Z', 'source': 'chat', 'person': 'CANARY_PERSON_201', 'reference': 'CANARY_REFERENCE_202', 'observed_at': '2026-11-01T12:00:00Z'}, f'add-{i}')['result']['uuid']
         apply('continuity_update', {'uuid': uid, 'context': f'CANARY_CONTEXT_{i}', 'next': f'CANARY_NEXT_{i}', 'remainingMinutes': 17}, f'continuity-{i}')
         if i == 3:
             apply('task_done', {'uuid': uid}, 'close-3')
@@ -98,6 +98,11 @@ with tempfile.TemporaryDirectory(prefix='day-anonymize-') as state:
             axi('resize', str(width), str(height))
             result = json.loads(axi('run', script=(ROOT / 'scripts/test_anonymize_ui.mjs').read_text()).strip().splitlines()[-1])
             report['checks'].append({'viewport': [width, height], **result})
+        report['mobile'] = []
+        for width in (1280, 900, 768, 600, 480, 390, 360):
+            axi('resize', str(width), '900')
+            result = json.loads(axi('run', script=(ROOT / 'scripts/test_mobile_layout.mjs').read_text()).strip().splitlines()[-1])
+            report['mobile'].append({'width': width, **result})
         report['reload'] = json.loads(axi('run', script="await page.eval(async()=>{await dayAnonymize.setActive(true)});await page.eval(()=>location.reload());await page.wait('[data-task-id]');console.log(JSON.stringify(await page.eval(async()=>{await dayAnonymize.ready;if(!dayAnonymize.active)throw Error('Session reload off');for(const e of document.querySelectorAll('.task-title,#profile-badge,.message-content'))if(e.textContent.includes('CANARY_'))throw Error('Reload leaked '+e.outerHTML+' hidden='+document.documentElement.hasAttribute('data-anon-loading'));if(!anonymizeProbe.frames||anonymizeProbe.leaks.length)throw Error('Reload visible frame canary '+JSON.stringify(anonymizeProbe));await dayAnonymize.setActive(false);return {reload:true,probe:anonymizeProbe}})));").strip().splitlines()[-1])
         report['console'] = axi('console')
         assert ' [error] ' not in report['console'], report['console']

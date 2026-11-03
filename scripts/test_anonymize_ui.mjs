@@ -10,7 +10,7 @@ console.log(JSON.stringify(await page.eval(async()=>{
  <p data-block style="font-weight:700">CANARY_BOLD_102 another multiline fixture with several different words to wrap naturally.</p>
  <div data-block style="display:inline-flex;gap:8px">CANARY_FLEX_103 secret multiple words</div>
  <p data-mixed>Links of «CANARY_TEMPLATE_104»</p><p data-anon-safe="text" data-struct>60% · 3/5 · 2026-11-02 · 14:30</p>
- <p data-private-label data-anon-private="text">Settings</p><p data-free>123456789012345678901</p><div hidden>CANARY_HIDDEN_105</div><div role="menu">CANARY_MENU_106</div>
+ <p data-private-label data-anon-private="text">Settings</p><p data-short-private data-anon-private="text">i</p><p data-long-private data-anon-private="text">CANARY_UNUSUALLY_LONG_PRIVATE_IDENTIFIER_130</p><p data-free>123456789012345678901</p><div hidden>CANARY_HIDDEN_105</div><div role="menu">CANARY_MENU_106</div>
  <dialog open><p>CANARY_DIALOG_107</p></dialog><svg width="100%" viewBox="0 0 400 30" height="30"><text x="0" y="20">CANARY_SVG_108</text></svg>
  <input value="CANARY_INPUT_109" title="CANARY_TITLE_110" aria-label="CANARY_ARIA_111" placeholder="CANARY_PLACEHOLDER_112">
  <textarea>CANARY_TEXTAREA_113</textarea><select><option value="CANARY_OPTION_VALUE_114">CANARY_OPTION_115</option></select>
@@ -28,7 +28,7 @@ console.log(JSON.stringify(await page.eval(async()=>{
  const selectControl=fixture.querySelector('select');await dayAnonymize.setActive(false);assert(input.value==='CANARY_INPUT_109'&&selectControl.value==='CANARY_OPTION_VALUE_114','Initial values exactly restored');await dayAnonymize.setActive(true);
  assert(!fixture.querySelector('[data-free]').textContent.includes('123456789012345678901'),'Free numbers masked');
  assert(!fixture.querySelector('[data-data-date]').textContent.includes('2026-12-24'),'Free numeric dates masked by origin');
- assert(fixture.querySelector('[data-copy]').textContent==='Settings','Catalog copy retained');assert(fixture.querySelector('[data-private-label]').textContent!=='Settings','Data equal to a UI label is still private');
+ assert(fixture.querySelector('[data-copy]').textContent==='Settings','Catalog copy retained');assert(fixture.querySelector('[data-private-label]').textContent!=='Settings','Data equal to a UI label is still private');assert(fixture.querySelector('[data-short-private]').textContent!=='i','Short private value masked');const neutral=fixture.querySelector('[data-long-private]').textContent.trim().split(/\s+/);assert(neutral.every((word,i)=>i===0||word!==neutral[i-1]),'No repeated adjacent replacement words');
  assert(fixture.querySelector('[data-mixed]').textContent.startsWith('Links of «')&&!fixture.querySelector('[data-mixed]').textContent.includes('CANARY'),'Template fixed part only');
  assert(fixture.querySelector('[data-struct]').textContent==='60% · 3/5 · 2026-11-02 · 14:30','Typed structure retained');
  assert(document.title===title,'Tab unchanged');assert(fixture.querySelector('[data-date]').value==='2026-11-02T14:30','Native typed date retained');assert(structures.every(({e,text})=>e.isConnected?e.textContent===text:true),'Real typed fields unchanged');

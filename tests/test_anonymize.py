@@ -24,3 +24,4 @@ class AnonymizeUITests(unittest.TestCase):
             report = json.loads((Path(out) / 'report.json').read_text())
             self.assertTrue(report['passed'])
             self.assertEqual(len(report['checks']), 2)
+            self.assertEqual([entry['width'] for entry in report['mobile']], [1280, 900, 768, 600, 480, 390, 360])
