@@ -37,6 +37,39 @@ If `python3` itself is absent, the shell reports that before the check can run.
 The READY result covers required core capabilities only; optional features and
 selected timezone data need separate verification. Tool versions may be unknown.
 
+## Anonymize mode
+
+Use **Anonymize** in the header (**Anonimizar** in Spanish) before a screenshot.
+It starts off, remembers its state only in this tab's `sessionStorage`, and
+restores current real text when turned off. The tab title stays unchanged; there
+is no extra banner or lock icon.
+
+A local DOM observer replaces unknown text, tooltips, accessible labels,
+placeholders and form values, including hidden panels, errors, diagnostics,
+conversation, filenames and later content. Interface copy comes from the existing
+translation catalogs; interpolated data is masked. Explicitly typed counts,
+progress, states and dates remain visible. A free-text numeric title is masked.
+Neutral replacements follow the interface language and measured word widths.
+Large updates keep the page invisible, preserving its layout, while frame-sized
+batches finish. Data controls are read only and submissions/write deliveries are
+blocked, so replacement text cannot be saved as real data.
+
+This is a screenshot aid, **not a privacy guarantee**. Browser chrome/tabs,
+images, canvas, CSS pseudo-elements, iframes and embedded content are outside its
+scope. URLs, internal attributes, logs and network traffic retain real values.
+Open shadow roots and SVG text are processed; inaccessible closed roots are not.
+Native controls keep their outer bounds but may wrap replacement text differently;
+complex bidi, ligatures, soft hyphens, variable fonts and unusual CSS also need
+visual review. Check the whole screenshot before sharing it.
+
+The existing Chrome AXI/SQLite fixture checks canaries, visible frames,
+restoration, two viewports/fonts, line counts, block geometry (2%) and 500/2,000-row
+performance. It runs in `unittest` when Chrome AXI is available, or separately:
+
+```sh
+python3 -B scripts/test_anonymize_ui.py --out /tmp/day-anonymize-proof
+```
+
 ## macOS
 
 Linux is verified. macOS is supported by design but is not accepted until the
