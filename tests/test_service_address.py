@@ -1,6 +1,7 @@
 """The local service keeps its address and session across restarts and never stays down."""
 import http.client
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -12,6 +13,7 @@ from day_attendant import lifecycle
 from day_attendant.profiles import configure
 from day_attendant.local_http import LOOPBACK_HOST
 from test_daily_domain import DailyBase
+from test_effort import FAKE_CODEX
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -20,7 +22,20 @@ class ServiceAddress(DailyBase):
     def setUp(self):
         super().setUp()
         configure(self.app, {'notification_policy': {'enabled': False}}, 'address-policy')
-        self.addCleanup(lambda: lifecycle.stop(self.app))
+        binary = Path(self.temp.name, 'codex')
+        binary.write_text(FAKE_CODEX.replace("log=Path(__file__).parent/'requests.jsonl'", "Path(__file__).with_name('codex.pid').write_text(str(os.getpid()))\nlog=Path(__file__).parent/'requests.jsonl'"))
+        binary.chmod(0o700)
+        from unittest.mock import patch
+        environment = patch.dict(os.environ, {'PATH': self.temp.name + os.pathsep + os.environ['PATH'], 'CODEX_HOME': self.temp.name})
+        environment.start(); self.addCleanup(environment.stop)
+        self.addCleanup(self.stop_fixture)
+
+    def stop_fixture(self):
+        lifecycle.stop(self.app)
+        pidfile = Path(self.temp.name, 'codex.pid')
+        if pidfile.exists():
+            with self.assertRaises(ProcessLookupError): os.kill(int(pidfile.read_text()), 0)
+
 
     def service(self, command):
         run = subprocess.run([sys.executable, '-B', '-m', 'day_attendant', '--json', '--state', self.temp.name,
@@ -88,6 +103,18 @@ class ServiceAddress(DailyBase):
             self.assertFalse(lifecycle.stop(self.app)['running'])
         self.assertFalse(lifecycle.status(self.app)['running'])
         self.assertTrue(lifecycle.start(self.app)['running'])
+
+
+class CleanupTests(unittest.TestCase):
+    def test_failed_test_stops_fixture_before_removing_state(self):
+        class FailingService(ServiceAddress):
+            def runTest(self):
+                self.service('start')
+                self.fail('intentional failure')
+        result = unittest.TestResult()
+        FailingService().run(result)
+        self.assertEqual(len(result.failures), 1)
+        self.assertEqual(result.errors, [])
 
 
 class ReceiptBoundaryTests(unittest.TestCase):

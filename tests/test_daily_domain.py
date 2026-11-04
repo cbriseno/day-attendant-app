@@ -16,10 +16,9 @@ from test_conversation import ChatFixture
 
 class DailyBase(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix='day-personal-test-')
+        self.temp=tempfile.TemporaryDirectory(prefix='day-personal-test-');self.addCleanup(self.temp.cleanup)
         self.app=Assistant(self.temp.name,clock=lambda:NOW);self.board=Connected(self.app,ReviewFixture())
         self.board.initialize(kind='personal',zone='America/Edmonton');self.counter=0
-    def tearDown(self):self.temp.cleanup()
     def request(self,action,payload):
         self.counter+=1;return self.board.request(action,payload,'daily-'+str(self.counter))
     def apply(self,action,payload):
