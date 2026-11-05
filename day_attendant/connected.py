@@ -16,6 +16,7 @@ import re
 import threading
 import uuid
 
+from .agent_mode import current as current_agent_mode, require_allowed
 from .errors import AssistantError
 from .profiles import turn_timeout
 from .service import PUBLIC_PRIORITY, Assistant, continuity_values, encoded, fingerprint, group_key, normalized_colors
@@ -260,6 +261,7 @@ class Connected:
                     con.execute("INSERT OR REPLACE INTO state VALUES('order_suggestion',?)",(encoded(suggestion),))
 
     def require_agent(self):
+        require_allowed(self.store, self.app.clock())
         if self.bridge is None or not getattr(self.bridge,'available',True):
             raise AssistantError('agent_unavailable','The assistant is unavailable. Known-data reminders still work.')
         profile=self.store.state_value('profile',{})
@@ -428,6 +430,7 @@ class Connected:
                 "diagnostics":{"operations":unresolved,"maintenance":maintenance,"reminders":transport_issues}, "epoch":self.store.epoch(),
                 "conversation":{'clearedAt':conversation.get('clearedAt')},
                 "operations_status":{"last_tick":self.store.state_value('last_tick'),'last_backup':self.store.state_value('last_backup'),'scheduler':self.store.state_value('scheduler')},
+                "agentMode": current_agent_mode(self.store, self.app.clock()),
                 "agent": {"provider":profile.get('harness'),'connected':  self.bridge is not None and getattr(self.bridge,'available',True) and getattr(self.bridge,'provider',profile.get('harness'))==profile.get('harness'),
                           "model": self.bridge.model if self.bridge else profile.get('model'),
                           "effort": getattr(self.bridge,'effort',None) if self.bridge else profile.get('effort'),

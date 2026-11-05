@@ -250,6 +250,10 @@ class Handler(BaseHTTPRequestHandler):
                 if set(body)!={'key'}:raise ValueError('fields')
                 result=self.server.chat.retry(body['key'])
                 if result['status']=='pending':self.server.pool.submit(self.server.run_chat,body['key'])
+            elif self.path=='/api/agent-mode':
+                if set(body)-{'mode','duration'}:raise ValueError('fields')
+                from .agent_mode import set_mode
+                result=set_mode(board.app,body['mode'],body.get('duration'))
             elif self.path=='/api/settings':
                 if set(body)-{'values','key','expected_revision'}:raise ValueError('fields')
                 result=configure(board.app,body['values'],body['key'],body.get('expected_revision'))
