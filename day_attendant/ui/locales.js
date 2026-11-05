@@ -834,3 +834,6 @@ Object.assign(globalThis.dayTranslations.es,{product_name:"Day Attendant",locale
 Object.assign(globalThis.dayTranslations.en,{"weekday_mon": "Mon", "weekday_tue": "Tue", "weekday_wed": "Wed", "weekday_thu": "Thu", "weekday_fri": "Fri", "weekday_sat": "Sat", "weekday_sun": "Sun", "source_general": "General", "source_chat": "Chat", "source_email": "Email", "source_ticket": "Ticket", "source_pr": "PR"});
 Object.assign(globalThis.dayTranslations.es,{"weekday_mon": "Lun", "weekday_tue": "Mar", "weekday_wed": "Mié", "weekday_thu": "Jue", "weekday_fri": "Vie", "weekday_sat": "Sáb", "weekday_sun": "Dom", "source_general": "General", "source_chat": "Chat", "source_email": "Correo", "source_ticket": "Ticket", "source_pr": "PR"});
 
+
+Object.assign(globalThis.dayTranslations.en,{next_up:"Up next",next_up_mark:"Mark as up next",next_up_remove:"Remove from up next"});
+Object.assign(globalThis.dayTranslations.es,{next_up:"Lo que sigue",next_up_mark:"Marcar para lo que sigue",next_up_remove:"Quitar de lo que sigue"});

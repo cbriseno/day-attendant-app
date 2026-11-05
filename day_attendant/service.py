@@ -287,7 +287,7 @@ class Assistant:
                     raise AssistantError("undo_conflict", "The responsibility changed after this fact; nothing was overwritten.")
                 changes = dict(p["patch"])
                 if isinstance(changes.get("project"),str):changes["project"]=[changes["project"]] if changes["project"] else None
-                if not changes or set(changes) - {"description", "priority", "due", "wait", "start", "status", "end", "depends", "project", "lastActive", "groupChanged"}:
+                if not changes or set(changes) - {"description", "priority", "due", "wait", "start", "status", "end", "depends", "project", "lastActive", "groupChanged", "nextUp"}:
                     raise AssistantError("invalid_restore", "The inverse exceeds the fields of that decision.")
                 if changes.get('start',row.get('start')) and changes.get('status',row['status'])=='pending':
                     by_id={item['uuid']:item for item in self.tasks.rows()}
@@ -304,7 +304,7 @@ class Assistant:
                     by_id = {item["uuid"]: item for item in self.tasks.rows()}
                     if self.blockers(row,by_id):
                         raise AssistantError("not_actionable", "The responsibility depends on another pending task.")
-                    changes = {"start": row.get("start") or wire(now), "wait": None}
+                    changes = {"start": row.get("start") or wire(now), "wait": None, "nextUp": None}
                 elif action == "front_todo":
                     changes = {"start": None, "wait": None}
                 else:
@@ -328,6 +328,10 @@ class Assistant:
                     if not p["title"].strip() or len(p["title"]) > 500:
                         raise AssistantError("invalid_title", "Invalid task title.")
                     changes["description"] = p["title"].strip()
+                if "nextUp" in p:
+                    if p["nextUp"] and (row["status"] != "pending" or row.get("start") or row.get("lastActive")):
+                        raise AssistantError("invalid_request", "Only tasks not yet started can be marked next up.")
+                    changes["nextUp"] = True if p["nextUp"] else None
                 if p.get("priority"):
                     changes["priority"] = PRIORITIES[p["priority"]]
                 if "due" in p:
@@ -704,7 +708,7 @@ class Assistant:
             elif status == "pending" and not self.actionable(row, by_id, connected):
                 status = "blocked"
             view.append({"uuid": uid, "title": row["description"], "status": status,
-                         "priority": PUBLIC_PRIORITY.get(row.get("priority"), "medium"),
+                         "priority": PUBLIC_PRIORITY.get(row.get("priority"), "medium"), "nextUp": bool(row.get("nextUp")),
                          "group": next(iter(row_groups(row)),None), "groups": row_groups(row),
                          "number": aliases.get(row["uuid"]), "startedAt": stamp(parse(row["start"])) if row.get("start") else None,
                          "lastActiveAt": stamp(parse(row["lastActive"])) if row.get("lastActive") else None,

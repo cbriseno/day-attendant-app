@@ -38,7 +38,7 @@ FOLLOWUP_PROMPT = """Look at changes the person already made. They are saved; yo
 
 ALLOWED = {
     "task_add": {"title", "priority", "due", "source", "zone", "person", "reference", "observed_at", "estimate_minutes", "remainingMinutes", "awaiting", "context", "next", "group", "groups"},
-    "task_update": {"uuid", "title", "priority", "due", "zone", "progress", "context", "next", "awaiting", "remainingMinutes", "group", "groups", "order"},
+    "task_update": {"uuid", "title", "nextUp", "priority", "due", "zone", "progress", "context", "next", "awaiting", "remainingMinutes", "group", "groups", "order"},
     "front_activate": {"uuid", "order"}, "front_todo": {"uuid", "order"}, "front_retire": {"uuid"},
     "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"},
     "context_update": {"availableMinutes", "availableUntil", "rest"},
@@ -341,7 +341,7 @@ class Connected:
             extra = continuation.get(row["uuid"], {})
             state = "done" if row["status"] == "completed" else "retired" if row["status"] == "deleted" else "snoozed" if row["status"] == "waiting" else "active" if row["focused"] else "todo"
             tasks.append({"id": row["uuid"], "title": row["title"], "state": state,
-                "priority": row["priority"], "group": row["group"], "groups": row["groups"], "number": row["number"],
+                "priority": row["priority"], "nextUp": row["nextUp"], "group": row["group"], "groups": row["groups"], "number": row["number"],
                 "startedAt":row["startedAt"], "lastActiveAt":row["lastActiveAt"], "groupChangedAt":row["groupChangedAt"], "createdAt": row["created_at"], "closedAt": row["closed_at"],
                 "due": row["due_at"], "until": row["snoozed_until"],
                 "blocked": bool(row['blockedBy']), "dependsOn":row['dependsOn'],"blockedBy":row['blockedBy'],
@@ -540,6 +540,8 @@ class Connected:
         for name in ('uuid','title','priority','due','until','start','end','observed_at','zone','source','person','reference','context','next','group','to'):
             if name in payload and payload[name] is not None and not isinstance(payload[name],str):
                 raise AssistantError('invalid_request','Text fields must contain strings.')
+        if "nextUp" in payload and type(payload["nextUp"]) is not bool:
+            raise AssistantError("invalid_request", "Next up must be true or false.")
         if payload.get('priority') is not None and payload['priority'] not in PRIORITIES:
             raise AssistantError('invalid_request','Invalid priority.')
         if 'source' in payload and payload['source'] not in ('general','ticket','pr','chat','email','call','research'):
