@@ -257,6 +257,10 @@ html[data-anon-loading] body,html[data-anon-loading] body *{visibility:hidden!im
  .title-wrap .assistant-mark{position:static;margin:0;width:28px;height:28px}
 }
 
+/* Keep narrow-screen controls ordered and task rows clear of the edges. */
+@media(max-width:600px){.appbar{position:relative}.appbar .app-controls{justify-content:flex-start}.appbar .app-controls #chat-toggle,.appbar .app-controls #settings-open{position:absolute;top:2px}.appbar .app-controls #settings-open{right:0}.appbar .app-controls #chat-toggle{right:44px}.filter-chip{display:inline-block;line-height:28px;padding-block:0}.filter-chip .group-dot{display:inline-block;vertical-align:middle;margin:-2px 5px 0 0}}
+@container tasks (max-width:600px){.board.is-list .row-main,.board:not(.is-list) .row-main{padding:4px 10px 4px 7px;column-gap:8px}.board.is-list .row-main{padding-block:3px}}
+
 /* #39 r8: six priorities as one hot→cool ramp. Hue + fill strength + a 4-bar meter, so the level never depends on colour alone.
    Fills mix each level's ink into the palette surface, so Grafito, Papel and Océano each get their own tint. */
 :root{--pr-high-hue:#f2741c;--pr-soon-hue:#f2c318;--pr-medium-hue:#4c74f0;--pr-urgent-fg:#fff;--pr-urgent-fill:#b42318;--pr-high-fg:#9c3b00;--pr-soon-fg:#7a5400;--pr-medium-fg:#2f4fb5;--pr-low-fg:#565c66;--pr-someday-fg:#6b6f77;--pr-tint-strong:24%;--pr-tint-soon:34%;--pr-tint:14%}
