@@ -55,6 +55,7 @@ function localizedDates(container=document){
 }
 const clockIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>';
 const chevronIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+const chainIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10M8 5h3a4 4 0 0 1 4 4v1"/></svg>';
 const arrowIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
 const gripIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></svg>';
 const checkIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
@@ -187,7 +188,10 @@ const GROUP_COLORS={purple:'var(--h2)',teal:'var(--h1)',brown:'var(--h9)',sky:'v
 const AUTO_COLORS=['purple','teal','brown','sky','pink','orange','indigo','green'];
 let groupColors={};
 const groupKey=globalThis.dayOrdering.key,taskGroups=globalThis.dayOrdering.groups;
-const groupColor=label=>label?groupColors[label.trim().toLowerCase()]||AUTO_COLORS[globalThis.dayOrdering.hue(groupKey(label))%AUTO_COLORS.length]:'gray';
+// «Trabajo/Taller» is the subgroup Taller inside Trabajo: it reads «Trabajo › Taller» and keeps Trabajo's color.
+const groupParent=label=>String(label||'').split('/')[0].trim(),groupSub=label=>String(label||'').includes('/')?String(label).slice(String(label).indexOf('/')+1).trim():'';
+const groupName=label=>groupSub(label)?groupParent(label)+' › '+groupSub(label):String(label||'');
+const groupColor=label=>{if(!label)return 'gray';const base=groupParent(label)||label;return groupColors[label.trim().toLowerCase()]||groupColors[base.toLowerCase()]||AUTO_COLORS[globalThis.dayOrdering.hue(groupKey(base))%AUTO_COLORS.length]};
 const groupStyle=label=>'--gc:'+GROUP_COLORS[groupColor(label)];
 const groupDot=label=>'<span class="group-dot" style="'+groupStyle(label)+'" aria-hidden="true"></span>';
 // Color changes update the existing rows and dots; replacing hundreds of cards would interrupt a click.
@@ -206,17 +210,18 @@ function paintGroupColor(data,key){groupColors=data.groupColors||{};const byId=n
 let groupFilter='*',foldedGroups=new Set();try{groupFilter=localStorage.getItem('day-attendant-group-filter')??'*';foldedGroups=new Set(JSON.parse(localStorage.getItem('day-attendant-folded-groups')||'[]'))}catch{}
 let searchText='';
 const matchesSearch=t=>!searchText||String(t.number)===searchText||t.title.toLocaleLowerCase().includes(searchText.toLocaleLowerCase());
-const shownByFilter=t=>matchesSearch(t)&&(groupFilter==='*'||taskGroups(t).some(g=>'group:'+groupKey(g)===groupFilter)||!taskGroups(t).length&&groupFilter==='group:');
+const shownByFilter=t=>matchesSearch(t)&&(groupFilter==='*'||taskGroups(t).some(g=>'group:'+groupKey(g)===groupFilter||'group:'+groupKey(groupParent(g))===groupFilter)||!taskGroups(t).length&&groupFilter==='group:');
 $('task-search').oninput=()=>{searchText=$('task-search').value.trim();renderGroupView()};
 function renderGroupView(){changingGroupView=true;try{render()}finally{changingGroupView=false}}
 function setGroupFilter(value){groupFilter=value;try{localStorage.setItem('day-attendant-group-filter',value)}catch{}
  renderGroupView()}
 function toggleFold(key){if(!foldedGroups.delete(key))foldedGroups.add(key);try{localStorage.setItem('day-attendant-folded-groups',JSON.stringify([...foldedGroups]))}catch{}
+ for(const sub of $('board').querySelectorAll('.group-sub[data-parent]'))if(sub.dataset.parent===key)sub.classList.toggle('parent-folded',foldedGroups.has(key));
  const section=[...$('board').querySelectorAll('.group-section')].find(s=>groupKey(s.dataset.group)===key);if(!section)return;
  for(const a of section.getAnimations({subtree:true}))a.cancel();const folded=foldedGroups.has(key),button=section.querySelector('[data-fold]');section.classList.toggle('collapsed',folded);button.setAttribute('aria-expanded',String(!folded));button.setAttribute('aria-label',tr(folded?'group_expand':'group_collapse').replace('{group}',section.querySelector('h2').textContent));section.querySelector('.group-folded').textContent=folded?' · '+tr('group_folded'):'';section.firstElementChild._html=null;drawDependencies()}
 function groupInventory(data=flow.snapshot()){const groups=new Map();for(const t of data.tasks)for(const label of taskGroups(t)){const key=groupKey(label),g=groups.get(key)||{label,n:0,recent:''};g.n++;g.recent=[g.recent,t.groupChangedAt||t.createdAt||''].sort().at(-1);groups.set(key,g)}return [...groups.values()]}
 function rankedGroups(data=flow.snapshot()){const all=groupInventory(data),used=[...all].sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label)),recent=[...all].sort((a,b)=>b.recent.localeCompare(a.recent));return [...new Map([...used.slice(0,2),...recent.filter(g=>!used.slice(0,2).includes(g)).slice(0,2),...used].map(g=>[groupKey(g.label),g])).values()]}
-function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired'].includes(t.state)),groups=groupInventory({...data,tasks:open}).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label));
+function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired'].includes(t.state)),groups=groupInventory({...data,tasks:open.map(t=>({...t,groups:[...new Set(taskGroups(t).map(groupParent))]}))}).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label));
  if(groupFilter==='group:'&&open.some(t=>!taskGroups(t).length))groups.push({label:'',n:open.filter(t=>!taskGroups(t).length).length});
  if(!groups.length)return '';
  const selected=groups.find(g=>'group:'+groupKey(g.label)===groupFilter),limit=innerWidth<=600?2:3,visible=groups.slice(0,limit);
@@ -229,16 +234,24 @@ function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired'].
 const STATE_RANK={active:0,todo:1,snoozed:2};
 const isNextUp=t=>t.nextUp&&['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt;
 function groupLanes(data,proposals){
- const open=data.tasks.filter(t=>t.state in STATE_RANK&&!isNextUp(t)&&matchesSearch(t));
- const lanes=globalThis.dayOrdering.arrange(open,'group',{order:localOrder||data.taskOrder||[],then:activeThen()}).map(s=>{
-  const key=groupKey(s.label),name=s.label||tr('no_group'),folded=foldedGroups.has(key),tasks=[...s.tasks].sort((a,b)=>STATE_RANK[a.state]-STATE_RANK[b.state]);
-  const members=data.tasks.filter(t=>t.state!=='retired'&&(taskGroups(t).some(g=>groupKey(g)===key)||!taskGroups(t).length&&!key)),done=members.filter(t=>t.state==='done').length,pct=members.length?Math.round(100*done/members.length):0;
+ const open=data.tasks.filter(t=>t.state in STATE_RANK&&(!isNextUp(t)||isBlocked(t))&&matchesSearch(t));
+ // Subgroups follow their parent, indented; a parent with only subgroups still gets its heading, and
+ // its count and progress include them. Folding the parent folds its subgroups too.
+ const sections=globalThis.dayOrdering.arrange(open,'group',{order:localOrder||data.taskOrder||[],then:activeThen()}),have=new Set(sections.map(s=>groupKey(s.label)));
+ for(const s of [...sections])if(groupSub(s.label)&&!have.has(groupKey(groupParent(s.label)))){have.add(groupKey(groupParent(s.label)));sections.push({key:'group:'+groupKey(groupParent(s.label)),label:groupParent(s.label),draggable:true,tasks:[]})}
+ const order=s=>[s.label===null?1:0,groupParent(s.label).toLocaleLowerCase(),groupSub(s.label)?1:0,groupSub(s.label).toLocaleLowerCase()];
+ sections.sort((a,b)=>{const x=order(a),y=order(b);for(let i=0;i<4;i++){if(x[i]<y[i])return -1;if(x[i]>y[i])return 1}return 0});
+ const lanes=sections.map(s=>{
+  const sub=groupSub(s.label),parentKey=groupKey(groupParent(s.label)),key=groupKey(s.label),name=s.label?(sub?'› '+sub:s.label):tr('no_group'),folded=foldedGroups.has(key),parentFolded=!!sub&&foldedGroups.has(parentKey);
+  const inParent=t=>taskGroups(t).some(g=>groupKey(g)===key||!sub&&groupKey(groupParent(g))===key);
+  const tasks=[...s.tasks].sort((a,b)=>STATE_RANK[a.state]-STATE_RANK[b.state]),count=sub?tasks.length:open.filter(inParent).length;
+  const members=data.tasks.filter(t=>t.state!=='retired'&&(inParent(t)||!taskGroups(t).length&&!key)),done=members.filter(t=>t.state==='done').length,pct=members.length?Math.round(100*done/members.length):0;
   const next=tasks.filter(t=>t.due).sort((a,b)=>new Date(a.due)-new Date(b.due))[0],progress=formatted('group_progress',{done,total:members.length});
   const head='<button type="button" class="ib fold" data-fold="'+esc(key)+'" aria-expanded="'+!folded+'" aria-label="'+esc(tr(folded?'group_expand':'group_collapse').replace('{group}',name))+'">'+chevronIcon+'</button>'
-   +'<h2'+(s.label?' data-anon-private="text" tabindex="0" aria-keyshortcuts="F2" data-rename-label="'+esc(s.label)+'" title="'+esc(tr('group_label_hint'))+'"':'')+'>'+(s.label?groupDot(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>')+esc(name)+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+tasks.length+'</span>'
+   +'<h2'+(s.label?' data-anon-private="text" tabindex="0" aria-keyshortcuts="F2" data-rename-label="'+esc(s.label)+'" title="'+esc(tr('group_label_hint'))+'"':'')+'>'+(s.label?groupDot(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>')+esc(name)+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+count+'</span>'
    +'<span class="group-progress" data-anon-safe="text title aria-label" role="progressbar" aria-valuemin="0" aria-valuemax="'+members.length+'" aria-valuenow="'+done+'" aria-label="'+esc(progress)+'"><i style="width:'+pct+'%"></i></span>'
    +'<span class="group-summary" data-anon-safe="text title aria-label">'+esc(progress)+(next?' · <span data-anon-safe="text title"'+(new Date(next.due)<NOW?' class="late"':'')+' title="'+esc(full(next.due))+'">'+esc(tr('group_next').replace('{time}',short(next.due)))+'</span>':'')+'<span class="group-folded">'+(folded?' · '+esc(tr('group_folded')):'')+'</span></span>';
-  return {id:'group:'+key,cls:' group-section'+(folded?' collapsed':'')+(groupFilter!=='*'&&groupFilter!=='group:'+key?' filtered':''),attrs:' data-group="'+esc(s.label||'')+'"',style:s.label?groupStyle(s.label):'',head,
+  return {id:'group:'+key,cls:' group-section'+(sub?' group-sub'+(parentFolded?' parent-folded':''):'')+(folded?' collapsed':'')+(groupFilter!=='*'&&groupFilter!=='group:'+key&&groupFilter!=='group:'+parentKey?' filtered':''),attrs:' data-group="'+esc(s.label||'')+'"'+(sub?' data-parent="'+esc(parentKey)+'"':''),style:s.label?groupStyle(s.label):'',head,
    items:tasks.map(t=>({id:t.id,rowKey:t.id+'|'+s.key,html:taskRow(t,{...s,key:s.key},data,proposals.find(p=>p.intent.taskId===t.id))}))};
  });
  return lanes.length?lanes:[{id:'group:none',head:'',items:[{key:'empty',html:'<p class="lane-empty">'+esc(tr('lane_empty'))+'</p>'}]}];
@@ -254,6 +267,95 @@ function blockMenu(t,data){const off=data.readOnly||t.pending,ideas=['block_idea
   +'<div class="block-ideas">'+ideas.map(i=>'<button type="button" class="block-idea" data-menu-act="block-idea" data-value="'+esc(i)+'"'+(off?' disabled':'')+'>'+esc(i)+'</button>').join('')+'</div><p class="menu-error" role="alert" hidden></p>'
   +'<div class="menu-confirm-actions">'+(t.blockReason?'<button type="button" class="btn ghost" data-menu-act="block-clear"'+(off?' disabled':'')+'>'+esc(tr('block_clear'))+'</button>':'')+'<button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn primary" data-menu-act="block-save"'+(off?' disabled':'')+'>'+esc(tr('block_save'))+'</button></div>'}
 function focusBlockInput(){const i=menu?.node.querySelector('[data-menu-input=block]');if(i){i.focus({preventScroll:true});i.select()}}
+// Today in dependency order, read as straight lines: one section per goal (a task nothing else waits
+// for) listing, step by step, what to finish to reach it. A prerequisite shared by several goals is
+// repeated in each line, marked as such; it is the same task, so finishing it updates every line.
+const CHAIN_FREE='~sin-cadena';try{if(!localStorage.getItem('day-attendant-chains-seen')){foldedGroups.add(CHAIN_FREE);localStorage.setItem('day-attendant-folded-groups',JSON.stringify([...foldedGroups]));localStorage.setItem('day-attendant-chains-seen','1')}}catch{}
+// Each «blocks» relation inside a chain is drawn as its own thin connector between the numbered dots.
+function drawChainLinks(){
+ for(const box of document.querySelectorAll('.chain-section .lane-cards')){
+  box.querySelector(':scope>.chain-links')?.remove();
+  const steps=[...box.querySelectorAll(':scope>.chain-step')];if(steps.length<2)continue;
+  const top=box.getBoundingClientRect().top,dot=n=>{const r=steps[n-1].getBoundingClientRect();return r.top-top+r.height/2};
+  let paths='';
+  for(const [i,row] of steps.entries())for(const n of (row.dataset.unlocks||'').split(',').filter(Boolean).map(Number)){
+   const x=(parseFloat(getComputedStyle(row,'::before').left)||9)+9,y1=dot(i+1)+9,y2=dot(n)-9,bend=n-(i+1)>1?x-4:0;
+   paths+=bend?'<path d="M'+x+' '+y1+' C'+(x-bend)+' '+(y1+8)+' '+(x-bend)+' '+(y2-8)+' '+x+' '+y2+'"/>':'<path d="M'+x+' '+y1+' L'+x+' '+y2+'"/>';
+   paths+='<path class="tip" d="M'+(x-3)+' '+(y2-4)+' L'+x+' '+y2+' L'+(x+3)+' '+(y2-4)+'"/>';
+  }
+  box.style.position='relative';
+  box.insertAdjacentHTML('afterbegin','<svg class="chain-links" aria-hidden="true" style="position:absolute;left:0;top:0;width:30px;height:'+box.scrollHeight+'px">'+paths+'</svg>');
+ }
+}
+new ResizeObserver(()=>requestAnimationFrame(drawChainLinks)).observe($('board'));
+$('board').addEventListener('click',e=>{const b=e.target.closest('[data-chain-jump]');if(!b)return;e.preventDefault();e.stopPropagation();
+ const target=[...document.querySelectorAll('.chain-section')].find(s=>s.dataset.group===b.dataset.chainJump);if(!target)return;
+ target.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+ target.classList.remove('chain-flash');void target.offsetWidth;target.classList.add('chain-flash');target.querySelector('h2')?.setAttribute('tabindex','-1');target.querySelector('h2')?.focus({preventScroll:true})},true);
+function chainLanes(data,proposals){
+ const open=data.tasks.filter(t=>t.state in STATE_RANK),done=data.tasks.filter(t=>t.state==='done'),byId=new Map([...open,...done].map(t=>[t.id,t]));
+ const isDone=t=>t.state==='done',linksOf=t=>[...new Set([...(t.dependsOn||[]),...(t.blockedBy||[])])].filter(id=>byId.has(id)&&id!==t.id);
+ // Closed prerequisites stay in their chain as finished steps; only open ones still make a step wait.
+ const prereqs=t=>linksOf(t),waitsOn=t=>linksOf(t).filter(id=>!isDone(byId.get(id)));
+ const after=new Map([...byId.keys()].map(id=>[id,[]]));for(const t of byId.values())for(const p of prereqs(t))after.get(p).push(t.id);
+ const openAfter=id=>after.get(id).filter(x=>!isDone(byId.get(x)));
+ const rank=(a,b)=>(isDone(b)-isDone(a))||String(a.closedAt||'').localeCompare(String(b.closedAt||''))||STATE_RANK[a.state]-STATE_RANK[b.state]||PRIORITIES.indexOf(a.priority)-PRIORITIES.indexOf(b.priority)||(a.due||'~').localeCompare(b.due||'~')||a.id.localeCompare(b.id);
+ const goals=open.filter(t=>prereqs(t).length&&!openAfter(t.id).length).sort(rank),free=open.filter(t=>!prereqs(t).length&&!openAfter(t.id).length).sort(rank);
+ const lines=goals.map(goal=>{const set=new Set(),stack=[goal.id];while(stack.length){const id=stack.pop();if(set.has(id))continue;set.add(id);stack.push(...prereqs(byId.get(id)))}
+  // Prerequisites first; among the steps that are free at each point, the most pressing first.
+  const steps=[],done=new Set();while(steps.length<set.size){const ready=[...set].filter(id=>!done.has(id)&&prereqs(byId.get(id)).every(p=>done.has(p))).map(id=>byId.get(id)).filter(t=>t!==goal||done.size===set.size-1).sort(rank);
+   const next=ready[0]||[...set].map(id=>byId.get(id)).find(t=>!done.has(t.id));done.add(next.id);steps.push(next)}
+  return {goal,steps}});
+ const uses=new Map();for(const l of lines)for(const t of l.steps)uses.set(t.id,(uses.get(t.id)||0)+1);
+ const chainOf=id=>lines.find(l=>l.goal.id===id)||lines.find(l=>l.steps.some(t=>t.id===id)),andList=ns=>ns.length>1?ns.slice(0,-1).join(', ')+' '+tr('chain_and')+' '+ns[ns.length-1]:String(ns[0]);
+ const lanes=lines.map(({goal,steps})=>{const key='chain:'+goal.id,index=new Map(steps.map((t,i)=>[t.id,i+1]));let first=true;
+  const items=steps.map((t,i)=>{if(isDone(t))return {id:t.id,rowKey:t.id+'|'+key,html:doneStep(t,i,steps.length)};
+   const waits=waitsOn(t).map(id=>index.get(id)).sort((a,b)=>a-b),ready=!waits.length,isGoal=t===goal,now=ready&&first;if(now)first=false;
+   let html=taskRow(t,{key,label:null,draggable:false},data,proposals.find(p=>p.intent.taskId===t.id));
+   // Counts here describe only what this chain shows; links outside it name the other chain instead.
+   html=html.replace(/<button type="button" class="dependency-chip[^>]*>[^<]*<\/button>/g,'');
+   const unlocks=openAfter(t.id),inside=unlocks.map(id=>index.get(id)).filter(Boolean).sort((a,b)=>a-b),outside=unlocks.filter(id=>!index.has(id));
+   const jump=(target,label,hint)=>'<button type="button" class="chain-jump" data-chain-jump="'+esc('chain:'+target.goal.id)+'" title="'+esc(hint)+'" aria-label="'+esc(hint)+'"><span data-anon-private="text">'+esc(label)+'</span> ↗</button>';
+   const others=lines.filter(l=>l.goal!==goal&&l.steps.some(x=>x.id===t.id));
+   const unlockTag=(inside.length?'<span class="chain-unlocks" data-anon-safe="text">'+esc(tr(inside.length>1?'chain_unlocks_many':'chain_unlocks').replace('{steps}',andList(inside)))+'</span>':'')
+    +outside.map(id=>{const target=chainOf(id),title=byId.get(id).title;return jump(target,tr(inside.length?'chain_also_unlocks':'chain_only_unlocks').replace('{title}',title),tr('chain_jump_hint').replace('{title}',target.goal.title))}).join('')
+    +(!outside.length&&others.length?others.map(o=>jump(o,tr('chain_also_in').replace('{title}',o.goal.title),tr('chain_jump_hint').replace('{title}',o.goal.title))).join(''):'');
+   html=html.replace('<article class="task','<article data-step="'+(i+1)+'" data-unlocks="'+inside.join(',')+'" class="task chain-step'+(now?' chain-now':'')+(ready?' chain-ready':' chain-waiting')+(isGoal?' chain-goal':'')+(i===steps.length-1?' chain-last':''));
+   const tag='<span class="chain-step-label" data-anon-safe="text">'+esc(formatted('chain_step',{n:i+1}))+'</span>'
+    +(now?'<span class="chain-start" data-anon-safe="text">'+esc(tr(t.state==='active'?'chain_doing':'chain_start_here'))+'</span>':ready?'<span class="chain-start soft" data-anon-safe="text">'+esc(tr('chain_free_now'))+'</span>':'<span class="chain-wait" data-anon-safe="text">'+esc(tr(waits.length>1?'chain_waits_many':'chain_waits').replace('{steps}',andList(waits)))+'</span>')
+    +(isGoal?'<span class="chain-goal-label" data-anon-safe="text">'+esc(tr('chain_goal'))+'</span>':'')
+    +unlockTag;
+   html=html.replace('<span class="row-meta">','<span class="row-meta">'+tag);
+   if(waits.length)html=html.replace(/(data-action="done"[^>]*?title=")([^"]*)"/,(m,pre,title)=>pre+title+' · '+esc(tr(waits.length>1?'chain_waits_many':'chain_waits').replace('{steps}',andList(waits)))+'"').replace('class="check"','class="check chain-check-waits"');
+   return {id:t.id,rowKey:t.id+'|'+key,html}});
+  const groups=[...new Map(steps.flatMap(taskGroups).map(g=>[groupKey(groupParent(g)),groupParent(g)])).values()],ready=steps.filter(t=>!isDone(t)&&!waitsOn(t).length).length,finished=steps.filter(isDone).length;
+  const name=tr('chain_title').replace('{title}',goal.title);
+  const head='<span class="chain-icon" aria-hidden="true">'+chainIcon+'</span><h2 data-anon-private="text">'+esc(name)+'</h2>'
+   +'<span class="group-summary" data-anon-safe="text title aria-label">'+esc(finished?formatted('chain_progress',{done:finished,n:steps.length}):formatted('chain_steps',{n:steps.length}))+' · '+esc(formatted(ready===1?'chain_ready_one':'chain_ready',{n:ready}))+(groups.length>1?' · '+esc(tr('chain_crosses'))+' '+groups.map(g=>'<span class="chain-group" data-anon-private="text">'+groupDot(g)+esc(g)+'</span>').join(' '):'')+'</span>';
+  return {id:key,cls:' group-section chain-section'+(steps.some(t=>!isDone(t)&&shownByFilter(t))?'':' filtered'),attrs:' data-group="'+esc(key)+'" aria-label="'+esc(name)+'"',head,items}});
+ const intro={id:'chains:intro',cls:' chain-intro-lane',head:'',items:[{key:'intro',html:'<p class="focus-intro chain-intro" data-anon-safe="text title aria-label">'+esc(tr(lines.length?'chain_intro':'chain_empty'))+'</p>'}]};
+ // With no lines at all the loose tasks are the whole view: shown open, without a fold to toggle.
+ const foldable=!!lines.length,folded=foldable&&foldedGroups.has(CHAIN_FREE),shownFree=free.filter(shownByFilter);
+ const freeLane=shownFree.length?[{id:'chain:free',cls:' group-section chain-free'+(folded?' collapsed':''),attrs:' data-group="'+CHAIN_FREE+'"',
+  head:(foldable?'<button type="button" class="ib fold" data-fold="'+CHAIN_FREE+'" aria-expanded="'+!folded+'" aria-label="'+esc(tr(folded?'group_expand':'group_collapse').replace('{group}',tr('chain_free')))+'">'+chevronIcon+'</button>':'')+'<h2>'+esc(tr('chain_free'))+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+shownFree.length+'</span><span class="group-summary" data-anon-safe="text title aria-label">'+esc(tr('chain_free_hint'))+'<span class="group-folded">'+(folded?' · '+esc(tr('group_folded')):'')+'</span></span>',
+  items:shownFree.map(t=>({id:t.id,rowKey:t.id+'|chain:free',html:taskRow(t,{key:'chain:free',label:null,draggable:false},data,proposals.find(p=>p.intent.taskId===t.id))}))}]:[];
+ const justDone=chainJustDone&&byId.get(chainJustDone.id),freed=justDone&&isDone(justDone)?openAfter(justDone.id).map(id=>byId.get(id)).filter(t=>!waitsOn(t).length):[];
+ const notice=justDone&&isDone(justDone)?[{id:'chains:notice',cls:' chain-intro-lane',head:'',items:[{key:'notice',html:'<p class="chain-notice" role="status" data-anon-safe="aria-label">'+checkIcon+'<span data-anon-private="text">'+esc(freed.length?tr('chain_done_freed').replace('{title}',justDone.title).replace('{next}',freed.map(t=>t.title).join('», «')):tr('chain_done_plain').replace('{title}',justDone.title))+'</span><button type="button" class="ib" data-chain-notice-close aria-label="'+esc(tr('close'))+'" title="'+esc(tr('close'))+'">×</button></p>'}]}]:[];
+ return [intro,...notice,...lanes,...freeLane];
+}
+// A finished prerequisite keeps its place in the chain: checked, muted, with when it was done.
+function doneStep(t,i,total){
+ const when=t.closedAt&&Number.isFinite(Date.parse(t.closedAt))?(localValue(new Date(t.closedAt)).slice(0,10)===localValue(NOW).slice(0,10)?tr('chain_done_today'):tr('chain_done_on').replace('{date}',short(t.closedAt))):tr('chain_done_today');
+ return '<article data-step="'+(i+1)+'" data-unlocks="" class="task chain-step chain-done'+(i===total-1?' chain-last':'')+'" data-task-id="'+t.id+'"><div class="row-main"><span class="row-grip"></span>'
+  +'<span class="check done-check" aria-hidden="true"><span class="box">'+checkIcon+'</span></span>'
+  +'<div class="row-text"><s class="task-title" data-anon-private="text">'+esc(t.title)+'</s><span class="row-meta"><span class="chain-step-label" data-anon-safe="text">'+esc(formatted('chain_step',{n:i+1}))+'</span><span class="chain-done-label" data-anon-safe="text">'+esc(when)+'</span></span></div></div></article>'}
+let chainJustDone=null;
+// In this view, finishing a step says what it frees; finishing one that still waits asks first (#32 makes that a hard rule).
+$('board').addEventListener('click',e=>{if(orderView!=='chains')return;const close=e.target.closest('[data-chain-notice-close]');if(close){e.stopPropagation();chainJustDone=null;render();return}
+ const b=e.target.closest('[data-action="done"]');if(!b)return;const data=flow.snapshot(),t=data.tasks.find(x=>x.id===b.dataset.id);if(!t)return;
+ const waiting=(t.dependsOn||[]).map(id=>data.tasks.find(x=>x.id===id)).filter(x=>x&&!['done','retired'].includes(x.state));
+ if(waiting.length)return
+ chainJustDone={id:t.id}},true);
 const PRIORITIES=globalThis.dayOrdering.PRIORITIES;
 function priorityButton(t,off){return '<button type="button" class="priority-pill" data-priority="'+esc(t.priority)+'" data-id="'+t.id+'" data-action="priority" aria-haspopup="menu" aria-expanded="false" title="'+esc(tr('change_priority'))+'"'+(off?' disabled':'')+'><span class="visually-hidden">'+esc(tr('priority'))+': </span>'+esc(tr('priority_'+t.priority))+'</button>'}
 // One compact row per task: handle · finish · title and its data · priority · start or pause · snooze · more.
@@ -312,7 +414,7 @@ function focusLanes(data){const selected=globalThis.dayOrdering.focus(data.tasks
 function rowMeta(t,data,proposal,s={}){const time=(key,value,cls)=>'<span data-anon-safe="text title" class="'+cls+'" title="'+esc(full(value))+'">'+esc(tr(key).replace('{time}',short(value)))+'</span>';
  const off=data.readOnly||t.pending,menuButton=(action,cls,content,hint)=>'<button type="button" class="'+cls+'"'+(action==='due'?' data-anon-safe="text title"':'')+' data-id="'+t.id+'" data-action="'+action+'" aria-haspopup="menu" aria-expanded="false" title="'+esc(hint)+'"'+(off?' disabled':'')+'>'+content+'</button>';
  // Under group headings the chip is plain, without the dot the heading already shows.
- const groups=taskGroups(t),shown=groups.filter(g=>orderView!=='group'||groupKey(g)!==groupKey(s.label)),chips=shown.slice(0,2).map(g=>'<button type="button" class="group-chip" data-anon-private="text" data-id="'+t.id+'" data-action="group" data-group-name="'+esc(g)+'" data-rename-label="'+esc(g)+'" aria-haspopup="menu" aria-keyshortcuts="F2" title="'+esc(tr('group_chip_hint'))+'"'+(off?' disabled':'')+'>'+groupDot(g)+esc(g)+'</button>').join('');
+ const groups=taskGroups(t),shown=groups.filter(g=>orderView!=='group'||groupKey(g)!==groupKey(s.label)),chips=shown.slice(0,2).map(g=>'<button type="button" class="group-chip" data-anon-private="text" data-id="'+t.id+'" data-action="group" data-group-name="'+esc(g)+'" data-rename-label="'+esc(g)+'" aria-haspopup="menu" aria-keyshortcuts="F2" title="'+esc(tr('group_chip_hint'))+'"'+(off?' disabled':'')+'>'+groupDot(g)+esc(groupName(g))+'</button>').join('');
  return numberButton(t)+(orderView==='group'&&shown.length?'<span>'+esc(tr('also_in'))+'</span>':'')+chips+(shown.length>2?menuButton('group','group-chip','<span data-anon-safe="text">+'+(shown.length-2)+'</span>',tr('change_group')):'')+(!groups.length?menuButton('group','group-chip add','+ '+esc(tr('add_group_chip')),tr('add_group')):'')
   +(t.due?menuButton('due','task-due'+(new Date(t.due)<NOW?' late':''),esc(tr(new Date(t.due)<NOW?'meta_overdue':'meta_due').replace('{time}',short(t.due))),full(t.due)+' · '+tr('change_deadline')):'')
   +(t.until?time('meta_resumes',t.until,'task-wait'):'')
@@ -558,8 +660,8 @@ function render(data=flow.snapshot()) {
  const typing=typingState();rendering=true;startRows(data);
  const marked=data.tasks.filter(t=>isNextUp(t)&&!isBlocked(t)&&shownByFilter(t));
  const nextLane=marked.length?[{id:'next-up',head:'<h2>'+esc(tr('next_up'))+'</h2><span class="lane-count">'+marked.length+'</span>',items:marked.map(t=>({id:t.id,rowKey:t.id+'|next-up',html:taskRow(t,{key:'next-up',draggable:false},data,proposals.find(p=>p.intent.taskId===t.id))}))}]:[];
- morphBoard(taskView==='focus'?focusLanes(data):[...nextLane,...(orderView==='group'&&$('board').classList.contains('is-list')?groupLanes(data,proposals):[['active',tr("active")],['todo',tr("to_do")],['blocked',tr("lane_blocked")],['snoozed',tr("snoozed")]].map(([state,label])=>{
-  const rows=data.tasks.filter(t=>t.state===state&&!isNextUp(t)&&!isBlocked(t)&&shownByFilter(t)),sections=globalThis.dayOrdering.arrange(rows,orderView,{order:localOrder||data.taskOrder||[],suggestion:data.orderSuggestion?.result,then:activeThen()});
+ morphBoard(taskView==='focus'?focusLanes(data):orderView==='chains'&&$('board').classList.contains('is-list')?chainLanes(data,proposals):[...nextLane,...(orderView==='group'&&$('board').classList.contains('is-list')?groupLanes(data,proposals):[['active',tr("active")],['todo',tr("to_do")],['blocked',tr("lane_blocked")],['snoozed',tr("snoozed")]].map(([state,label])=>{
+  const rows=data.tasks.filter(t=>(state==='blocked'?t.state==='todo'&&isBlocked(t):state==='todo'?t.state==='todo'&&!isBlocked(t):t.state===state)&&(!isNextUp(t)||isBlocked(t))&&shownByFilter(t)),sections=globalThis.dayOrdering.arrange(rows,orderView,{order:localOrder||data.taskOrder||[],suggestion:data.orderSuggestion?.result,then:activeThen()});
   const items=sections.flatMap(s=>[...(orderView==='group'?[{key:'heading:'+s.key,html:groupHeading(s)}]:[]),...s.tasks.map(t=>({id:t.id,rowKey:t.id+'|'+state+'|'+s.key,html:taskRow(t,s,data,proposals.find(p=>p.intent.taskId===t.id))}))]);
   if(!rows.length)items.push({key:'empty',html:'<p class="lane-empty">'+esc(tr(state==='blocked'?'lane_blocked_empty':'lane_empty'))+'</p>'});
   return {state,head:'<span class="state-dot" aria-hidden="true"></span><h2>'+label+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+rows.length+'</span>',items};
@@ -567,7 +669,7 @@ function render(data=flow.snapshot()) {
  // A focused control whose card moved keeps its focus.
  if(active?.isConnected&&active!==document.activeElement&&$('board').contains(active))active.focus({preventScroll:true});
  restoreTyping(typing);rendering=false;
- showDependencies(data);
+ showDependencies(data);drawChainLinks();
  renderClosed(data);
  // Only changes waiting for the person appear here: a retire from the conversation, or one an older
  // version left unapplied. Direct actions never wait.
@@ -844,7 +946,7 @@ function moreMenu(t,data){const off=data.readOnly||t.pending,card=cardOf(t.id),i
 function groupMenu(t,data,selected){const off=data.readOnly||t.pending,groups=rankedGroups(data).map(g=>g.label),current=selected||taskGroups(t)[0];
  return '<p class="menu-title">'+esc(tr('groups_open'))+'</p>'+(current?menuItem('group-rename',esc(tr('rename_group'))+' · '+esc(current),{value:current,disabled:off}):'')
   +'<div class="menu-form"><input type="text" class="menu-input" data-menu-input="group" maxlength="120" autocomplete="off" placeholder="'+esc(tr('group_search_create'))+'" aria-label="'+esc(tr('group_search_create'))+'"'+(off?' disabled':'')+'></div>'
-  +'<div class="menu-scroll">'+groups.map(g=>menuItem('group-toggle',groupDot(g)+esc(g),{value:g,checked:taskGroups(t).some(x=>groupKey(x)===groupKey(g)),disabled:off}).replace('menuitemradio','menuitemcheckbox')).join('')+'</div><p class="menu-error" role="alert" hidden></p>'
+  +'<div class="menu-scroll">'+groups.map(g=>menuItem('group-toggle',groupDot(g)+esc(groupName(g)),{value:g,checked:taskGroups(t).some(x=>groupKey(x)===groupKey(g)),disabled:off}).replace('menuitemradio','menuitemcheckbox')).join('')+'</div><p class="menu-error" role="alert" hidden></p>'
   +(current?'<div class="menu-sep" role="separator"></div><p class="menu-title">'+esc(tr('group_color_of').replace('{group}',current))+'</p><div class="swatches">'+Object.keys(GROUP_COLORS).map(c=>'<button type="button" class="swatch" role="menuitemradio" aria-checked="'+(groupColor(current)===c)+'" data-menu-act="group-color" data-group-name="'+esc(current)+'" data-value="'+c+'" style="--c:'+GROUP_COLORS[c]+'" aria-label="'+esc(tr('color_'+c))+'"'+(off?' disabled':'')+'></button>').join('')+'</div>':'')}
 function groupDialog(title,body,origin){const d=document.createElement('dialog');d.className='group-dialog';d.innerHTML='<form class="modal-form"><header class="modal-header"><h2>'+esc(title)+'</h2><button type="button" class="btn ghost" data-dismiss aria-label="'+esc(tr('close'))+'">×</button></header><div class="modal-body">'+body+'<p class="error" role="alert" hidden></p></div></form>';document.body.append(d);registerDialog(d);d.querySelector('[data-dismiss]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());openDialog(d,origin);return d}
 const renameViews=new Map();try{for(const [k,v] of JSON.parse(sessionStorage.getItem('day-attendant-rename-views')||'[]'))renameViews.set(k,v)}catch{}

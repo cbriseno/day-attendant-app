@@ -14,7 +14,7 @@ const task=(id,priority,extra={})=>({id,priority,group:null,due:null,createdAt:'
 const plain=value=>JSON.parse(JSON.stringify(value));
 const ids=sections=>plain(sections.flatMap(s=>s.tasks.map(t=>t.id)));
 
-assert.deepEqual(plain(VIEWS),['priority','manual','newest','group','suggested']);
+assert.deepEqual(plain(VIEWS),['priority','manual','newest','group','chains','suggested']);
 const a=task('a','low',{createdAt:'2026-10-01T00:00:00Z',group:'Move'}),b=task('b','high',{createdAt:'2026-10-03T00:00:00Z',due:'2026-10-30T00:00:00Z'}),
  c=task('c','high',{createdAt:'2026-10-02T00:00:00Z',group:'home'}),d=task('d','medium',{createdAt:'2026-10-04T00:00:00Z',group:'Home'}),
  e=task('e','high',{createdAt:'2026-10-05T00:00:00Z',group:'move'});

@@ -1,7 +1,7 @@
 /* Display order only: no view changes a task's stored priority, group or state. */
 (() => {
 'use strict';
-const VIEWS=['priority','manual','newest','group','suggested'];
+const VIEWS=['priority','manual','newest','group','chains','suggested'];
 // A second key orders tasks inside each section of Priority or Group; 'manual' keeps the drag order.
 const THEN=['manual','priority','due','title','newest'],THEN_VIEWS=['priority','group'];
 // Most pressing first; an unknown value sorts and groups as medium.
