@@ -45,7 +45,7 @@ class Store:
         self.idle, self.idle_lock = [], threading.Lock()
         with exclusive(self.lock_path), self.connect() as con:
             version = con.execute("PRAGMA user_version").fetchone()[0]
-            if version > 4:
+            if version > 5:
                 raise AssistantError("newer_schema", "The state requires a newer assistant version.")
             if version == 0:
                 con.executescript('''
@@ -104,6 +104,11 @@ class Store:
             settled = not con.in_transaction
         finally:
             release(self, con, settled)
+
+    def schedules(self):
+        with self.connect() as con:
+            if con.execute('PRAGMA user_version').fetchone()[0] < 5:return {}
+            return {row['uuid']: json.loads(row['data']) for row in con.execute('SELECT uuid,data FROM task_schedules')}
 
     def lock(self):
         return exclusive(self.lock_path)

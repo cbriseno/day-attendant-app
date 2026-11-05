@@ -194,7 +194,7 @@ def verify(filename):
             if 'manifest.json' not in names:raise ValueError('manifest missing')
             if archive.getinfo('manifest.json').file_size>2*1024*1024:raise ValueError('manifest too large')
             manifest=json.loads(archive.read('manifest.json'))
-            if manifest.get('format') not in (1,FORMAT) or manifest.get('application')!='Day Attendant' or manifest.get('state_schema') not in (3,4):raise ValueError('unsupported format')
+            if manifest.get('format') not in (1,FORMAT) or manifest.get('application')!='Day Attendant' or manifest.get('state_schema') not in (3,4,5):raise ValueError('unsupported format')
             files=manifest['files']
             base=BASE_FILES if manifest['format']==FORMAT else LEGACY_FILES
             backend='python-sqlite' if manifest['format']==FORMAT else 'taskwarrior'
@@ -331,13 +331,13 @@ def upgrade_profile(state):
     app=Assistant(preflight(state))
     with exclusive(app.store.path/'server.lock',timeout=0):
         with app.store.connect() as con:version=con.execute('PRAGMA user_version').fetchone()[0]
-        if version not in (3,4) or version==3 and not app.store.state_value('connected',False):raise AssistantError('unsupported_migration','Only the known connected v3 profile is upgraded automatically; legacy data is not imported.')
+        if version not in (3,4,5) or version in (3,4) and not app.store.state_value('connected',False):raise AssistantError('unsupported_migration','Only known connected v3 and v4 profiles are upgraded automatically; legacy data is not imported.')
         backup=None
-        if version==3:
+        if version in (3,4):
             backup=snapshot(app,category='migration')
             Connected(app).initialize(_upgrade_backup=backup['path'])
         tasks=upgrade_tasks(app)
-        return {'upgraded':bool(backup or tasks),'schema':4,'task_schema':app.tasks.schema(),'profile':app.store.state_value('profile'),'backup':backup,'priority_migration':tasks}
+        return {'upgraded':bool(backup or tasks),'schema':5,'task_schema':app.tasks.schema(),'profile':app.store.state_value('profile'),'backup':backup,'priority_migration':tasks}
 
 
 def prune(folder,profile_id):

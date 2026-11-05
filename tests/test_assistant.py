@@ -259,7 +259,9 @@ app.mutate(sys.argv[2],json.loads(sys.argv[3]),sys.argv[4],app.store.revision() 
             row = con.execute("SELECT status,attempts FROM notices").fetchone()
             self.assertEqual(tuple(row), ("failed", 3))
         self.clock.advance(days=1)
-        self.assertEqual(self.app.notify()["attempts"], [])
+        self.assertEqual(len(self.app.notify()["attempts"]), 1)
+        with self.app.store.connect() as con:
+            self.assertEqual(sorted(tuple(r) for r in con.execute("SELECT kind,status FROM notices")), [("due", "obsolete"), ("overdue", "pending")])
 
     def test_notifier_runs_without_writer_lock_or_write_transaction(self):
         self.add(due="2026-10-28T12:30Z")

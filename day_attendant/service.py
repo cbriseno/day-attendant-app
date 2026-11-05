@@ -11,6 +11,7 @@ from . import platforms
 from .store import Store, DEFAULTS
 from .taskstore import PRIORITIES, TaskStore, canonical
 from .timeutil import instant, parse, stamp, utcnow, wire
+from . import schedules
 
 PUBLIC_PRIORITY = {v: k for k, v in PRIORITIES.items()}
 PRIORITY_RANK = {name: rank for rank, name in enumerate(PRIORITIES)}
@@ -339,6 +340,12 @@ class Assistant:
                 if row['status'] != 'completed' and self.blockers(row, {item['uuid']: item for item in self.tasks.rows()}):
                     raise AssistantError('not_actionable', 'Complete the pending prerequisites first.')
                 changes = {} if row['status']=='completed' else {"status": "completed", "end": wire(now), "start": None, "wait": None}
+                repeat=(self.store.schedules().get(row['uuid']) or {}).get('repeat')
+                if repeat and row['status']=='pending':
+                    # A repeating responsibility stays open: completing it moves it to its next occurrence.
+                    following=schedules.next_due(stamp(parse(row['due'])) if row.get('due') else None,repeat,self.store.state_value('timezone','UTC'),self.clock())
+                    changes={"due":wire(following),"start":None,"wait":None}
+                    repeated_to=following
             elif action == "task_snooze":
                 if row["status"] != "pending":
                     raise AssistantError("terminal_task", "Only pending tasks can be snoozed.")
@@ -379,6 +386,13 @@ class Assistant:
                 changes["lastActive"]=row["start"]
             patch(row, changes)
             plan["result"] = {"uuid": row["uuid"]}
+            if action == 'task_done' and locals().get('repeated_to'):
+                plan['result']['repeated'] = repeated_to
+                with self.store.connect() as con:
+                    record=con.execute('SELECT data FROM continuity WHERE uuid=?',(row['uuid'],)).fetchone()
+                continuity=json.loads(record[0]) if record else {}
+                if continuity.get('checklist'):
+                    plan['effect']['continuity_set']=[row['uuid'],{'checklist':[dict(item,done=False) for item in continuity['checklist']]},now]
             if action == "task_restore":
                 # A propagated raise is undone with its task, each blocker only if nothing touched it since.
                 for item in p.get("also") or []:
@@ -390,6 +404,11 @@ class Assistant:
                     patch(other, dict(item["patch"]))
             if action == "task_update" and "priority" in changes and row["status"] == "pending":
                 self.raise_blockers(row, changes["priority"], patch, plan)
+        elif action=='schedule_update':
+            uid=self.required(p['uuid'])['uuid']
+            value=schedules.validate({k:p[k] for k in ('repeat','reminders') if k in p})
+            if self.store.schedules().get(uid)!=value:plan['effect']['schedule_set']=[uid,value]
+            plan['result']={'uuid':uid}
         elif action=='related_update':
             uid=self.required(p['uuid'])['uuid'];refs=p['relatedTo']
             if not isinstance(refs,list) or len(refs)>100 or any(not isinstance(x,str) for x in refs):raise AssistantError('invalid_relations','Related responsibilities must be a bounded UUID list.')
@@ -684,6 +703,10 @@ class Assistant:
                     for other in refs:con.execute('INSERT OR IGNORE INTO related VALUES(?,?)',tuple(sorted((uid,other))))
                 if 'order_set' in effect:
                     con.execute("INSERT OR REPLACE INTO state VALUES('task_order',?)",(encoded(effect['order_set']),))
+                if 'schedule_set' in effect:
+                    uid,value=effect['schedule_set']
+                    if value is None:con.execute('DELETE FROM task_schedules WHERE uuid=?',(uid,))
+                    else:con.execute('INSERT OR REPLACE INTO task_schedules VALUES(?,?)',(uid,encoded(value)))
                 if 'group_colors_set' in effect:
                     con.execute("INSERT OR REPLACE INTO state VALUES('group_colors',?)",(encoded(effect['group_colors_set']),))
                 if 'group_color_set' in effect:
@@ -757,6 +780,9 @@ class Assistant:
         now = self.clock()
         cfg = self.store.config()
         result = []
+        plans = self.store.schedules()
+        kinds = (self.store.state_value('notification_policy') or {}).get('kinds') or {}
+        zone = self.store.state_value('timezone', 'UTC')
         for task in view:
             if task["status"] in ("completed", "deleted", "waiting"):
                 continue
@@ -766,8 +792,14 @@ class Assistant:
                 result.append({"id": identity, "entity": uid, "kind": kind,
                                "episode": episode, "title": title, "task": task})
             due = task["due_at"]
-            if due and parse(due) <= now + timedelta(minutes=cfg["due_soon_minutes"]):
+            if due and parse(due) <= now and kinds.get('overdue', True):
+                add("overdue", due, task["title"])
+            elif due and parse(due) <= now + timedelta(minutes=cfg["due_soon_minutes"]) and parse(due) > now and kinds.get('soon', True):
                 add("due", due, task["title"])
+            if kinds.get('reminder', True):
+                for item, at in schedules.reminder_instants(plans.get(uid), due, zone):
+                    if now - schedules.REMINDER_WINDOW < parse(at) <= now:
+                        add("reminder", at, task["title"])
             wait = task["snoozed_until"]
             if wait and parse(wait) <= now:
                 add("snooze_ready", wait, task["title"])
@@ -818,13 +850,13 @@ class Assistant:
             self.store.assert_writable()
             self.clean_read()
             now = self.now()
-            # One reason per entity, ordered independently of backend export order.
-            rank = {"event": 0, "due": 1, "snooze_ready": 2, "chat_waiting": 3, "stale": 4}
+            # Each explicit reminder and due kind can be delivered independently.
+            rank = {"event": 0, "reminder": 1, "overdue": 1, "due": 1, "snooze_ready": 2, "chat_waiting": 3, "stale": 4}
             candidates = sorted(self._candidates(self._view()),
                                 key=lambda n: (rank[n["kind"]], n["episode"], n["entity"]))
             selected = {}
             for item in candidates:
-                selected.setdefault(item["entity"], item)
+                selected.setdefault(item["id"] if item["kind"] in ("reminder", "due", "overdue") else item["entity"], item)
             candidates = list(selected.values())
             hold=self.store.state_value('restore_suppression',{})
             if hold.get('until') and parse(hold['until'])>self.clock():candidates=[x for x in candidates if x['id'] not in hold.get('ids',[])]
@@ -872,7 +904,7 @@ class Assistant:
                     repeat = timedelta(minutes=current_policy["unchangedRepeatMinutes"] if current_policy else self.store.config()["repeat_minutes"])
                     if any(r["status"] == "sending" or
                            (r["status"] == "uncertain" and not retry_uncertain) or
-                           (r["accepted_at"] and parse(r["accepted_at"]) + repeat > self.clock())
+                           (r["accepted_at"] and (r["id"] == item["id"] or item["kind"] not in ("reminder", "due", "overdue") and r["kind"] not in ("reminder", "due", "overdue")) and parse(r["accepted_at"]) + repeat > self.clock())
                            for r in siblings):
                         continue
                     if row["status"] in ("sending", "failed") or (row["status"] == "uncertain" and not retry_uncertain):
@@ -914,7 +946,7 @@ class Assistant:
                     item = current[item["id"]]
                 # A task may still change after this last check. This is a bounded
                 # race with external delivery, not an atomic task+popup operation.
-                outcome = self.notifier("Day Attendant", item["title"])
+                outcome = self.notifier("Day Attendant", schedules.notice_text(item["kind"], item["title"], (self.store.state_value("profile") or {}).get("locale", "en")))
                 self.fault("after_notify")
                 status = "uncertain" if outcome.get("uncertain") else "accepted" if outcome.get("accepted") else "pending" if attempt_number < 3 else "failed"
                 retry_at = stamp(self.clock() + timedelta(minutes=2 ** attempt_number)) if status == "pending" else None

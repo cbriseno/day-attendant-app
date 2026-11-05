@@ -46,6 +46,7 @@ ALLOWED = {
     "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "checklist", "blockReason"},
     "dependency_update": {"uuid","dependsOn"},
     "related_update": {"uuid","relatedTo"},
+    "schedule_update": {"uuid","repeat","reminders"},
     "order_update": {"order"},
     "group_rename": {"group", "to"},
     "group_color_update": {"group", "color"},
@@ -69,7 +70,7 @@ FOLLOWUP_ACTIONS = ("front_activate", "front_todo", "task_snooze", "task_update"
 BASIS = ("state", "until", "due", "priority", "groups", "dependsOn", "blockedBy", "remainingMinutes", "awaiting")
 CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "checklist": [], "blockReason": "", "blockedSince": None}
 # Effects whose previous value a fact keeps, so Undo can restore them.
-RESTORABLE = {"order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link"}
+RESTORABLE = {"schedule_set", "order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link"}
 # Inverse-only actions: Undo reaches them, never a request of their own.
 RESTORE = ("task_restore", "event_restore", "group_restore")
 
@@ -132,12 +133,12 @@ class Connected:
             if self.store.state_value('maintenance') and self.store.state_value('profile'):return
             self.store.assert_writable()
             with self.store.connect() as con:version=con.execute('PRAGMA user_version').fetchone()[0]
-            if version==3 and not _upgrade_backup:
+            if version in (3,4) and self.store.state_value('connected',False) and not _upgrade_backup:
                 raise AssistantError('profile_upgrade_required','Stop the old service and run profile upgrade; a verified backup is required before migration.')
-            if version==3:
+            if version in (3,4) and self.store.state_value('connected',False):
                 from .archives import verify,task_digest
                 previous=verify(_upgrade_backup)
-                if previous['state_schema']!=3 or previous['revision']!=self.store.revision() or previous['task_fingerprint']!=task_digest(self.app.tasks.rows()):raise AssistantError('migration_stale','The profile changed after its migration backup. Capture a fresh backup before upgrading.')
+                if previous['state_schema']!=version or previous['revision']!=self.store.revision() or previous['task_fingerprint']!=task_digest(self.app.tasks.rows()):raise AssistantError('migration_stale','The profile changed after its migration backup. Capture a fresh backup before upgrading.')
             existing=self.store.state_value('connected',False)
             profile=self.store.state_value('profile')
             selected=kind or (profile or {}).get('kind') or 'synthetic'
@@ -166,6 +167,7 @@ class Connected:
                       proposal_id TEXT NOT NULL, generation INTEGER NOT NULL, status TEXT NOT NULL,
                       input TEXT NOT NULL, result TEXT, at TEXT NOT NULL);
                     CREATE TABLE IF NOT EXISTS continuity(uuid TEXT PRIMARY KEY, data TEXT NOT NULL);
+                    CREATE TABLE IF NOT EXISTS task_schedules(uuid TEXT PRIMARY KEY, data TEXT NOT NULL);
                     CREATE TABLE IF NOT EXISTS acknowledgments(signature TEXT PRIMARY KEY, code TEXT NOT NULL, at TEXT NOT NULL);
                     CREATE TABLE IF NOT EXISTS facts(id INTEGER PRIMARY KEY AUTOINCREMENT, operation_key TEXT UNIQUE NOT NULL,
                       proposal_id TEXT NOT NULL, action TEXT NOT NULL, plan TEXT NOT NULL, at TEXT NOT NULL);
@@ -215,7 +217,7 @@ class Connected:
                 con.execute("INSERT OR IGNORE INTO state VALUES('conversation',?)",(encoded({'floor':floor,'clearedAt':self.app.now() if floor else None}),))
                 # The later review starts with changes made from now on, never with an upgraded profile's history.
                 con.execute("INSERT OR IGNORE INTO state VALUES('review_cursor',?)",(encoded(con.execute('SELECT COALESCE(MAX(id),0) FROM facts').fetchone()[0]),))
-                con.execute('PRAGMA user_version=4')
+                con.execute('PRAGMA user_version=5')
             if existing:return
             if selected=='personal':
                 with self.store.connect() as con:con.execute("INSERT OR REPLACE INTO state VALUES('connected','true')")
@@ -420,7 +422,7 @@ class Connected:
         if suggestion:
             suggestion={'request':suggestion['request'],'result':suggestion.get('result')}
             if suggestion['result']:suggestion['stale']=suggestion['result']['fingerprint']!=self._suggestion_input({'tasks':tasks,'context':context})['fingerprint']
-        return {"tasks": tasks, "taskOrder": [uid for uid in self.store.state_value('task_order',[]) if uid in known], "groupColors": normalized_colors(self.store.state_value('group_colors',{})), "orderSuggestion": suggestion, "context": context,
+        return {"tasks": tasks, "taskOrder": [uid for uid in self.store.state_value('task_order',[]) if uid in known], "groupColors": normalized_colors(self.store.state_value('group_colors',{})), "schedules": {uid:v for uid,v in self.store.schedules().items() if uid in known}, "orderSuggestion": suggestion, "context": context,
                 "timezone": self.store.state_value('timezone','America/Edmonton'),
                 "calendar_events":self.store.events(),"notification_policy":self.store.state_value('notification_policy'),
                 "proposals": proposals, "events": facts, "lastFact": self._fact_summary(last) if last else None, "messages": messages,
@@ -475,6 +477,7 @@ class Connected:
         """Values an effect replaces, read before it applies, so Undo restores exactly them."""
         effect,inverse=plan["effect"],{}
         if "order_set" in effect:inverse["order"]=self.store.state_value("task_order",[])
+        if "schedule_set" in effect:inverse["schedule"]=[effect["schedule_set"][0],self.store.schedules().get(effect["schedule_set"][0])]
         if "group_colors_set" in effect:inverse["group_colors"]=self.store.state_value("group_colors",{})
         if "group_color_set" in effect:inverse["group_color"]=normalized_colors(self.store.state_value("group_colors",{})).get(effect["group_color_set"][0])
         if "context_set" in effect:
@@ -583,7 +586,7 @@ class Connected:
             plan = self._plan(intent, key)  # Validate before superseding any prior intent.
             if validate_only:return {'intent':intent,'validated':True}
             identity = str(uuid.uuid4())
-            prefix='calendar:' if action.startswith('event_') else 'dependencies:' if action=='dependency_update' else 'related:' if action=='related_update' else 'metadata:' if action in ('continuity_update','provenance_update') else 'task:'
+            prefix='calendar:' if action.startswith('event_') else 'dependencies:' if action=='dependency_update' else 'related:' if action=='related_update' else 'schedule:' if action=='schedule_update' else 'metadata:' if action in ('continuity_update','provenance_update') else 'task:'
             entity=prefix+payload['uuid'] if payload.get('uuid') else 'context' if action=='context_update' else 'order' if action=='order_update' else 'group:'+group_key(payload['group']) if action=='group_color_update' else 'new:'+key
             changed=bool(plan["steps"] or plan["effect"])
             waits=changed and origin=='chat' and action in CONFIRM_FROM_CHAT
@@ -779,6 +782,11 @@ class Connected:
         if "order_set" in effect:
             if self.store.state_value("task_order",[])!=effect["order_set"]:raise conflict
             return "order_update",{"order":inverse["order"],"undo_of":fact_id}
+        if "schedule_set" in effect:
+            uid,value=effect["schedule_set"]
+            if self.store.schedules().get(uid)!=value:raise conflict
+            previous=inverse["schedule"][1] or {}
+            return "schedule_update",{"uuid":uid,"repeat":previous.get("repeat"),"reminders":previous.get("reminders") or [],"undo_of":fact_id}
         if "group_color_set" in effect:
             name,color=effect["group_color_set"]
             if normalized_colors(self.store.state_value("group_colors",{})).get(name)!=color:raise conflict

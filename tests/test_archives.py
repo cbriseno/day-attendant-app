@@ -60,6 +60,19 @@ class ArchiveTests(DailyBase):
         backup=archives.snapshot(self.app,self.folder,category='migration')
         self.board.initialize(_upgrade_backup=backup['path'])
         self.assertEqual(self.app.store.state_value('profile'),profile);self.assertEqual(self.app.tasks.get(uid)['description'],'Pre-upgrade')
-        with self.app.store.connect() as con:self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],4)
+        with self.app.store.connect() as con:self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],5)
+
+    def test_schema4_upgrade_requires_verified_snapshot(self):
+        uid=self.add('Preserved task')
+        with self.app.store.connect() as con:
+            con.execute('DROP TABLE task_schedules')
+            con.execute('PRAGMA user_version=4')
+        with self.assertRaises(AssistantError) as error:self.board.initialize()
+        self.assertEqual(error.exception.code,'profile_upgrade_required')
+        backup=archives.snapshot(self.app,self.folder,category='migration')
+        self.board.initialize(_upgrade_backup=backup['path'])
+        self.assertEqual(self.app.tasks.get(uid)['description'],'Preserved task')
+        self.assertEqual(self.app.store.schedules(),{})
+        with self.app.store.connect() as con:self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],5)
 
 if __name__=='__main__':unittest.main()

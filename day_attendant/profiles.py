@@ -66,7 +66,8 @@ def default_policy():
     return {'enabled': True, 'timezone': None, 'weekdays': [0,1,2,3,4],
             'start': '09:00', 'end': '18:00', 'quietStart': '22:00', 'quietEnd': '08:00',
             'pausedUntil': None, 'intervalMinutes': 10, 'unchangedRepeatMinutes': 1440,
-            'dailyBudget': 12, 'technicalDefault': True}
+            'dailyBudget': 12, 'technicalDefault': True,
+            'kinds': {'soon': True, 'overdue': True, 'reminder': True}}
 
 
 def validate_policy(value):
@@ -92,6 +93,10 @@ def validate_policy(value):
     for key,maximum in [('intervalMinutes',1440),('unchangedRepeatMinutes',10080),('dailyBudget',100)]:
         if type(result[key]) is not int or not 1<=result[key]<=maximum:
             raise AssistantError('invalid_policy','Reminder intervals and budgets must be positive bounded integers.')
+    kinds = result['kinds']
+    if not isinstance(kinds, dict) or set(kinds) - {'soon', 'overdue', 'reminder'} or any(not isinstance(v, bool) for v in kinds.values()):
+        raise AssistantError('invalid_policy', 'Notification kinds are on/off switches for soon, overdue and reminder.')
+    result['kinds'] = dict(default_policy()['kinds'], **kinds)
     if result['timezone'] is not None:
         try:ZoneInfo(result['timezone'])
         except (ZoneInfoNotFoundError,TypeError) as error:raise AssistantError('invalid_zone','Invalid reminder time zone.') from error

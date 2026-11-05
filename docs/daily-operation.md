@@ -222,7 +222,9 @@ under the writer lock. An active owner remains protected; check `doctor` before 
 
 With the selected service stopped, `profile upgrade` takes a verified coherent backup,
 checks its task fingerprint and revision again under the coordinator lock, and upgrades
-the task store in one SQLite transaction. Schema 3 converts a nonempty single `project`
+the profile and task stores. Connected profile schema 5 adds a table for per-task
+repetition and reminders; existing schema 3 and 4 profiles need this verified upgrade
+before starting the new service. Backups include the table and offline restore preserves it. Schema 3 converts a nonempty single `project`
 into an ordered list and registers all tasks, including closed/retired/recurring records,
 in an append-only numeric alias table. Migration order is creation instant then UUID.
 Aliases are never removed or reused; retries preserve existing mappings. No last-active
