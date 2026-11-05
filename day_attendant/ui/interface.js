@@ -106,6 +106,10 @@ refreshLabels();
 // Order views change presentation only. A drag stays inside its section (same lane and, in
 // those views, the same priority or group) and saves the profile's manual order.
 let orderView='priority';try{orderView=localStorage.getItem('day-attendant-order')||'priority'}catch{}if(!globalThis.dayOrdering.VIEWS.includes(orderView))orderView='priority';
+let orderThen='manual';try{orderThen=localStorage.getItem('day-attendant-order-then')||'manual'}catch{}if(!globalThis.dayOrdering.THEN.includes(orderThen))orderThen='manual';
+// The second key only applies where the primary view has sections; elsewhere it stays stored but hidden.
+const activeThen=()=>globalThis.dayOrdering.thenOptions(orderView).includes(orderThen)?orderThen:'manual';
+function syncThen(){const options=globalThis.dayOrdering.thenOptions(orderView),select=$('order-then');$('order-then-wrap').hidden=!options.length;for(const o of select.options)o.hidden=!options.includes(o.value);select.value=activeThen();select.classList.toggle('is-set',activeThen()!=='manual')}
 let taskView='list';
 let localOrder=null,orderBase=null,orderSaving=false,drag=null;
 // Motion: a card that changes place glides there from where it was (FLIP), a new one fades in and
@@ -223,7 +227,7 @@ function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired'].
 const STATE_RANK={active:0,todo:1,snoozed:2};
 function groupLanes(data,proposals){
  const open=data.tasks.filter(t=>t.state in STATE_RANK&&matchesSearch(t));
- const lanes=globalThis.dayOrdering.arrange(open,'group',{order:localOrder||data.taskOrder||[]}).map(s=>{
+ const lanes=globalThis.dayOrdering.arrange(open,'group',{order:localOrder||data.taskOrder||[],then:activeThen()}).map(s=>{
   const key=groupKey(s.label),name=s.label||tr('no_group'),folded=foldedGroups.has(key),tasks=[...s.tasks].sort((a,b)=>STATE_RANK[a.state]-STATE_RANK[b.state]);
   const members=data.tasks.filter(t=>t.state!=='retired'&&(taskGroups(t).some(g=>groupKey(g)===key)||!taskGroups(t).length&&!key)),done=members.filter(t=>t.state==='done').length,pct=members.length?Math.round(100*done/members.length):0;
   const next=tasks.filter(t=>t.due).sort((a,b)=>new Date(a.due)-new Date(b.due))[0],progress=formatted('group_progress',{done,total:members.length});
@@ -246,7 +250,7 @@ function priorityButton(t,off){return '<button type="button" class="priority-pil
 let rowsShared='',rowsKept=new Map(),rowsBuilt=new Map(),blocksOf=new Map(),suggested=new Set();
 function startRows(data){
  // What every row reads: when any of it changes, no kept row is used.
- const shared=JSON.stringify([locale,zone,zoneRules,[...zoneYears.values()],localValue(NOW).slice(0,10),orderView,orderView==='suggested'&&data.orderSuggestion?.result?.order,data.readOnly,groupColors,data.context.availableMinutes!==null]);
+ const shared=JSON.stringify([locale,zone,zoneRules,[...zoneYears.values()],localValue(NOW).slice(0,10),orderView,activeThen(),orderView==='suggested'&&data.orderSuggestion?.result?.order,data.readOnly,groupColors,data.context.availableMinutes!==null]);
  rowsKept=shared===rowsShared?rowsBuilt:new Map();rowsShared=shared;rowsBuilt=new Map();
  blocksOf=new Map();for(const r of data.tasks)for(const id of new Set(r.blockedBy))if(blocksOf.has(id))blocksOf.get(id).push(r.id);else blocksOf.set(id,[r.id]);
  suggested=new Set((data.suggestions||[]).filter(s=>s.current).map(s=>s.taskId));
@@ -317,6 +321,7 @@ function suggestionReason(t,data){const order=data.orderSuggestion?.result?.orde
 function groupHeading(s){return '<h3 class="group-heading"'+(s.label?' data-anon-private="text"':'')+' data-group="'+esc(s.label||'')+'">'+(s.label?groupDot(s.label)+esc(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>'+esc(tr('no_group')))+'<span class="lane-count" data-anon-safe="text title aria-label">'+s.tasks.length+'</span></h3>'}
 // Only the suggested order has something to say or ask; the other orders explain themselves.
 function orderNote(data){
+ if(activeThen()!=='manual')return '<p>'+esc(tr('order_then_note').replace('{primary}',tr('order_'+orderView).toLocaleLowerCase(locale)).replace('{then}',tr('order_'+activeThen()).toLocaleLowerCase(locale)))+'</p><button type="button" class="btn ghost" id="order-then-reset">'+esc(tr('order_then_reset'))+'</button>';
  if(orderView!=='suggested')return '';
  const s=data.orderSuggestion,result=s?.result,pending=s?.request?.status==='pending',failed=s?.request?.status==='incomplete';
  const text=(result?tr('suggestion_from').replace('{time}',short(result.at))+(s.stale?' '+tr('suggestion_stale'):''):tr('suggestion_none'))+(pending?' '+tr('suggestion_pending'):failed?' '+tr('suggestion_failed')+(known(s.request.code)?tr('error_'+s.request.code):tr('chat_failed_generic')):'');
@@ -499,7 +504,7 @@ function render(data=flow.snapshot()) {
  if(titleEdit&&!data.tasks.some(t=>t.id===titleEdit.id&&!['done','retired'].includes(t.state)))titleEdit=null;
  const typing=typingState();rendering=true;startRows(data);
  morphBoard(taskView==='focus'?focusLanes(data):orderView==='group'&&$('board').classList.contains('is-list')?groupLanes(data,proposals):[['active',tr("active")],['todo',tr("to_do")],['snoozed',tr("snoozed")]].map(([state,label])=>{
-  const rows=data.tasks.filter(t=>t.state===state&&shownByFilter(t)),sections=globalThis.dayOrdering.arrange(rows,orderView,{order:localOrder||data.taskOrder||[],suggestion:data.orderSuggestion?.result});
+  const rows=data.tasks.filter(t=>t.state===state&&shownByFilter(t)),sections=globalThis.dayOrdering.arrange(rows,orderView,{order:localOrder||data.taskOrder||[],suggestion:data.orderSuggestion?.result,then:activeThen()});
   const items=sections.flatMap(s=>[...(orderView==='group'?[{key:'heading:'+s.key,html:groupHeading(s)}]:[]),...s.tasks.map(t=>({id:t.id,rowKey:t.id+'|'+state+'|'+s.key,html:taskRow(t,s,data,proposals.find(p=>p.intent.taskId===t.id))}))]);
   if(!rows.length)items.push({key:'empty',html:'<p class="lane-empty">'+esc(tr('lane_empty'))+'</p>'});
   return {state,head:'<span class="state-dot" aria-hidden="true"></span><h2>'+label+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+rows.length+'</span>',items};
@@ -819,8 +824,9 @@ function setTaskView(view){closeMenu();taskView=view;if(view==='focus')dependenc
 $('list-view').onclick=()=>setTaskView('list');$('board-view').onclick=()=>setTaskView('board');$('focus-view').onclick=()=>setTaskView('focus');
 $('board').addEventListener('click',e=>{if(e.target.closest('[data-exit-focus]'))setTaskView('list')});
 $('group-filters').onclick=e=>{const rename=e.target.closest('[data-rename-group]');if(rename){renameGroup(rename.dataset.renameGroup,rename);return}if(e.target.closest('[data-more-groups]')){showGroups(e.target,true);return}const b=e.target.closest('[data-filter]');if(b&&b.dataset.filter!==groupFilter)setGroupFilter(b.dataset.filter)};
-$('order-choice').value=orderView;$('order-choice').onchange=()=>{orderView=$('order-choice').value;try{localStorage.setItem('day-attendant-order',orderView)}catch{}render()};
-$('order-note').onclick=e=>{if(e.target.closest('#suggest-order'))safely(async()=>{await deliver('/api/suggestion',{});announceStatus(tr('suggestion_pending'))})};
+$('order-choice').value=orderView;$('order-choice').onchange=()=>{orderView=$('order-choice').value;try{localStorage.setItem('day-attendant-order',orderView)}catch{}syncThen();render()};
+syncThen();$('order-then').onchange=()=>{orderThen=$('order-then').value;try{localStorage.setItem('day-attendant-order-then',orderThen)}catch{}syncThen();render()};
+$('order-note').onclick=e=>{if(e.target.closest('#order-then-reset')){orderThen='manual';try{localStorage.setItem('day-attendant-order-then',orderThen)}catch{}syncThen();render();$('order-then').focus();return}if(e.target.closest('#suggest-order'))safely(async()=>{await deliver('/api/suggestion',{});announceStatus(tr('suggestion_pending'))})};
 $('board').addEventListener('keydown',e=>{const handle=e.target.closest?.('.drag-handle');if(!handle||!['ArrowUp','ArrowDown'].includes(e.key)||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;e.preventDefault();const ids=sectionIds(handle.closest('.task').dataset.section),from=ids.indexOf(handle.dataset.id),to=from+(e.key==='ArrowUp'?-1:1);if(to>=0&&to<ids.length&&placeOrder(handle.dataset.id,ids,to))announceStatus(tr('moved_to').replace('{n}',to+1).replace('{total}',ids.length))});
 // Dragging: the card lifts and follows the pointer with a slight tilt, the others make room and it
 // lands where it is let go. A mouse drags from the handle or any empty part of the row; a touch

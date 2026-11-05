@@ -49,8 +49,8 @@ function scrubAttributes(el){
   const masked=replacement(source,el,name);if(source!==masked){remember(el,name,source,masked);el.setAttribute(name,masked)}else originals.get(el)?.delete(name);
  }
 }
-const presentationSelect=el=>['locale-choice','theme-choice','palette-choice','order-choice'].includes(el.id);
-const chromeValues=new WeakMap([...document.querySelectorAll('#locale-choice,#theme-choice,#palette-choice,#order-choice')].map(el=>[el,new Set([...el.options].map(o=>o.value))]));
+const presentationSelect=el=>['locale-choice','theme-choice','palette-choice','order-choice','order-then'].includes(el.id);
+const chromeValues=new WeakMap([...document.querySelectorAll('#locale-choice,#theme-choice,#palette-choice,#order-choice,#order-then')].map(el=>[el,new Set([...el.options].map(o=>o.value))]));
 const chromeValue=(el,value)=>chromeValues.get(el.tagName==='OPTION'?el.parentElement:el)?.has(value);
 const dateValue=(el,value)=>el.matches('input[type=date],input[type=datetime-local],input[type=time]')&&/^(?:\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?|\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)$/.test(value);
 function scrubControl(el,cache){

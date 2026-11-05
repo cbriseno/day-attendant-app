@@ -484,7 +484,7 @@ Object.assign(globalThis.dayTranslations.es,{
  error_fact_not_found:'Ese cambio guardado ya no existe.',error_maintenance:'Hay un mantenimiento en curso. Intenta de nuevo cuando termine.'
 });
 // Order views and groups.
-Object.assign(globalThis.dayTranslations.en,{order_label:'Order',order_priority:'Priority',order_manual:'My order',order_newest:'Newest',order_group:'Group',order_suggested:'Suggested',
+Object.assign(globalThis.dayTranslations.en,{order_then:'then',order_due:'Due date',order_title:'Title',order_then_note:'By {primary}, then by {then} inside each section. Switch back to “My order” to drag.',order_then_reset:'Back to my order',order_label:'Order',order_priority:'Priority',order_manual:'My order',order_newest:'Newest',order_group:'Group',order_suggested:'Suggested',
  suggestion_none:'No suggestion yet. Asking uses one request to your assistant; switching views never does.',suggestion_from:'Assistant suggestion from {time}.',suggestion_stale:'Tasks changed since then.',
  suggestion_pending:'The assistant is preparing a suggestion…',suggestion_failed:'The last request did not finish: ',suggest_order:'Suggest an order',suggest_again:'Suggest again',
  not_in_suggestion:'Not in this suggestion',reorder:'Reorder',reorder_hint:'Drag, or press the up and down arrow keys',moved_to:'Moved to position {n} of {total}.',order_saved:'Order saved',
@@ -492,7 +492,7 @@ Object.assign(globalThis.dayTranslations.en,{order_label:'Order',order_priority:
  error_invalid_order:'The order could not be saved. Reload the list and try again.',error_suggestion_busy:'The assistant is already preparing a suggestion.',
  error_invalid_group:'Use a group label of at most 120 characters on one line.',error_restart_interrupted:'It was interrupted by a restart. Ask again.',
  error_context_changed:'The assistant settings changed. Ask again.'});
-Object.assign(globalThis.dayTranslations.es,{order_label:'Orden',order_priority:'Prioridad',order_manual:'Mi orden',order_newest:'Más recientes',order_group:'Grupo',order_suggested:'Sugerido',
+Object.assign(globalThis.dayTranslations.es,{order_then:'luego',order_due:'Vencimiento',order_title:'Título',order_then_note:'Por {primary} y, dentro de cada sección, por {then}. Para arrastrar, vuelve a «Mi orden».',order_then_reset:'Volver a mi orden',order_label:'Orden',order_priority:'Prioridad',order_manual:'Mi orden',order_newest:'Más recientes',order_group:'Grupo',order_suggested:'Sugerido',
  suggestion_none:'Aún no hay sugerencia. Pedirla usa una solicitud a tu asistente; cambiar de vista nunca lo hace.',suggestion_from:'Sugerencia del asistente de {time}.',suggestion_stale:'Las tareas cambiaron desde entonces.',
  suggestion_pending:'El asistente está preparando una sugerencia…',suggestion_failed:'La última solicitud no terminó: ',suggest_order:'Sugerir un orden',suggest_again:'Sugerir de nuevo',
  not_in_suggestion:'Fuera de esta sugerencia',reorder:'Reordenar',reorder_hint:'Arrastra o usa las flechas arriba y abajo',moved_to:'Movida a la posición {n} de {total}.',order_saved:'Orden guardado',

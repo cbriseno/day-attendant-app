@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const context={};vm.createContext(context);
 vm.runInContext(await readFile(path.join(root,'day_attendant/ui/ordering.js'),'utf8'),context);
-const {VIEWS,PRIORITIES,manualIds,arrange,move,place,adopt,hue}=context.dayOrdering;
+const {VIEWS,PRIORITIES,manualIds,arrange,move,place,adopt,hue,thenOptions}=context.dayOrdering;
 const task=(id,priority,extra={})=>({id,priority,group:null,due:null,createdAt:'2026-10-0'+id.length+'T00:00:00Z',...extra});
 // Values cross the vm realm boundary; compare them as plain data.
 const plain=value=>JSON.parse(JSON.stringify(value));
@@ -47,6 +47,18 @@ assert.deepEqual(plain(grouped.map(s=>s.label)),['Home','move',null]);
 assert.deepEqual(plain(grouped.map(s=>s.tasks.map(t=>t.id))),[['d','c'],['e','a'],['b']]);
 assert.ok(grouped.every(s=>s.draggable));
 assert.equal(hue(' Home'),hue('home'));assert.notEqual(hue('home'),hue('move'));
+
+// A second key reorders inside each group or priority section, and those sections take no drops.
+const titled=all.map(t=>({...t,title:{a:'Zeta',b:'alfa',c:'Beta',d:'gamma',e:'Delta'}[t.id]}));
+const byTitle=arrange(titled,'group',{order:['d','e','c','a','b'],then:'title'});
+assert.deepEqual(plain(byTitle.map(s=>s.tasks.map(t=>t.id))),[['c','d'],['e','a'],['b']]);
+assert.ok(byTitle.every(s=>!s.draggable));
+assert.deepEqual(plain(arrange(all,'group',{then:'due'}).map(s=>s.tasks.map(t=>t.id))),[['c','d'],['e','a'],['b']]);
+assert.deepEqual(ids(arrange(all,'priority',{order:['e','a','c','b','d'],then:'newest'})),['e','b','c','d','a']);
+// Priority cannot be its own second key; unknown or inapplicable keys keep the drag order.
+assert.deepEqual(plain(thenOptions('priority')),['manual','due','title','newest']);assert.deepEqual(plain(thenOptions('manual')),[]);
+assert.ok(arrange(all,'priority',{then:'priority'}).every(s=>s.draggable));
+assert.deepEqual(ids(arrange(all,'manual',{order:['e','a','c','b','d'],then:'title'})),['e','a','c','b','d']);
 
 // Suggested view follows the stored suggestion; tasks it omits follow in manual order.
 const suggested=arrange(all,'suggested',{order:['a','b','c','d','e'],suggestion:{order:[{id:'d',reason:'x'},{id:'b',reason:'y'}]}});

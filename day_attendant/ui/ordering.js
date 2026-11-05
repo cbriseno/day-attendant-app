@@ -2,6 +2,8 @@
 (() => {
 'use strict';
 const VIEWS=['priority','manual','newest','group','suggested'];
+// A second key orders tasks inside each section of Priority or Group; 'manual' keeps the drag order.
+const THEN=['manual','priority','due','title','newest'],THEN_VIEWS=['priority','group'];
 // Most pressing first; an unknown value sorts and groups as medium.
 const PRIORITIES=['urgent','high','soon','medium','low','someday'],RANK=Object.fromEntries(PRIORITIES.map((p,i)=>[p,i]));
 const cmp=(a,b)=>a<b?-1:a>b?1:0;
@@ -13,16 +15,22 @@ const groups=t=>Array.isArray(t.groups)?t.groups:t.group?[t.group]:[];
 const groupKey=t=>key(groups(t)[0]);
 function hue(label){let h=0;for(const c of label.trim().toLocaleLowerCase())h=(h*31+c.codePointAt(0))%360;return h}
 // Each section is the scope of a drag: a task moves only among tasks the view treats as equal.
-function arrange(tasks,view,{order=[],suggestion=null}={}){
+function thenOptions(view){return THEN_VIEWS.includes(view)?THEN.filter(k=>!(view==='priority'&&k==='priority')):[]}
+function arrange(tasks,view,{order=[],suggestion=null,then='manual'}={}){
  const position=new Map(manualIds(tasks,order).map((id,i)=>[id,i])),manual=(a,b)=>position.get(a.id)-position.get(b.id);
+ // A computed secondary order replaces the drag order inside the section, so those sections take no drops.
+ const by=thenOptions(view).includes(then)&&then!=='manual'?then:'manual';
+ const second={manual,priority:(a,b)=>(RANK[a.priority]??RANK.medium)-(RANK[b.priority]??RANK.medium)||manual(a,b),
+  due:(a,b)=>cmp(a.due||'~',b.due||'~')||manual(a,b),newest:(a,b)=>cmp(b.createdAt||'',a.createdAt||'')||manual(a,b),
+  title:(a,b)=>(a.title||'').localeCompare(b.title||'',undefined,{sensitivity:'base',numeric:true})||manual(a,b)}[by],drag=by==='manual';
  if(view==='newest')return [{key:'all',draggable:false,tasks:[...tasks].sort((a,b)=>cmp(b.createdAt||'',a.createdAt||'')||cmp(a.id,b.id))}];
  if(view==='suggested'){const ranks=new Map((suggestion?.order||[]).map((item,i)=>[item.id,i]));return [{key:'all',draggable:false,tasks:[...tasks].sort((a,b)=>(ranks.get(a.id)??Infinity)-(ranks.get(b.id)??Infinity)||manual(a,b))}]}
  if(view==='manual')return [{key:'all',draggable:true,tasks:[...tasks].sort(manual)}];
  if(view==='group'){
-  const groups=new Map();for(const t of [...tasks].sort(manual))for(const label of (globalThis.dayOrdering.groups(t).length?globalThis.dayOrdering.groups(t):[null])){const k=key(label);if(!groups.has(k))groups.set(k,{key:'group:'+k,label,draggable:true,tasks:[]});groups.get(k).tasks.push(t)}
+  const groups=new Map();for(const t of [...tasks].sort(second))for(const label of (globalThis.dayOrdering.groups(t).length?globalThis.dayOrdering.groups(t):[null])){const k=key(label);if(!groups.has(k))groups.set(k,{key:'group:'+k,label,draggable:drag,tasks:[]});groups.get(k).tasks.push(t)}
   return [...groups.values()].sort((a,b)=>(a.label===null)-(b.label===null)||(a.label??'').localeCompare(b.label??'',undefined,{sensitivity:'base'}));
  }
- return PRIORITIES.map(p=>({key:p,draggable:true,tasks:tasks.filter(t=>(RANK[t.priority]===undefined?'medium':t.priority)===p).sort(manual)})).filter(s=>s.tasks.length);
+ return PRIORITIES.map(p=>({key:p,draggable:drag,tasks:tasks.filter(t=>(RANK[t.priority]===undefined?'medium':t.priority)===p).sort(second)})).filter(s=>s.tasks.length);
 }
 // Reinsert next to the new neighbour within the whole order, so every other relative position persists.
 function move(order,section,id,to){const rest=section.filter(x=>x!==id),index=Math.max(0,Math.min(to,rest.length));if(!rest.length||!order.includes(id)||section.indexOf(id)===index)return order.slice();const result=order.filter(x=>x!==id);result.splice(index<rest.length?result.indexOf(rest[index]):result.indexOf(rest.at(-1))+1,0,id);return result}
@@ -43,5 +51,5 @@ function focus(tasks,now=Date.now()){
  const available=open.filter(t=>!blocked(t)).sort(rank),active=available.filter(t=>t.state==='active').slice(0,2);
  return {active,next:available.filter(t=>t.state==='todo').slice(0,5-active.length),soon:open.filter(t=>t.state==='snoozed'&&t.until&&Date.parse(t.until)<=now+72*3600000).sort((a,b)=>cmp(a.until,b.until)||rank(a,b)).slice(0,2)};
 }
-globalThis.dayOrdering={groups,key,focus,VIEWS,PRIORITIES,manualIds,arrange,move,place,adopt,hue};
+globalThis.dayOrdering={groups,key,focus,VIEWS,THEN,thenOptions,PRIORITIES,manualIds,arrange,move,place,adopt,hue};
 })();
