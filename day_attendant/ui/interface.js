@@ -307,7 +307,7 @@ function rowMeta(t,data,proposal,s={}){const time=(key,value,cls)=>'<span data-a
   +(t.until?time('meta_resumes',t.until,'task-wait'):'')
   +(t.awaiting?'<span class="task-wait">'+esc(tr('meta_waiting'))+'</span>':'')
   +(data.context.availableMinutes!==null&&Number.isFinite(t.remainingMinutes)?'<span data-anon-safe="text">'+esc(formatted('meta_remaining',{n:t.remainingMinutes}))+'</span>':'')
-  +creationTime(t)+activityTime(t)+dependencyChips(t,data)
+  +creationTime(t)+activityTime(t)+dependencyChips(t,data)+checklistChip(t)
   +(proposal?'<button class="pending-badge" type="button"'+(data.readOnly?' disabled':'')+' data-id="'+t.id+'" data-action="pending">'+esc(tr('pending_change_badge'))+'</button>':'')}
 // The assistant's later look leaves a discreet mark on the affected card; it never moves the card.
 const currentSuggestion=(id,data)=>(data.suggestions||[]).find(s=>s.current&&s.taskId===id);
@@ -638,6 +638,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
  return '<div class="expand" data-expand="'+t.id+'"><div class="xgrid">'
   +field('context','where_i_left_off','<textarea id="'+id('context')+'" data-id="'+t.id+'" data-field="context" data-anon-private="value text" rows="2" maxlength="2000" placeholder="'+esc(tr('where_i_left_off_placeholder'))+'"'+off+'>'+esc(draftValue(t,'context'))+'</textarea>')
   +field('next','next_step','<input type="text" id="'+id('next')+'" data-id="'+t.id+'" data-field="next" data-anon-private="value text" maxlength="2000" autocomplete="off" placeholder="'+esc(tr('next_step_placeholder'))+'" value="'+esc(draftValue(t,'next'))+'"'+off+'>')
+  +checklistField(t,off)
   +field('remainingMinutes','remaining_minutes','<input type="number" id="'+id('remainingMinutes')+'" data-id="'+t.id+'" data-field="remainingMinutes" data-anon-safe="value" min="0" step="any" inputmode="decimal" placeholder="'+esc(tr('not_estimated'))+'" value="'+esc(draftValue(t,'remainingMinutes'))+'"'+off+'>')
   +'<div class="xfield xswitch"><label class="switch"><input type="checkbox" data-id="'+t.id+'" data-field="awaiting"'+(draftValue(t,'awaiting')?' checked':'')+off+'><span>'+esc(tr('awaiting_label'))+'</span></label>'+fieldNote(t,'awaiting')+'</div>'
   +'<div class="xfield"><span class="xlabel">'+esc(tr('requires_label'))+'</span><div class="rel-list">'+relationRows(t.dependsOn,'dep',t,data)+'</div>'+pickerInput(t,'dep',data)+'</div>'
@@ -648,6 +649,70 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
 function toggleExpand(id,open=expanded!==id){const t=task(id);if(open&&(!t||t.pending))return;flush();expanded=open?id:null;retireAsk=null;savedNote=null;render();
  const card=$('board').querySelector('[data-task-id="'+id+'"]');// An instant scroll: a smooth one would keep scrolling and close a menu opened right after.
  if(open){card?.querySelector('.expand')?.scrollIntoView({block:'nearest'});card?.querySelector('[data-field="context" data-anon-private="value text"]')?.focus({preventScroll:true})}else restoreTitleFocus(id)}
+
+// #45 A light checklist per task: ordered one-line items kept with the task (no dates, priority or links of their own).
+const checklistOf=t=>Array.isArray(t?.checklist)?t.checklist:[];
+const checklistCount=t=>{const l=checklistOf(t);return {done:l.filter(i=>i.done).length,n:l.length}};
+function checklistChip(t){const {done,n}=checklistCount(t);if(!n)return '';const all=done===n;
+ return '<button type="button" class="check-count'+(all?' all':'')+'" data-cl-open="'+t.id+'" title="'+esc(tr('checklist_open'))+'" aria-label="'+esc(formatted('checklist_progress_aria',{done,n}))+'"><span aria-hidden="true">☑</span> '+done+'/'+n+'<span class="cl-mini" aria-hidden="true"><span style="width:'+Math.round(100*done/n)+'%"></span></span></button>'}
+let clEdit=null,clFocus=null,clDrag=null,clMenuItem=null;
+function checklistField(t,off){const l=checklistOf(t),{done,n}=checklistCount(t),lid='cl-label-'+t.id,dis=off?' disabled':'';
+ const item=(i,k)=>'<li class="cl-item'+(i.done?' done':'')+'" data-cl-item="'+esc(i.id)+'" data-cl-task="'+t.id+'"'+(off?'':' draggable="true"')+'>'
+  +'<span class="cl-grip" aria-hidden="true" title="'+esc(tr('checklist_drag'))+'">⋮⋮</span>'
+  +'<input type="checkbox" class="cl-check" id="cl-'+t.id+'-'+esc(i.id)+'" data-cl-toggle="'+esc(i.id)+'"'+(i.done?' checked':'')+dis+' aria-describedby="'+lid+'">'
+  +(clEdit&&clEdit.task===t.id&&clEdit.item===i.id
+    ?'<input type="text" class="cl-edit" data-cl-editing="'+esc(i.id)+'" maxlength="300" value="'+esc(i.text)+'" aria-label="'+esc(tr('checklist_edit_aria'))+'">'
+    :'<label class="cl-text" for="cl-'+t.id+'-'+esc(i.id)+'" data-cl-text="'+esc(i.id)+'" data-anon-private="text" title="'+esc(tr('checklist_edit_hint'))+'">'+esc(i.text)+'</label>')
+  +(off?'':'<button type="button" class="cl-btn" data-cl-convert="'+esc(i.id)+'" aria-haspopup="menu" title="'+esc(tr('checklist_convert'))+'" aria-label="'+esc(tr('checklist_convert'))+': '+esc(i.text)+'">↗</button>'
+   +'<button type="button" class="cl-btn" data-cl-remove="'+esc(i.id)+'" title="'+esc(tr('checklist_remove'))+'" aria-label="'+esc(tr('checklist_remove'))+': '+esc(i.text)+'">✕</button>')+'</li>';
+ return '<div class="xfield checklist" data-checklist="'+t.id+'"><span class="xlabel" id="'+lid+'">'+esc(tr('checklist_label'))+(n?' · '+done+'/'+n:'')+'</span>'
+  +(n?'<div class="cl-bar" role="progressbar" aria-labelledby="'+lid+'" aria-valuemin="0" aria-valuemax="'+n+'" aria-valuenow="'+done+'"><span style="width:'+Math.round(100*done/n)+'%"></span></div>':'')
+  +(n?'<ul class="cl-list" aria-labelledby="'+lid+'">'+l.map(item).join('')+'</ul>':'')
+  +(off||l.length>=50?'':'<input type="text" class="cl-add" data-cl-add="'+t.id+'" maxlength="300" autocomplete="off" placeholder="'+esc(tr(n?'checklist_add_more':'checklist_add'))+'" aria-label="'+esc(tr('checklist_add'))+'">')
+  +(n&&done===n&&!['done','retired'].includes(t.state)&&!off?'<div class="cl-alldone" role="status"><span>'+esc(tr('checklist_all_done'))+'</span><button type="button" class="btn" data-cl-finish="'+t.id+'">'+esc(tr('complete'))+'</button></div>':'')
+  +'</div>'}
+function saveChecklist(id,list,focus){clFocus=focus||null;request('continuity_update',{uuid:id,checklist:list}).then(()=>restoreClFocus())}
+function restoreClFocus(){if(!clFocus)return;const f=clFocus;requestAnimationFrame(()=>{const box=$('board').querySelector('[data-checklist="'+f.task+'"]');const el=box?.querySelector(f.sel);if(el){el.focus({preventScroll:true});if(f.sel.includes('cl-edit'))el.select?.()}})}
+const newItemId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function moveItem(id,itemId,to){const t=task(id),l=[...checklistOf(t)],from=l.findIndex(i=>i.id===itemId);if(from<0||to<0||to>=l.length||to===from)return;const [x]=l.splice(from,1);l.splice(to,0,x);saveChecklist(id,l,{task:id,sel:'[data-cl-toggle="'+CSS.escape(itemId)+'"]'})}
+function finishEdit(id,itemId,value,keep){const t=task(id),l=checklistOf(t),text=String(value).trim();clEdit=null;
+ if(!keep||!text||l.find(i=>i.id===itemId)?.text===text){render();restoreClFocus2(id,itemId);return}
+ saveChecklist(id,l.map(i=>i.id===itemId?{...i,text}:i),{task:id,sel:'[data-cl-text="'+CSS.escape(itemId)+'"]'})}
+const restoreClFocus2=(id,itemId)=>{clFocus={task:id,sel:'[data-cl-toggle="'+CSS.escape(itemId)+'"]'};restoreClFocus()};
+function startClEdit(id,itemId){clEdit={task:id,item:itemId};clFocus={task:id,sel:'[data-cl-editing="'+CSS.escape(itemId)+'"]'};render();restoreClFocus()}
+async function convertItem(id,itemId,asPrerequisite){const t=task(id),item=checklistOf(t).find(i=>i.id===itemId);if(!t||!item)return;
+ const p=await request('task_add',{title:item.text,priority:t.priority,groups:taskGroups(t)});const uid=p?.result?.uuid;if(!uid)return;
+ await request('continuity_update',{uuid:id,checklist:checklistOf(task(id)).filter(i=>i.id!==itemId)});
+ if(asPrerequisite){const now=task(id);await request('dependency_update',{uuid:id,dependsOn:[...(now?.dependsOn||[]),uid]})}
+ announceStatus(tr(asPrerequisite?'checklist_converted_dep':'checklist_converted').replace('{title}',item.text))}
+$('board').addEventListener('click',e=>{
+ const open=e.target.closest('[data-cl-open]');if(open){e.stopPropagation();e.preventDefault();toggleExpand(open.dataset.clOpen,true);setTimeout(()=>$('board').querySelector('[data-checklist="'+open.dataset.clOpen+'"] .cl-check, [data-checklist="'+open.dataset.clOpen+'"] .cl-add')?.focus({preventScroll:true}),80);return}
+ const box=e.target.closest('[data-checklist]');if(box){const id=box.dataset.checklist,t=task(id);if(!t)return;
+  const tog=e.target.closest('[data-cl-toggle]');if(tog){e.stopPropagation();const itemId=tog.dataset.clToggle;saveChecklist(id,checklistOf(t).map(i=>i.id===itemId?{...i,done:tog.checked}:i),{task:id,sel:'[data-cl-toggle="'+CSS.escape(itemId)+'"]'});return}
+  const rm=e.target.closest('[data-cl-remove]');if(rm){e.stopPropagation();const l=checklistOf(t),k=l.findIndex(i=>i.id===rm.dataset.clRemove),next=l[k+1]||l[k-1];saveChecklist(id,l.filter(i=>i.id!==rm.dataset.clRemove),next?{task:id,sel:'[data-cl-toggle="'+CSS.escape(next.id)+'"]'}:{task:id,sel:'.cl-add'});announceStatus(tr('checklist_removed'));return}
+  const cv=e.target.closest('[data-cl-convert]');if(cv){e.stopPropagation();clMenuItem=cv.dataset.clConvert;const r=cv.getBoundingClientRect();openMenu(id,'clconvert',{x:r.left,y:r.bottom+4});return}
+  const fin=e.target.closest('[data-cl-finish]');if(fin){e.stopPropagation();request('task_done',{uuid:id});return}
+  if(e.target.closest('.cl-text'))e.preventDefault();// a single click on the text is not a toggle; double click edits
+  e.stopPropagation();return}
+ // Finishing a task that still has open checklist items asks first, with the app's own popover.
+ const b=e.target.closest('[data-action="done"]');if(!b)return;const t=task(b.dataset.id);if(!t||['done','retired'].includes(t.state))return;
+ const {done,n}=checklistCount(t);if(n&&done<n){e.stopPropagation();e.preventDefault();const r=b.getBoundingClientRect();openMenu(t.id,'cldone',{x:r.left,y:r.bottom+4})}},true);
+$('board').addEventListener('dblclick',e=>{const x=e.target.closest('[data-cl-text]');if(!x)return;const box=x.closest('[data-checklist]');e.stopPropagation();e.preventDefault();startClEdit(box.dataset.checklist,x.dataset.clText)},true);
+$('board').addEventListener('keydown',e=>{const box=e.target.closest?.('[data-checklist]');if(!box)return;const id=box.dataset.checklist,t=task(id);if(!t)return;
+ const add=e.target.closest('[data-cl-add]');
+ if(add){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();e.stopPropagation();const text=add.value.trim();if(!text)return;add.value='';saveChecklist(id,[...checklistOf(t),{id:newItemId(),text,done:false}],{task:id,sel:'.cl-add'})}
+  else if(e.key==='Escape'){e.stopPropagation();if(add.value){add.value=''}else add.blur()}return}
+ const ed=e.target.closest('[data-cl-editing]');
+ if(ed){if(e.key==='Enter'){e.preventDefault();e.stopPropagation();finishEdit(id,ed.dataset.clEditing,ed.value,true)}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();finishEdit(id,ed.dataset.clEditing,ed.value,false)}return}
+ const li=e.target.closest('[data-cl-item]');if(!li)return;const itemId=li.dataset.clItem,k=checklistOf(t).findIndex(i=>i.id===itemId);
+ if(e.altKey&&(e.key==='ArrowUp'||e.key==='ArrowDown')){e.preventDefault();e.stopPropagation();moveItem(id,itemId,k+(e.key==='ArrowUp'?-1:1));return}
+ if(e.key==='F2'){e.preventDefault();e.stopPropagation();startClEdit(id,itemId);return}
+ if(e.key==='Delete'&&e.target.matches('.cl-check')){e.preventDefault();e.stopPropagation();li.querySelector('[data-cl-remove]')?.click()}},true);
+$('board').addEventListener('focusout',e=>{const ed=e.target.closest?.('[data-cl-editing]');if(ed&&clEdit){const box=ed.closest('[data-checklist]');finishEdit(box.dataset.checklist,ed.dataset.clEditing,ed.value,true)}},true);
+$('board').addEventListener('dragstart',e=>{const li=e.target.closest?.('[data-cl-item]');if(!li)return;e.stopPropagation();clDrag={task:li.dataset.clTask,item:li.dataset.clItem};e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',li.dataset.clItem);li.classList.add('dragging')},true);
+$('board').addEventListener('dragover',e=>{if(!clDrag)return;const li=e.target.closest?.('[data-cl-item]');if(!li||li.dataset.clTask!==clDrag.task)return;e.preventDefault();e.stopPropagation();for(const x of li.parentNode.children)x.classList.toggle('drop-before',x===li)},true);
+$('board').addEventListener('drop',e=>{if(!clDrag)return;const li=e.target.closest?.('[data-cl-item]');e.preventDefault();e.stopPropagation();const d=clDrag;clDrag=null;if(!li||li.dataset.clTask!==d.task)return;const l=checklistOf(task(d.task));moveItem(d.task,d.item,l.findIndex(i=>i.id===li.dataset.clItem))},true);
+$('board').addEventListener('dragend',e=>{if(!clDrag&&!e.target.closest?.('[data-cl-item]'))return;clDrag=null;for(const x of $('board').querySelectorAll('.cl-item.dragging,.cl-item.drop-before'))x.classList.remove('dragging','drop-before')},true);
 // Prerequisites offered by the picker never close a loop: a task cannot wait for one that waits for it.
 function waitsOn(from,to,data){const seen=new Set(),walk=id=>{if(id===to)return true;if(seen.has(id))return false;seen.add(id);return (data.tasks.find(x=>x.id===id)?.dependsOn||[]).some(walk)};return walk(from)}
 function showPicker(input){const data=flow.snapshot(),id=input.dataset.pickerTask,kind=input.dataset.search,t=data.tasks.find(x=>x.id===id),list=input.nextElementSibling;if(!t||!list)return;picker={id,kind,value:input.value};
@@ -786,7 +851,7 @@ function linksMenu(t,data){const off=data.readOnly||t.pending,find=id=>data.task
  const section=(label,ids,kind)=>'<p class="menu-title">'+esc(tr(label))+'</p>'+(ids.map(find).filter(Boolean).map(o=>'<div class="menu-link">'+menuItem('link-go',relationTitle(o,data),{value:o.id,title:tr('go_to_task')})+(off?'':'<button type="button" class="menu-link-remove" data-menu-act="link-remove" data-value="'+kind+':'+o.id+'" aria-label="'+esc(tr('remove_link')+': '+o.title)+'" title="'+esc(tr('remove_link'))+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>')+'</div>').join('')||'<p class="menu-note">'+esc(tr('links_none'))+'</p>');
  return '<p class="menu-title task-name">'+esc(tr('links_of').replace('{title}',t.title))+'</p>'+section('links_blocked_by',t.dependsOn,'dep')+section('links_blocks',dependents,'dependent')+section('links_related',t.relatedTo,'rel')
   +'<div class="menu-sep" role="separator"></div>'+menuItem('connect-needs',esc(tr('add_requirement')),{icon:linkIcon,disabled:off})+menuItem('connect',esc(tr('this_blocks')),{icon:linkIcon,disabled:off})}
-const menuBodies={retire:()=>'',priority:priorityMenu,snooze:snoozeMenu,more:moreMenu,group:groupMenu,due:dueMenu,dependencies:linksMenu};
+const menuBodies={cldone:t=>{const {done,n}=checklistCount(t);return '<p class="menu-confirm">'+esc(formatted('checklist_done_confirm',{left:n-done,n}))+'</p><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn" data-menu-act="cl-done-anyway">'+esc(tr('checklist_done_anyway'))+'</button></div>'},clconvert:t=>{const i=checklistOf(t).find(x=>x.id===clMenuItem);return '<p class="menu-confirm">'+esc(tr('checklist_convert_title').replace('{title}',i?.text||''))+'</p><button type="button" class="menu-item" role="menuitem" data-menu-act="cl-convert"><span class="menu-label">'+esc(tr('checklist_convert_plain'))+'</span></button><button type="button" class="menu-item" role="menuitem" data-menu-act="cl-convert-dep"><span class="menu-label">'+esc(tr('checklist_convert_dep'))+'</span></button>'},retire:()=>'',priority:priorityMenu,snooze:snoozeMenu,more:moreMenu,group:groupMenu,due:dueMenu,dependencies:linksMenu};
 function openMenu(id,action,point,selectedGroup){const data=flow.snapshot(),t=data.tasks.find(t=>t.id===id);if(!t||document.querySelector('dialog[open]'))return;closeMenu(false);
  const node=document.createElement('div');node.className='row-menu';node.setAttribute('role','menu');node.innerHTML=menuBodies[action](t,data,selectedGroup);localizedDates(node);
  const sheet=sheetMedia.matches,scrim=sheet?document.createElement('div'):null;if(scrim){scrim.className='menu-scrim';document.body.append(scrim)}
@@ -809,6 +874,8 @@ function menuAct(b){const {id}=menu,t=task(id),act=b.dataset.menuAct,value=b.dat
  if(act==='group-toggle'){const node=menu.node;const groups=taskGroups(t),has=groups.some(g=>groupKey(g)===groupKey(value));b.disabled=true;safely(async()=>{try{await flow.request('task_update',{uuid:id,groups:has?groups.filter(g=>groupKey(g)!==groupKey(value)):[...groups,value]});if(menu?.node===node)b.setAttribute('aria-checked',String(!has))}finally{b.disabled=false}});return}
  if(act==='retire'){retireConfirm();return}
  if(act==='keep'){closeMenu();return}
+ if(act==='cl-done-anyway'){closeMenu(false);request('task_done',{uuid:id});return}
+ if(act==='cl-convert'||act==='cl-convert-dep'){const item=clMenuItem;closeMenu(false);convertItem(id,item,act==='cl-convert-dep');return}
  if(act==='details'){closeMenu(false);toggleExpand(id);return}
  if(act==='edit-title'){closeMenu(false);startTitleEdit(id);return}
  if(act==='set-due'){swapMenu('due');return}
@@ -1024,7 +1091,7 @@ class RemoteFlow{
   else if(body.action==='task_add')tasks=[...tasks,{id:'draft:'+(++this.drafts),title:p.title,state:'todo',priority:p.priority||'medium',group:p.groups?.[0]||p.group||null,groups:p.groups||(p.group?[p.group]:[]),due:p.due||null,until:null,blocked:false,dependsOn:[],blockedBy:[],relatedTo:[],attachmentIds:[],context:'',next:'',awaiting:false,remainingMinutes:null,createdAt:null,pending:true}];
   else if(body.action==='event_add'||body.action==='event_update'){const events=data.calendar_events||[],shown={title:p.title,...(p.start?{start_at:p.start}:{}),...(p.end?{end_at:p.end}:{})};if(body.action==='event_update'&&!events.some(e=>e.uuid===p.uuid))return false;
    this.data={...data,calendar_events:(body.action==='event_add'?[...events,{uuid:'draft:'+(++this.drafts),...shown,pending:true}]:events.map(e=>e.uuid===p.uuid?{...e,...shown}:e)).sort((a,b)=>Date.parse(a.start_at)-Date.parse(b.start_at))};globalThis.dayDaily?.update(this.data);return {tasks:data.tasks,context:data.context,calendar_events:events}}
-  else if(body.action==='continuity_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const fields=Object.fromEntries(['context','next','awaiting','remainingMinutes'].filter(k=>k in p).map(k=>[k,p[k]]));tasks=tasks.map(t=>t.id===p.uuid?{...t,...fields}:t)}
+  else if(body.action==='continuity_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const fields=Object.fromEntries(['context','next','awaiting','remainingMinutes','checklist'].filter(k=>k in p).map(k=>[k,p[k]]));tasks=tasks.map(t=>t.id===p.uuid?{...t,...fields}:t)}
   else if(body.action==='dependency_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const done=new Set(tasks.filter(t=>t.state==='done').map(t=>t.id)),blockedBy=p.dependsOn.filter(id=>!done.has(id));tasks=tasks.map(t=>t.id===p.uuid?{...t,dependsOn:[...p.dependsOn],blockedBy,blocked:blockedBy.length>0}:t)}
   else if(body.action==='related_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const wanted=new Set(p.relatedTo);tasks=tasks.map(t=>t.id===p.uuid?{...t,relatedTo:[...p.relatedTo]}:wanted.has(t.id)&&!t.relatedTo.includes(p.uuid)?{...t,relatedTo:[...t.relatedTo,p.uuid]}:!wanted.has(t.id)&&t.relatedTo.includes(p.uuid)?{...t,relatedTo:t.relatedTo.filter(x=>x!==p.uuid)}:t)}
   else if(body.action==='context_update')context={...context,...p};

@@ -26,8 +26,27 @@ def fingerprint(value):
     return hashlib.sha256(encoded(value).encode()).hexdigest()
 
 
+CHECKLIST_LIMIT = 50
+
+
+def checklist_items(items):
+    """A task's light checklist: short ordered items with no due date, priority or links of their own."""
+    if not isinstance(items,list) or len(items)>CHECKLIST_LIMIT:
+        raise AssistantError('invalid_checklist','A checklist holds up to 50 items.')
+    clean,seen=[],set()
+    for item in items:
+        if not isinstance(item,dict) or set(item)-{'id','text','done'}:raise AssistantError('invalid_checklist','Invalid checklist item.')
+        ident,text,done=item.get('id'),item.get('text'),item.get('done',False)
+        if not isinstance(ident,str) or not 1<=len(ident)<=40 or ident in seen:raise AssistantError('invalid_checklist','Each checklist item needs its own id.')
+        if not isinstance(text,str) or not text.strip() or len(text)>300 or any(ord(c)<32 for c in text):raise AssistantError('invalid_checklist','Checklist items are one line of 1-300 characters.')
+        if not isinstance(done,bool):raise AssistantError('invalid_checklist','Done is true or false.')
+        seen.add(ident);clean.append({'id':ident,'text':text.strip(),'done':done})
+    return clean
+
+
 def continuity_values(payload):
-    value={k:payload[k] for k in ('remainingMinutes','awaiting','context','next') if k in payload}
+    value={k:payload[k] for k in ('remainingMinutes','awaiting','context','next','checklist') if k in payload}
+    if 'checklist' in value:value['checklist']=checklist_items(value['checklist'])
     remaining=value.get('remainingMinutes')
     if remaining is not None and (isinstance(remaining,bool) or not isinstance(remaining,(int,float)) or not math.isfinite(remaining) or not 0<=remaining<=100000):
         raise AssistantError('invalid_estimate','Use nonnegative minutes or leave the estimate empty.')
@@ -458,7 +477,7 @@ class Assistant:
                     plan["effect"]["context_set"] = value
             else:
                 uid = self.required(p["uuid"])["uuid"]
-                allowed = {"remainingMinutes", "awaiting", "context", "next"}
+                allowed = {"remainingMinutes", "awaiting", "context", "next", "checklist"}
                 if set(p) - allowed - {"uuid"}:
                     raise AssistantError("invalid_continuity", "Invalid declaration.")
                 value = continuity_values(p)

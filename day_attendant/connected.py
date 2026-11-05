@@ -42,7 +42,7 @@ ALLOWED = {
     "front_activate": {"uuid", "order"}, "front_todo": {"uuid", "order"}, "front_retire": {"uuid"},
     "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"},
     "context_update": {"availableMinutes", "availableUntil", "rest"},
-    "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next"},
+    "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "checklist"},
     "dependency_update": {"uuid","dependsOn"},
     "related_update": {"uuid","relatedTo"},
     "order_update": {"order"},
@@ -66,7 +66,7 @@ PRESENTATION = ("order_update", "group_color_update", "group_rename", "group_res
 FOLLOWUP_DELAY = 2.6  # seconds without new changes before the assistant looks at them
 FOLLOWUP_ACTIONS = ("front_activate", "front_todo", "task_snooze", "task_update")
 BASIS = ("state", "until", "due", "priority", "groups", "dependsOn", "blockedBy", "remainingMinutes", "awaiting")
-CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": ""}
+CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "checklist": []}
 # Effects whose previous value a fact keeps, so Undo can restore them.
 RESTORABLE = {"order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link"}
 # Inverse-only actions: Undo reaches them, never a request of their own.
@@ -350,7 +350,7 @@ class Connected:
                 "source":row['metadata'].get('source','general'),"person":row['metadata'].get('person'),"reference":row['metadata'].get('reference'),
                 "observedAt":row['metadata'].get('observed_at'),"capturedAt":row['metadata'].get('captured_at'),
                 "context": extra.get("context", ""), "next": extra.get("next", ""),
-                "remainingMinutes": extra.get("remainingMinutes"), "awaiting": extra.get("awaiting", False),
+                "remainingMinutes": extra.get("remainingMinutes"), "awaiting": extra.get("awaiting", False), "checklist": extra.get("checklist", []),
                 "progressRecordedAt": row["metadata"].get("human_progress_at")})
         return tasks
 
