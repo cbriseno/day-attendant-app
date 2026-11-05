@@ -139,6 +139,30 @@ class Assistant:
         if connected:return [dep for dep in row.get('depends',[]) if by_id.get(dep,{}).get('status')!='completed']
         return [dep for dep in row.get('depends',[]) if by_id.get(dep,{}).get('status') in ('pending','recurring')]
 
+    def raise_blockers(self, row, priority, patch, plan):
+        """A more urgent task makes every open task that blocks it, directly or indirectly, at least as urgent.
+        It only raises, never lowers, and shares the change's single Undo."""
+        rank = lambda value: PRIORITY_RANK.get(PUBLIC_PRIORITY.get(value), len(PRIORITY_RANK))
+        wanted = rank(priority)
+        if wanted >= rank(row.get("priority")):
+            return
+        by_id = {item["uuid"]: item for item in self.tasks.rows()}
+        seen, queue, raised = {row["uuid"]}, list(row.get("depends") or []), []
+        while queue:
+            uid = queue.pop(0)
+            if uid in seen:
+                continue
+            seen.add(uid)
+            blocker = by_id.get(uid)
+            if not blocker or blocker.get("status") != "pending":
+                continue
+            if rank(blocker.get("priority")) > wanted:
+                patch(blocker, {"priority": priority})
+                raised.append(uid)
+            queue.extend(blocker.get("depends") or [])
+        if raised:
+            plan["result"]["raised"] = raised
+
     def validate_dependencies(self,target,refs):
         if not isinstance(refs,list) or len(refs)>100 or any(not isinstance(x,str) for x in refs):
             raise AssistantError('invalid_dependencies','Dependencies must be a bounded list of task UUIDs.')
@@ -328,6 +352,17 @@ class Assistant:
                 changes["lastActive"]=row["start"]
             patch(row, changes)
             plan["result"] = {"uuid": row["uuid"]}
+            if action == "task_restore":
+                # A propagated raise is undone with its task, each blocker only if nothing touched it since.
+                for item in p.get("also") or []:
+                    other = self.required(item["uuid"])
+                    if canonical(other) != upgraded_record(item["expected_after"]):
+                        raise AssistantError("undo_conflict", "A raised blocker changed after this fact; nothing was overwritten.")
+                    if set(item["patch"]) - {"priority"}:
+                        raise AssistantError("invalid_restore", "The inverse exceeds the fields of that decision.")
+                    patch(other, dict(item["patch"]))
+            if action == "task_update" and "priority" in changes and row["status"] == "pending":
+                self.raise_blockers(row, changes["priority"], patch, plan)
         elif action=='related_update':
             uid=self.required(p['uuid'])['uuid'];refs=p['relatedTo']
             if not isinstance(refs,list) or len(refs)>100 or any(not isinstance(x,str) for x in refs):raise AssistantError('invalid_relations','Related responsibilities must be a bounded UUID list.')

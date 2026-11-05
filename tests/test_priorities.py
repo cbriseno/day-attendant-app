@@ -10,8 +10,8 @@ import unittest
 
 from day_attendant import archives
 from day_attendant.cli import main
-from day_attendant.connected import Connected
 from day_attendant.errors import AssistantError
+from day_attendant.connected import Connected
 from day_attendant.service import Assistant
 from day_attendant.taskstore import PRIORITIES, SCHEMA, TaskStore
 from test_connected import NOW, ReviewFixture
@@ -227,3 +227,59 @@ class ServiceStartUpgradeTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class BlockerPriorityTests(DailyBase):
+    def priorities(self):
+        return {t['id']: t['priority'] for t in self.board.snapshot()['tasks']}
+
+    def test_raising_a_blocked_task_raises_open_blockers_and_one_undo_restores_all(self):
+        ids = {}
+        for name, level in (('goal', 'medium'), ('direct', 'low'), ('indirect', 'medium'), ('higher', 'urgent'), ('closed', 'low')):
+            ids[name] = self.apply('task_add', {'title': name, 'priority': level})['result']['uuid']
+        self.apply('dependency_update', {'uuid': ids['goal'], 'dependsOn': [ids['direct'], ids['higher'], ids['closed']]})
+        self.apply('dependency_update', {'uuid': ids['direct'], 'dependsOn': [ids['indirect']]})
+        self.apply('task_done', {'uuid': ids['closed']})
+        p = self.apply('task_update', {'uuid': ids['goal'], 'priority': 'high'})
+        self.assertEqual(sorted(p['result']['raised']), sorted([ids['direct'], ids['indirect']]))
+        levels = self.priorities()
+        self.assertEqual([levels[ids[k]] for k in ('goal', 'direct', 'indirect', 'higher')], ['high', 'high', 'high', 'urgent'])
+        self.assertEqual(self.app.tasks.get(ids['closed'])['priority'], 'L')
+        last = self.board.snapshot()['lastFact']
+        self.assertTrue(last['undoable'])
+        self.assertEqual(sorted(last['raised']), sorted([ids['direct'], ids['indirect']]))
+        self.assertEqual(self.board.undo(last['id'], 'undo-raise')['phase'], 'applied')
+        levels = self.priorities()
+        self.assertEqual([levels[ids[k]] for k in ('goal', 'direct', 'indirect', 'higher')], ['medium', 'low', 'medium', 'urgent'])
+
+    def test_lowering_never_changes_blockers(self):
+        goal = self.apply('task_add', {'title': 'goal', 'priority': 'high'})['result']['uuid']
+        blocker = self.apply('task_add', {'title': 'blocker', 'priority': 'medium'})['result']['uuid']
+        self.apply('dependency_update', {'uuid': goal, 'dependsOn': [blocker]})
+        p = self.apply('task_update', {'uuid': goal, 'priority': 'low'})
+        self.assertNotIn('raised', p['result'])
+        self.assertEqual(self.priorities()[blocker], 'medium')
+
+    def test_urgent_raise_reaches_the_whole_chain_and_undoes_in_one_step(self):
+        goal = self.apply('task_add', {'title': 'goal', 'priority': 'low'})['result']['uuid']
+        mid = self.apply('task_add', {'title': 'mid', 'priority': 'medium'})['result']['uuid']
+        root = self.apply('task_add', {'title': 'root', 'priority': 'low'})['result']['uuid']
+        self.apply('dependency_update', {'uuid': goal, 'dependsOn': [mid]})
+        self.apply('dependency_update', {'uuid': mid, 'dependsOn': [root]})
+        self.apply('task_update', {'uuid': goal, 'priority': 'urgent'})
+        self.assertEqual([self.priorities()[x] for x in (goal, mid, root)], ['urgent'] * 3)
+        self.assertEqual(self.board.undo(self.board.snapshot()['lastFact']['id'], 'undo-urgent')['phase'], 'applied')
+        self.assertEqual([self.priorities()[x] for x in (goal, mid, root)], ['low', 'medium', 'low'])
+
+    def test_undo_refuses_without_overwriting_when_a_raised_blocker_changed_since(self):
+        goal = self.apply('task_add', {'title': 'goal', 'priority': 'low'})['result']['uuid']
+        blocker = self.apply('task_add', {'title': 'blocker', 'priority': 'low'})['result']['uuid']
+        self.apply('dependency_update', {'uuid': goal, 'dependsOn': [blocker]})
+        self.apply('task_update', {'uuid': goal, 'priority': 'high'})
+        raise_fact = self.board.snapshot()['lastFact']['id']
+        self.apply('task_update', {'uuid': blocker, 'title': 'blocker edited'})
+        before = self.board.snapshot()['tasks']
+        with self.assertRaises(AssistantError) as caught:
+            self.board.undo(raise_fact, 'undo-stale-raise')
+        self.assertEqual(caught.exception.code, 'undo_conflict')
+        self.assertEqual(self.board.snapshot()['tasks'], before)

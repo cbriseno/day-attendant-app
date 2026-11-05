@@ -309,7 +309,7 @@ class Connected:
         plan = json.loads(row["plan"])
         return {"id": row["id"], "action": row["action"], "at": row["at"], "proposal_id": row["proposal_id"], "proposalId": row["proposal_id"],
                 "taskId": plan.get("target_uuid"), "undoOf": plan.get("undo_of"), "origin": plan.get("origin"),
-                "undoable": self._undoable(plan), "reviewStatus": plan.get("review_status"),
+                "undoable": self._undoable(plan), "reviewStatus": plan.get("review_status"), "raised": (plan.get("result") or {}).get("raised") or [],
                 "reviewComplete": plan.get("review_status") == "not_required" or plan.get("review_complete") is not False}
 
     def announced(self, proposal):
@@ -501,6 +501,7 @@ class Connected:
         steps,effect=plan["steps"],set(plan["effect"])
         if plan.get("action") in ("group_rename","group_restore"):return bool(steps or effect)
         if len(steps)==1 and steps[0].get("before") is None:return plan.get("action")=="task_add"
+        if len(steps)>1 and plan.get("action")=="task_update" and all(s.get("before") and set(s["patch"])=={"priority"} for s in steps[1:]):steps=steps[:1]
         if len(steps)==1:return not effect-{"attachments_link","continuity_set","order_set"} and ("continuity_set" not in effect or "continuity" in plan.get("inverse",{}))
         return not steps and bool(effect) and bool(plan.get("inverse")) and not effect-RESTORABLE
 
@@ -763,6 +764,7 @@ class Connected:
                 return "task_restore",{"uuid":step["uuid"],"expected_after":step["after"],"undo_of":fact_id,
                     "patch":{"status":"deleted","end":wire(self.app.now()),"start":None,"wait":None}}
             payload={"uuid":step["uuid"],"expected_after":step["after"],"patch":{k:step["before"].get(k) for k in step["patch"]},"undo_of":fact_id}
+            if len(steps)>1:payload["also"]=[{"uuid":s["uuid"],"expected_after":s["after"],"patch":{"priority":s["before"].get("priority")}} for s in steps[1:]]
             if "continuity_set" in effect:expect_continuity();payload["continuity"]=inverse["continuity"][1]
             if "order_set" in effect:
                 if self.store.state_value("task_order",[])!=effect["order_set"]:raise conflict
