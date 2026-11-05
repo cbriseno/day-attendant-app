@@ -122,7 +122,7 @@ class ConnectedTests(unittest.TestCase):
     def test_waiting_change_goes_stale_when_a_linked_task_changes(self):
         self.apply('dependency_update',{'uuid':self.ids[2],'dependsOn':[self.ids[1]]})
         proposal=self.waiting_retire(self.ids[1])
-        self.apply('task_done',{'uuid':self.ids[2]})
+        self.apply('dependency_update',{'uuid':self.ids[2],'dependsOn':[]})
         current=self.board.proposal(proposal['id'])
         self.assertEqual(current['phase'],'stale')
         with self.assertRaises(AssistantError):self.board.confirm(proposal['id'],current['generation'])
@@ -228,15 +228,23 @@ class ConnectedTests(unittest.TestCase):
         self.assertEqual(json.loads(self.board.snapshot()['events'][-1]['plan'])['undo_of'],fact)
         self.assertEqual(self.board.snapshot()['lastFact']['undoOf'],fact)
 
-    def test_undo_cannot_activate_a_now_blocked_dependency(self):
+    def test_undo_can_activate_a_now_blocked_dependency(self):
         self.app.tasks.patch(self.ids[1],{'status':'completed'})
         self.app.tasks.patch(self.ids[0],{'depends':self.ids[1]})
         self.apply('task_done',{'uuid':self.ids[0]})
         fact=self.board.snapshot()['events'][-1]['id']
         self.app.tasks.patch(self.ids[1],{'status':'pending','end':None})
-        with self.assertRaises(AssistantError) as error:self.board.undo(fact,'undo-with-new-dependency')
-        self.assertEqual(error.exception.code,'not_actionable')
-        self.assertEqual(self.app.tasks.get(self.ids[0])['status'],'completed')
+        self.board.undo(fact,'undo-with-new-dependency')
+        self.assertEqual(self.app.tasks.get(self.ids[0])['status'],'pending')
+
+    def test_blocked_task_can_start_but_not_complete(self):
+        self.apply('dependency_update', {'uuid': self.ids[2], 'dependsOn': [self.ids[1]]})
+        self.apply('front_activate', {'uuid': self.ids[2]})
+        with self.assertRaises(AssistantError) as error:
+            self.request('task_done', {'uuid': self.ids[2]})
+        self.assertEqual(error.exception.code, 'not_actionable')
+        self.apply('task_done', {'uuid': self.ids[1]})
+        self.apply('task_done', {'uuid': self.ids[2]})
 
     def death(self,point):
         script='''

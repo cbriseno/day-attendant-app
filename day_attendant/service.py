@@ -308,10 +308,8 @@ class Assistant:
                 if isinstance(changes.get("project"),str):changes["project"]=[changes["project"]] if changes["project"] else None
                 if not changes or set(changes) - {"description", "priority", "due", "wait", "start", "status", "end", "depends", "project", "lastActive", "groupChanged", "nextUp"}:
                     raise AssistantError("invalid_restore", "The inverse exceeds the fields of that decision.")
-                if changes.get('start',row.get('start')) and changes.get('status',row['status'])=='pending':
-                    by_id={item['uuid']:item for item in self.tasks.rows()}
-                    if self.blockers(dict(row,depends=changes.get('depends',row.get('depends')) or []),by_id):
-                        raise AssistantError('not_actionable','The inverse cannot activate a responsibility whose dependencies are now pending.')
+                if changes.get('status') == 'completed' and self.blockers(dict(row, depends=changes.get('depends', row.get('depends')) or []), {item['uuid']: item for item in self.tasks.rows()}):
+                    raise AssistantError('not_actionable', 'Complete the pending prerequisites first.')
                 if 'depends' in changes:self.validate_dependencies(row['uuid'],changes['depends'] or [])
             elif action=='dependency_update':
                 wanted=self.validate_dependencies(row['uuid'],p['dependsOn'])
@@ -320,9 +318,6 @@ class Assistant:
                 if row["status"] != "pending":
                     raise AssistantError("terminal_task", "The responsibility is already closed.")
                 if action == "front_activate":
-                    by_id = {item["uuid"]: item for item in self.tasks.rows()}
-                    if self.blockers(row,by_id):
-                        raise AssistantError("not_actionable", "The responsibility depends on another pending task.")
                     changes = {"start": row.get("start") or wire(now), "wait": None, "nextUp": None}
                 elif action == "front_todo":
                     changes = {"start": None, "wait": None}
@@ -334,6 +329,8 @@ class Assistant:
             elif action == "task_done":
                 if row['status']=='deleted':
                     raise AssistantError('terminal_task','Restore a retired responsibility before marking it complete.')
+                if row['status'] != 'completed' and self.blockers(row, {item['uuid']: item for item in self.tasks.rows()}):
+                    raise AssistantError('not_actionable', 'Complete the pending prerequisites first.')
                 changes = {} if row['status']=='completed' else {"status": "completed", "end": wire(now), "start": None, "wait": None}
             elif action == "task_snooze":
                 if row["status"] != "pending":

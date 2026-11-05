@@ -265,10 +265,10 @@ function taskRow(t,s,data,proposal){
  rowsBuilt.set(t.id+'|'+s.key,row);return row.html}
 function buildRow(t,s,data,proposal){
  const stripe=orderView==='group'?s.label:taskGroups(t)[0];
- const off=data.readOnly||t.pending,label=text=>esc(text+': '+t.title),blockedStart=t.blocked&&t.state!=='active';
+ const off=data.readOnly||t.pending,label=text=>esc(text+': '+t.title);
  const handle=s.draggable&&!data.readOnly&&!t.pending?'<button type="button" class="drag-handle" data-id="'+t.id+'" data-action="move" aria-label="'+label(tr('reorder'))+'" title="'+esc(tr('reorder_hint'))+'">'+gripIcon+'</button>':'';
  const state=t.state==='active'?'<button type="button" class="ib state-action on" data-id="'+t.id+'" data-action="todo" aria-label="'+label(tr('pause'))+'" title="'+esc(tr('pause'))+'"'+(off?' disabled':'')+'>'+pauseIcon+'</button>'
-  :'<button type="button" class="ib state-action" data-id="'+t.id+'" data-action="activate" aria-label="'+label(t.state==='snoozed'?tr('resume_b3bd0b'):tr('start'))+'" title="'+esc(blockedStart?tr('start_blocked'):t.state==='snoozed'?tr('resume_b3bd0b'):tr('start'))+'"'+(off||blockedStart?' disabled':'')+'>'+playIcon+'</button>';
+  :'<button type="button" class="ib state-action" data-id="'+t.id+'" data-action="activate" aria-label="'+label(t.state==='snoozed'?tr('resume_b3bd0b'):tr('start'))+'" title="'+esc(t.state==='snoozed'?tr('resume_b3bd0b'):tr('start'))+'"'+(off?' disabled':'')+'>'+playIcon+'</button>';
  const open=expanded===t.id&&!t.pending;
  return '<article class="task'+(stripe?' grouped':'')+(t.state==='active'?' is-active':'')+(t.pending?' saving':'')+(open?' expanded':'')+(titleEdit?.id===t.id?' editing':'')+'"'+(stripe?' style="'+groupStyle(stripe)+'"':'')+' data-task-id="'+t.id+'" data-section="'+esc(t.state+':'+s.key)+'"><div class="row-main">'
   +'<span class="row-grip">'+handle+'</span>'
@@ -1058,8 +1058,7 @@ function dropCard(d){
  const before=near('previousElementSibling'),after=near('nextElementSibling');let heading=card.previousElementSibling;while(heading&&!heading.classList.contains('group-heading'))heading=heading.previousElementSibling;
  const changes=[],notes=[];
  if(state!==t.state){
-  if(state==='active'&&t.blocked){notice(tr('drop_blocked'));return false}
-  if(state==='snoozed'){const until=tomorrowAt(9).toISOString();changes.push(['snooze',{taskId:t.id,until}]);notes.push(tr('drop_snoozed').replace('{time}',short(until)))}
+   if(state==='snoozed'){const until=tomorrowAt(9).toISOString();changes.push(['snooze',{taskId:t.id,until}]);notes.push(tr('drop_snoozed').replace('{time}',short(until)))}
   else{changes.push([state==='active'?'activate':'todo',{taskId:t.id}]);notes.push(tr('drop_moved').replace('{lane}',laneName(state)))}
  }
  const patch={};
