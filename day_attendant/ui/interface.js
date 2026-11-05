@@ -761,7 +761,7 @@ let expanded=null,titleEdit=null,picker=null,savedNote=null,retireAsk=null,rende
 // What the person typed, by task and field, with the value it started from. A draft survives
 // every redraw and a conflict; it goes only once saved or discarded.
 const drafts=new Map(),fieldTimers=new Map(),draftKey=(id,field)=>id+'|'+field;
-const FIELD_ACTIONS={title:'task_update',context:'continuity_update',next:'continuity_update',remainingMinutes:'continuity_update',awaiting:'continuity_update',blockReason:'continuity_update'};
+const FIELD_ACTIONS={title:'task_update',notes:'continuity_update',context:'continuity_update',next:'continuity_update',remainingMinutes:'continuity_update',awaiting:'continuity_update',blockReason:'continuity_update'};
 const same=(a,b)=>(a??null)===(b??null);
 const draftValue=(t,field)=>{const d=drafts.get(draftKey(t.id,field));return d?d.value:field==='remainingMinutes'?(t.remainingMinutes??''):t[field]};
 function startDraft(id,field,value){const t=task(id);if(!t)return null;const k=draftKey(id,field);let d=drafts.get(k);if(!d){d={id,field,value,base:t[field],conflict:null,error:''};drafts.set(k,d)}d.value=value;d.error='';return d}
@@ -874,6 +874,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
   :'<button type="button" class="btn ghost danger" data-x="retire"'+off+'>'+esc(tr('retire_7ad0e0'))+'</button><button type="button" class="btn ghost" data-x="duplicate"'+off+'>'+esc(tr('duplicate'))+'</button><button type="button" class="btn ghost" data-x="close">'+esc(tr('close_details'))+'</button><span class="saved-note" aria-live="polite">'+(note?checkIcon+esc(note):'')+'</span>';
  return '<div class="expand" data-expand="'+t.id+'"><div class="xgrid">'
   +'<div class="xfield"><span class="xlabel">'+esc(tr('files_label'))+'</span>'+taskFiles(t,true)+'</div>'
+  +field('notes','general_notes','<textarea id="'+id('notes')+'" data-id="'+t.id+'" data-field="notes" data-anon-private="value text" rows="3" maxlength="2000"'+off+'>'+esc(draftValue(t,'notes'))+'</textarea>'+(t.notes?'<div class="note-preview" data-anon-private="text">'+richText(t.notes)+'</div>':''))
   +field('context','where_i_left_off','<textarea id="'+id('context')+'" data-id="'+t.id+'" data-field="context" data-anon-private="value text" rows="2" maxlength="2000" placeholder="'+esc(tr('where_i_left_off_placeholder'))+'"'+off+'>'+esc(draftValue(t,'context'))+'</textarea>')
   +field('next','next_step','<input type="text" id="'+id('next')+'" data-id="'+t.id+'" data-field="next" data-anon-private="value text" maxlength="2000" autocomplete="off" placeholder="'+esc(tr('next_step_placeholder'))+'" value="'+esc(draftValue(t,'next'))+'"'+off+'>')
   +checklistField(t,off)
@@ -988,9 +989,10 @@ function restoreTyping(s){if(!s)return;const node=$('board').querySelector(s.sea
 $('board').addEventListener('input',e=>{const {field,id,search}=e.target.dataset||{};if(search){showPicker(e.target);return}if(!field||!id||field==='awaiting')return;startDraft(id,field,e.target.value);if(field!=='title')queueSave(id,field)});
 $('board').addEventListener('change',e=>{const {field,id}=e.target.dataset||{};if(field==='awaiting'&&id){startDraft(id,'awaiting',e.target.checked);saveDraft(id,'awaiting')}});
 $('board').addEventListener('focusin',e=>{if(e.target.dataset?.search){hidePickers(e.target.nextElementSibling);showPicker(e.target)}});
+$('board').addEventListener('focusin',e=>{if(e.target.matches('[data-field=notes]')&&!e.target.dataset.formatWired){e.target.dataset.formatWired='1';formatInput(e.target)}});
 $('board').addEventListener('focusout',e=>{if(rendering)return;const {field,id,search}=e.target.dataset||{};
  if(search){setTimeout(()=>{const list=e.target.nextElementSibling;if(list&&!list.contains(document.activeElement)&&document.activeElement!==e.target){list.hidden=true;e.target.setAttribute('aria-expanded','false');if(picker?.id===e.target.dataset.pickerTask)picker=null}},150);return}
- if(!field||!id)return;if(field==='title'){if(formatLinkOpen||e.relatedTarget?.closest?.('[data-conflict],.format-bar,[data-format-dialog]'))return;commitTitle(id)}else if(drafts.has(draftKey(id,field)))saveDraft(id,field)});
+ if(!field||!id)return;if(field==='title'){if(formatLinkOpen||e.relatedTarget?.closest?.('[data-conflict],.format-bar,[data-format-dialog]'))return;commitTitle(id)}else if(!formatLinkOpen&&!e.relatedTarget?.closest?.('.format-bar,[data-format-dialog]')&&drafts.has(draftKey(id,field)))saveDraft(id,field)});
 $('board').addEventListener('keydown',e=>{const {field,id,search}=e.target.dataset||{};
  if(field==='title'&&id){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();commitTitle(id)}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelTitle(id)}return}
  if(search&&e.key==='Enter'){e.preventDefault();e.target.nextElementSibling?.querySelector('[data-pick]')?.click();return}
@@ -1404,7 +1406,7 @@ class RemoteFlow{
   else if(body.action==='task_add')tasks=[...tasks,{id:'draft:'+(++this.drafts),title:p.title,state:'todo',priority:p.priority||'medium',group:p.groups?.[0]||p.group||null,groups:p.groups||(p.group?[p.group]:[]),due:p.due||null,until:null,blocked:false,dependsOn:[],blockedBy:[],relatedTo:[],attachmentIds:[],context:'',next:'',awaiting:false,remainingMinutes:null,createdAt:null,pending:true}];
   else if(body.action==='event_add'||body.action==='event_update'){const events=data.calendar_events||[],shown={title:p.title,...(p.start?{start_at:p.start}:{}),...(p.end?{end_at:p.end}:{})};if(body.action==='event_update'&&!events.some(e=>e.uuid===p.uuid))return false;
    this.data={...data,calendar_events:(body.action==='event_add'?[...events,{uuid:'draft:'+(++this.drafts),...shown,pending:true}]:events.map(e=>e.uuid===p.uuid?{...e,...shown}:e)).sort((a,b)=>Date.parse(a.start_at)-Date.parse(b.start_at))};globalThis.dayDaily?.update(this.data);return {tasks:data.tasks,context:data.context,calendar_events:events}}
-  else if(body.action==='continuity_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const fields=Object.fromEntries(['context','next','awaiting','remainingMinutes','checklist','blockReason'].filter(k=>k in p).map(k=>[k,p[k]]));if('blockReason' in p)fields.blockedSince=p.blockReason?(tasks.find(t=>t.id===p.uuid)?.blockedSince||new Date().toISOString()):null;tasks=tasks.map(t=>t.id===p.uuid?{...t,...fields}:t)}
+  else if(body.action==='continuity_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const fields=Object.fromEntries(['context','next','notes','awaiting','remainingMinutes','checklist','blockReason'].filter(k=>k in p).map(k=>[k,p[k]]));if('blockReason' in p)fields.blockedSince=p.blockReason?(tasks.find(t=>t.id===p.uuid)?.blockedSince||new Date().toISOString()):null;tasks=tasks.map(t=>t.id===p.uuid?{...t,...fields}:t)}
   else if(body.action==='dependency_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const done=new Set(tasks.filter(t=>t.state==='done').map(t=>t.id)),blockedBy=p.dependsOn.filter(id=>!done.has(id));tasks=tasks.map(t=>t.id===p.uuid?{...t,dependsOn:[...p.dependsOn],blockedBy,blocked:blockedBy.length>0}:t)}
   else if(body.action==='related_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const wanted=new Set(p.relatedTo);tasks=tasks.map(t=>t.id===p.uuid?{...t,relatedTo:[...p.relatedTo]}:wanted.has(t.id)&&!t.relatedTo.includes(p.uuid)?{...t,relatedTo:[...t.relatedTo,p.uuid]}:!wanted.has(t.id)&&t.relatedTo.includes(p.uuid)?{...t,relatedTo:t.relatedTo.filter(x=>x!==p.uuid)}:t)}
   else if(body.action==='context_update')context={...context,...p};

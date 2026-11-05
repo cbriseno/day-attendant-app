@@ -46,7 +46,7 @@ def checklist_items(items):
 
 
 def continuity_values(payload):
-    value={k:payload[k] for k in ('remainingMinutes','awaiting','context','next','checklist','blockReason','blockedSince') if k in payload}
+    value={k:payload[k] for k in ('remainingMinutes','awaiting','context','next','notes','checklist','blockReason','blockedSince') if k in payload}
     if 'checklist' in value:value['checklist']=checklist_items(value['checklist'])
     # A manual block names an outside reason (a person, a provider, a decision); dependencies stay separate.
     if 'blockReason' in value:
@@ -60,7 +60,7 @@ def continuity_values(payload):
         raise AssistantError('invalid_estimate','Use nonnegative minutes or leave the estimate empty.')
     if 'awaiting' in value and not isinstance(value['awaiting'],bool):
         raise AssistantError('invalid_continuity','Waiting requires an explicit declaration.')
-    if any(not isinstance(value[k],str) or len(value[k])>2000 for k in ('context','next') if k in value):
+    if any(not isinstance(value[k],str) or len(value[k])>2000 for k in ('context','next','notes') if k in value):
         raise AssistantError('invalid_continuity','Context must be short text.')
     return value
 
@@ -517,7 +517,7 @@ class Assistant:
                     plan["effect"]["context_set"] = value
             else:
                 uid = self.required(p["uuid"])["uuid"]
-                allowed = {"remainingMinutes", "awaiting", "context", "next", "checklist", "blockReason"}
+                allowed = {"remainingMinutes", "awaiting", "context", "next", "notes", "checklist", "blockReason"}
                 if set(p) - allowed - {"uuid", "blockedSince"}:
                     raise AssistantError("invalid_continuity", "Invalid declaration.")
                 value = continuity_values(p)

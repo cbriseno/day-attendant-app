@@ -43,7 +43,7 @@ ALLOWED = {
     "front_activate": {"uuid", "order"}, "front_todo": {"uuid", "order"}, "front_retire": {"uuid"},
     "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"},
     "context_update": {"availableMinutes", "availableUntil", "rest"},
-    "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "checklist", "blockReason"},
+    "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "notes", "checklist", "blockReason"},
     "dependency_update": {"uuid","dependsOn"},
     "related_update": {"uuid","relatedTo"},
     "schedule_update": {"uuid","repeat","reminders"},
@@ -69,7 +69,7 @@ PRESENTATION = ("order_update", "group_color_update", "group_rename", "group_res
 FOLLOWUP_DELAY = 2.6  # seconds without new changes before the assistant looks at them
 FOLLOWUP_ACTIONS = ("front_activate", "front_todo", "task_snooze", "task_update")
 BASIS = ("state", "until", "due", "priority", "groups", "dependsOn", "blockedBy", "remainingMinutes", "awaiting")
-CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "checklist": [], "blockReason": "", "blockedSince": None}
+CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "notes": "", "checklist": [], "blockReason": "", "blockedSince": None}
 # Effects whose previous value a fact keeps, so Undo can restore them.
 RESTORABLE = {"schedule_set", "order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link", "attachments_set"}
 # Inverse-only actions: Undo reaches them, never a request of their own.
@@ -361,7 +361,7 @@ class Connected:
                 "files":files.get(row["uuid"],[]),
                 "source":row['metadata'].get('source','general'),"person":row['metadata'].get('person'),"reference":row['metadata'].get('reference'),
                 "observedAt":row['metadata'].get('observed_at'),"capturedAt":row['metadata'].get('captured_at'),
-                "context": extra.get("context", ""), "next": extra.get("next", ""),
+                "context": extra.get("context", ""), "next": extra.get("next", ""), "notes": extra.get("notes", ""),
                 "remainingMinutes": extra.get("remainingMinutes"), "awaiting": extra.get("awaiting", False), "checklist": extra.get("checklist", []),
                 "blockReason": extra.get("blockReason", ""), "blockedSince": extra.get("blockedSince"),
                 "progressRecordedAt": row["metadata"].get("human_progress_at")})
@@ -557,7 +557,7 @@ class Connected:
         restoring={"undo_of","declaredAt"} if inverse and action=="context_update" else {"undo_of","blockedSince"} if inverse and action=="continuity_update" else {"undo_of"} if inverse else set()
         if not isinstance(action,str) or action not in RESTORE and (action not in ALLOWED or set(payload)-ALLOWED[action]-restoring):
             raise AssistantError("unsupported_action", "Unsupported action or fields.")
-        for name in ('uuid','title','priority','due','until','start','end','observed_at','zone','source','person','reference','context','next','group','to'):
+        for name in ('uuid','title','priority','due','until','start','end','observed_at','zone','source','person','reference','context','next','notes','group','to'):
             if name in payload and payload[name] is not None and not isinstance(payload[name],str):
                 raise AssistantError('invalid_request','Text fields must contain strings.')
         if "nextUp" in payload and type(payload["nextUp"]) is not bool:

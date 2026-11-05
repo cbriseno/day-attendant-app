@@ -868,3 +868,6 @@ Object.assign(globalThis.dayTranslations.es,{format_text:'Dar formato',format_bo
 
 Object.assign(globalThis.dayTranslations.en,{files_label:'Attachments',file_preview:'Image preview',file_previous:'Previous',file_next:'Next'});
 Object.assign(globalThis.dayTranslations.es,{files_label:'Adjuntos',file_preview:'Vista previa',file_previous:'Anterior',file_next:'Siguiente'});
+
+Object.assign(globalThis.dayTranslations.en,{general_notes:'Notes',field_notes:'Notes'});
+Object.assign(globalThis.dayTranslations.es,{general_notes:'Notas generales',field_notes:'Notas generales'});
