@@ -142,7 +142,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(204,b'', 'image/x-icon');return
         if self.path=='/themes.css':
             self.reply(200,(ASSETS/'themes.css').read_bytes(),'text/css; charset=utf-8');return
-        if self.path in ('/interface.js','/locales.js','/daily.js','/ordering.js','/theme.js','/anonymize.js','/anonymize-boot.js'):
+        if self.path in ('/interface.js','/locales.js','/daily.js','/ordering.js','/theme.js','/anonymize.js','/anonymize-boot.js','/proactive.js'):
             self.reply(200,(ASSETS/self.path[1:]).read_bytes(),'text/javascript; charset=utf-8');return
         if not self.authenticated():
             self.reply(401,{'error':{'code':'session_required','message':'Open the local link for this session.'}});return
@@ -250,6 +250,20 @@ class Handler(BaseHTTPRequestHandler):
                 if set(body)!={'key'}:raise ValueError('fields')
                 result=self.server.chat.retry(body['key'])
                 if result['status']=='pending':self.server.pool.submit(self.server.run_chat,body['key'])
+            elif self.path=='/api/proactive':
+                from . import proactive
+                op=body.get('op')
+                if op in ('tick','run') and set(body)=={'op'}:
+                    result={'added':proactive.run_pass(board,manual=op=='run'),'limited':proactive.limit_reached(board)}
+                elif op=='settings' and set(body)=={'op','values'}:
+                    with board.store.lock():
+                        board.store.assert_writable()
+                        result=proactive.configure(board.store,body['values'])
+                elif op=='answer' and set(body)=={'op','id','answer','key'}:
+                    with board.proactive_lock:
+                        result=proactive.answer(board,body['id'],body['answer'],body['key'],board.store.state_value('timezone','UTC'))
+                    if result.get('result'):review=True
+                else:raise ValueError('op')
             elif self.path=='/api/agent-mode':
                 if set(body)-{'mode','duration'}:raise ValueError('fields')
                 from .agent_mode import set_mode

@@ -121,6 +121,7 @@ class Connected:
         self.inflight_lock = threading.Lock()
         self.suggesting = set()
         self.fact_targets = {}  # Facts are append-only; their operation key confirms a cached target.
+        self.proactive_lock = threading.Lock()
         self.reviewing = threading.Lock()
         self.review_again = False
 
@@ -455,6 +456,8 @@ class Connected:
         # Stored dates beyond the window keep the service's rules without widening it for everyone.
         rules["years"] = [zone_year(data["timezone"], year) for year in stored_years(data, rules)]
         data["zoneRules"] = rules
+        from .proactive import view as proactive_view
+        with self.store.lock():data["proactive"] = proactive_view(self)
         data["tag"] = fingerprint({k: v for k, v in data.items() if k != "now"})[:32]
         return data
 

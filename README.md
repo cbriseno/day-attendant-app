@@ -98,7 +98,10 @@ A new personal profile is empty. `service open` prints a private session URL and
 attempts to open your browser; if no browser is available, open that URL yourself.
 Treat it as a credential. Without Codex/Claude, typed tasks, calendar, relationships,
 local known-data rules and backups work. Chat, model follow-up and suggested order
-show their unavailable status. Starting a service sends no inference turn.
+show their unavailable status. Starting a service sends no inference turn. While the
+browser page is open, optional check-ins use the selected assistant and its subscription;
+Settings controls their frequency, rest hours and daily limit. Pausing or turning off
+assistant use blocks new model turns while local reminders and backups continue.
 
 On Linux, private state is `day-attendant/profiles/default` inside the user
 state directory selected by `XDG_STATE_HOME`; that directory defaults to
