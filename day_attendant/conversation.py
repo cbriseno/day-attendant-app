@@ -67,7 +67,7 @@ class Conversation:
                 return dict(old)
             self.board.store.assert_writable()
             for ref in refs:
-                if not con.execute('SELECT 1 FROM attachments WHERE id=?',(ref,)).fetchone():raise AssistantError('attachment_not_found','A selected attachment does not exist.')
+                if not con.execute("SELECT 1 FROM attachments WHERE id=? AND mime IN ('image/png','image/jpeg','image/webp')",(ref,)).fetchone():raise AssistantError('attachment_not_found','A selected image does not exist.')
             con.execute("INSERT INTO messages(key,role,text,status,at,capture_only) VALUES(?,'user',?,'pending',?,?)",(key,text,self.board.app.now(),int(capture_only)))
             for ref in refs:con.execute('INSERT INTO message_attachments VALUES(?,?)',(key,ref))
             return dict(con.execute('SELECT * FROM messages WHERE key=?',(key,)).fetchone())

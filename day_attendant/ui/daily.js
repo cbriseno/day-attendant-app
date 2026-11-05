@@ -41,11 +41,11 @@ function buildCapture(){
 function openCapture(origin,event=null,draft=null){
  const d=buildCapture();eventId=event?.uuid||null;captureRevision=flow.snapshot().revision;$('capture-title').value=event?.title||draft?.title||'';
  if(draft){if(draft.priority)$('capture-priority').value=draft.priority;if(draft.due)$('capture-due').value=ui.localValue(new Date(draft.due))}
- const selectedGroups=wireGroupPicker('capture-group',draft?.groups||[]);
+ const selectedGroups=wireGroupPicker('capture-group',draft?.groups||[]),files=ui.attachmentPicker(d.querySelector('.modal-body'),$('capture-title'));ui.formatInput($('capture-title'));
  $('capture-kind').value=event?'event':'task';$('capture-kind').disabled=!!event;
  const kind=()=>{const isEvent=$('capture-kind').value==='event';$('event-fields').hidden=!isEvent;$('capture-due').closest('label').hidden=isEvent;$('capture-priority-field').hidden=isEvent;$('capture-group-picker').hidden=isEvent};$('capture-kind').onchange=kind;kind();
  const start=storedTime('capture-start',event?.start_at),end=storedTime('capture-end',event?.end_at);if(event)d.querySelector('details').hidden=true;
- d.querySelector('form').onsubmit=e=>{e.preventDefault();formAction(d.id,async()=>{const title=$('capture-title').value.trim();if(!title)throw Error(tr('daily_9996af5999'));const isEvent=$('capture-kind').value==='event';let payload={title};if(isEvent){payload.start=start();payload.end=end();if(!payload.start||!payload.end)throw Error(tr('daily_ad3c3e9e8e'));if(eventId)payload.uuid=eventId}else{payload.priority=$('capture-priority').value;payload.due=requiredTime('capture-due');payload.groups=selectedGroups()}
+ d.querySelector('form').onsubmit=e=>{e.preventDefault();formAction(d.id,async()=>{const title=$('capture-title').value.trim();if(!title)throw Error(tr('daily_9996af5999'));const isEvent=$('capture-kind').value==='event';let payload={title};if(isEvent){payload.start=start();payload.end=end();if(!payload.start||!payload.end)throw Error(tr('daily_ad3c3e9e8e'));if(eventId)payload.uuid=eventId}else{payload.priority=$('capture-priority').value;payload.due=requiredTime('capture-due');payload.groups=selectedGroups();payload.attachmentIds=files.ids()}
  if(!eventId){payload.source=$('capture-source').value;for(const [name,id] of [['person','capture-person'],['reference','capture-reference']])if($(id).value.trim())payload[name]=$(id).value.trim();const observed=requiredTime('capture-observed');if(observed)payload.observed_at=observed}
  await flow.request(eventId?'event_update':isEvent?'event_add':'task_add',payload,undefined,captureRevision);if(draft&&$('qa-input').value===draft.raw){$('qa-input').value='';renderQuick()}d.close('saved')})};open(d,origin);
 }
@@ -102,13 +102,14 @@ function renderQuick(showError=false){
  const q=parseQuick(value);
  if(q.error&&(showError||!q.title)){box.innerHTML=`<span class="qa-error">${esc(q.error)}</span>`;return}
  const past=q.due&&new Date(q.due)<new Date(flow.snapshot().now||Date.now());
- box.innerHTML=`<span>${esc(tr('daily_68f93bc9de'))}</span><b>${esc(q.title)}</b><span class="priority-pill" data-priority="${q.priority||'medium'}">${esc(tr('priority_'+(q.priority||'medium')))}</span>`
+ box.innerHTML=`<span>${esc(tr('daily_68f93bc9de'))}</span><b>${ui.richText(q.title)}</b><select class="priority-pill qa-priority" aria-label="${esc(tr('priority'))}" data-priority="${q.priority||'medium'}">${['urgent','high','medium','low'].map(p=>`<option value="${p}"${p===(q.priority||'medium')?' selected':''}>${esc(tr('priority_'+p))}</option>`).join('')}</select>`
   +q.groups.map(g=>{const near=similarGroup(g);return `<span class="qa-group">${ui.groupDot(g)}${esc(g)}${!rankedGroups().some(x=>groupKey(x.label)===groupKey(g))?' ('+esc(tr('new_group'))+')':''}</span>`+(near?`<span class="qa-similar">${esc(tr('group_similar').replace('{group}',near))} <button type="button" class="link-button" data-use-group="${esc(near)}" data-typed="${esc(g)}">${esc(tr('use_group').replace('{group}',near))}</button></span>`:'')}).join('')
   +(q.due?`<span${past?' class="qa-warn"':''}>${esc(tr('daily_655310dc3f')+ui.full(q.due))}${past?' · '+esc(tr('daily_846f78a2c1')):''}</span>`:'')
   +(q.error?`<span class="qa-error">${esc(q.error)}</span>`:`<span>· Enter</span>`);renderGroupSuggestions();
 }
 const quick=document.createElement('form');quick.className='quick-add';quick.id='quick-add';quick.autocomplete='off';
 quick.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><input id="qa-input" maxlength="2400" enterkeyhint="done" aria-describedby="qa-preview"><button class="btn ghost qa-hash" type="button" id="qa-hash" aria-label="${esc(tr('groups_open'))}">#</button><button class="btn primary" type="submit" id="qa-submit"></button>`;
+const quickFiles=ui.attachmentPicker(quick,quick.querySelector('#qa-input'));ui.formatInput(quick.querySelector('#qa-input'));
 const quickPreview=document.createElement('div');quickPreview.className='qa-preview';quickPreview.id='qa-preview';quickPreview.setAttribute('aria-live','polite');
 $('tasks-area').insertBefore(quick,document.querySelector('.toolbar'));$('tasks-area').insertBefore(quickPreview,document.querySelector('.toolbar'));
 const quickLabels=()=>{$('qa-input').removeAttribute('placeholder');$('qa-input').setAttribute('aria-label',tr('daily_8d72694f53'));$('qa-submit').textContent=tr('daily_61cc55aa04')};
@@ -131,15 +132,21 @@ for(const node of [suggestions,hashList]){node.onpointerdown=e=>e.preventDefault
 $('qa-hash').onclick=()=>{hashOpen=!hashOpen;quickFocused=true;$('qa-input').focus();renderGroupSuggestions()};
 $('qa-input').addEventListener('focus',()=>{quickFocused=true;renderGroupSuggestions()});$('qa-input').addEventListener('blur',()=>{quickFocused=false;hashOpen=false;hashIndex=-1;renderGroupSuggestions()});
 $('qa-input').addEventListener('keydown',e=>{if(hashList.hidden)return;const options=[...hashList.querySelectorAll('button')];if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();hashIndex=(hashIndex+(e.key==='ArrowDown'?1:-1)+options.length)%options.length;renderGroupSuggestions()}else if(['Enter','Tab'].includes(e.key)&&options.length){e.preventDefault();e.stopImmediatePropagation();chooseGroup(options[Math.max(0,hashIndex)].dataset.pickGroup)}else if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();hashOpen=false;quickFocused=false;renderGroupSuggestions()}});
+quickPreview.addEventListener('change',e=>{
+ if(!e.target.matches('.qa-priority'))return;
+ const input=$('qa-input'),words=input.value.match(/#"(?:[^"\\]|\\.)*"|\S+/gu)||[];
+ input.value=words.filter(word=>{const match=/^!(\S+)$/.exec(word.toLocaleLowerCase().replace(/[.,;]+$/,''));return !match||!PRIORITY_WORDS[match[1]]}).join(' ')+' !'+e.target.value;
+ input.focus();renderQuick();
+});
 quickPreview.onclick=e=>{const b=e.target.closest('[data-use-group]');if(!b)return;const input=$('qa-input');input.value=input.value.replace(/#"(?:[^"\\]|\\.)*"|\S+/gu,word=>readHash(word)===b.dataset.typed?groupToken(b.dataset.useGroup):word);input.focus();renderQuick()};
 $('qa-input').addEventListener('input',()=>{quickFocused=true;hashIndex=-1;renderQuick()});
 // Local keys only: Enter adds, Esc clears the line, then leaves it.
 $('qa-input').addEventListener('keydown',e=>{if(e.key!=='Escape')return;e.preventDefault();e.stopPropagation();if($('qa-input').value){$('qa-input').value='';renderQuick()}else $('qa-input').blur()});
 quick.onsubmit=e=>{e.preventDefault();const input=$('qa-input'),raw=input.value;if(!raw.trim()){input.focus();return}const q=parseQuick(raw);if(q.error){renderQuick(true);input.focus();return}
- const payload={title:q.title,priority:q.priority||'medium',source:'general',groups:q.groups,...(q.due?{due:q.due}:{})};
+ let ids;try{ids=quickFiles.ids()}catch(error){notice(error.message);return}const payload={title:q.title,priority:q.priority||'medium',source:'general',groups:q.groups,attachmentIds:ids,...(q.due?{due:q.due}:{})};
  // The card shows at once; the line is free for the next one while the service saves it.
  input.value='';renderQuick();input.focus();
- safely(async()=>{try{await flow.request('task_add',payload)}catch(error){if(!input.value){input.value=raw;renderQuick()}throw error}})};
+ safely(async()=>{try{await flow.request('task_add',payload);quickFiles.clear(ids)}catch(error){if(!input.value){input.value=raw;renderQuick()}throw error}})};
 
 function buildSettings(){
  $('settings-dialog')?.remove();const days=['mon','tue','wed','thu','fri','sat','sun'].map(k=>tr('weekday_'+k));

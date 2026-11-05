@@ -376,6 +376,25 @@ function taskRow(t,s,data,proposal){
  // The chips stand for the other tasks a row names, and the two times for what the clock changes in it.
  const inputs=JSON.stringify([t,s.key,s.draggable,!!proposal,creationAge(t.createdAt),!!t.due&&new Date(t.due)<NOW])+dependencyChips(t,data),kept=rowsKept.get(t.id+'|'+s.key),row=kept?.inputs===inputs?kept:{inputs,html:buildRow(t,s,data,proposal)};
  rowsBuilt.set(t.id+'|'+s.key,row);return row.html}
+const imageFile=file=>['image/png','image/jpeg','image/webp'].includes(file.mime);
+function taskFiles(t,details=false){
+ const files=t.files||[];if(!files.length&&!details)return '';
+ const items=(details?files:files.slice(0,2)).map(file=>{
+  const content=imageFile(file)?'<button type="button" class="file-preview" data-preview="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(file.name)+'"><img src="/api/attachments/'+esc(file.id)+'" alt=""></button>':'<a class="file-chip" href="/api/attachments/'+esc(file.id)+'" download="'+esc(file.name)+'">📎 '+esc(file.name)+'</a>';
+  return '<span class="task-file">'+content+(details?'<button type="button" class="file-remove" data-file-remove="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(tr('remove_file').replace('{name}',file.name))+'">×</button>':'')+'</span>';
+ }).join('');
+ return '<div class="task-files">'+items+(!details&&files.length>2?'<span>+'+(files.length-2)+'</span>':'')+(details?'<label class="btn ghost">'+esc(tr('attach_files'))+'<input type="file" data-file-add="'+esc(t.id)+'" multiple hidden></label>':'')+'</div>';
+}
+function previewFiles(id,fileId,origin){
+ const files=(task(id)?.files||[]).filter(imageFile);let index=files.findIndex(file=>file.id===fileId);if(index<0)return;
+ const d=groupDialog(tr('file_preview'),'<div class="preview-body"><img alt=""><p class="hint"></p><div class="actions"><button type="button" class="btn" data-previous>'+esc(tr('file_previous'))+'</button><button type="button" class="btn" data-next>'+esc(tr('file_next'))+'</button></div></div>',origin);
+ const draw=()=>{const file=files[index];d.querySelector('img').src='/api/attachments/'+encodeURIComponent(file.id);d.querySelector('img').alt=file.name;d.querySelector('.hint').textContent=file.name+' · '+(index+1)+' / '+files.length;d.querySelector('[data-previous]').disabled=index===0;d.querySelector('[data-next]').disabled=index===files.length-1};
+ const move=delta=>{index=Math.max(0,Math.min(files.length-1,index+delta));draw()};d.querySelector('[data-previous]').onclick=()=>move(-1);d.querySelector('[data-next]').onclick=()=>move(1);d.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')move(-1);if(e.key==='ArrowRight')move(1)});draw();
+}
+async function uploadTaskFiles(id,files){
+ const ids=[];for(const file of files){if(file.size>20*1024*1024)throw Error(tr('file_too_large'));const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});const saved=await deliver('/api/attachments',{name:file.name,mime:file.type||'application/octet-stream',base64,purpose:'task'},undefined,{refresh:false});ids.push(saved.id)}
+ const current=task(id);if(!current)throw Error(tr('reason_not_applied'));await flow.request('attachments_update',{uuid:id,attachmentIds:[...current.attachmentIds,...ids]});
+}
 function buildRow(t,s,data,proposal){
  const stripe=orderView==='group'?s.label:taskGroups(t)[0];
  const off=data.readOnly||t.pending,label=text=>esc(text+': '+t.title);
@@ -386,7 +405,7 @@ function buildRow(t,s,data,proposal){
  return '<article class="task'+(stripe?' grouped':'')+(t.state==='active'?' is-active':'')+(t.blockReason?' is-blocked':'')+(t.pending?' saving':'')+(open?' expanded':'')+(titleEdit?.id===t.id?' editing':'')+'"'+(stripe?' style="'+groupStyle(stripe)+'"':'')+' data-task-id="'+t.id+'" data-section="'+esc(t.state+':'+s.key)+'"><div class="row-main">'
   +'<span class="row-grip">'+handle+'</span>'
   +'<button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+label(tr('complete'))+'" title="'+esc(tr('complete'))+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button>'
-  +'<div class="row-text">'+suggestionReason(t,data)+titleCell(t,data)+'<span class="row-meta">'+rowMeta(t,data,proposal,s)+'</span></div>'
+  +'<div class="row-text">'+suggestionReason(t,data)+titleCell(t,data)+taskFiles(t)+'<span class="row-meta">'+rowMeta(t,data,proposal,s)+'</span></div>'
   +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+(t.nextUp?'★':'☆')+'</button>':'')+priorityButton(t,off)+''
   +state+'<button type="button" class="ib" data-id="'+t.id+'" data-action="snooze" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('snooze'))+'" title="'+esc(tr('snooze'))+'"'+(off?' disabled':'')+'>'+clockIcon+'</button>'
   +'<button type="button" class="ib more" data-id="'+t.id+'" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('more_actions'))+'" title="'+esc(tr('more_actions_hint'))+'">'+moreIcon+'</button></div>'
@@ -775,10 +794,37 @@ function fieldNote(t,field){const d=drafts.get(draftKey(t.id,field));if(!d)retur
  const cur=d.conflict.current,shown=field==='awaiting'?tr(cur?'value_yes':'value_no'):cur===null||cur===undefined||cur===''?tr('value_empty'):String(cur);
  const b=(kind,label,cls)=>'<button type="button" class="btn '+cls+'" data-conflict="'+kind+'" data-conflict-id="'+t.id+'" data-conflict-field="'+field+'">'+esc(tr(label))+'</button>';
  return '<div class="field-conflict" role="alert"><p>'+esc(tr('conflict_changed').replace('{value}',shown))+'</p><div class="conflict-actions">'+b('mine','conflict_keep_mine','primary')+b('theirs','conflict_use_current','ghost')+'</div></div>'}
+function richText(value){
+ const text=String(value),pattern=/\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;let html='',last=0,match;
+ while((match=pattern.exec(text))){html+=esc(text.slice(last,match.index));
+  if(match[1]){let url;try{url=new URL(match[2]);if(!['http:','https:'].includes(url.protocol))url=null}catch{url=null}
+   html+=url?'<a href="'+esc(url.href)+'" target="_blank" rel="noopener noreferrer">'+esc(match[1])+'</a>':esc(match[0]);
+  }else html+=match[3]?'<strong>'+esc(match[3])+'</strong>':'<em>'+esc(match[4])+'</em>';
+  last=pattern.lastIndex;
+ }return html+esc(text.slice(last));
+}
+let formatLinkOpen=false;
+function formatInput(input){
+ const bar=document.createElement('span');bar.className='format-bar';bar.hidden=true;bar.setAttribute('role','toolbar');bar.setAttribute('aria-label',tr('format_text'));
+ for(const [kind,label] of [['bold','B'],['italic','I'],['link','↗']]){const b=document.createElement('button');b.type='button';b.dataset.format=kind;b.textContent=label;b.setAttribute('aria-label',tr('format_'+kind));bar.append(b)}
+ input.after(bar);
+ const update=()=>{bar.hidden=document.activeElement!==input||input.selectionStart===input.selectionEnd};
+ input.addEventListener('select',update);input.addEventListener('focus',update);input.addEventListener('keyup',update);input.addEventListener('pointerup',update);
+ const wrap=(start,end,text)=>{input.setRangeText(text,start,end,'select');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();update()};
+ const act=kind=>{const start=input.selectionStart,end=input.selectionEnd,selected=input.value.slice(start,end);
+  if(kind!=='link'){const mark=kind==='bold'?'**':'*';wrap(start,end,mark+selected+mark);return}
+  formatLinkOpen=true;const d=groupDialog(tr('format_link'),'<label class="field"><span>'+esc(tr('link_text'))+'</span><input name="label" required></label><label class="field"><span>'+esc(tr('link_address'))+'</span><input name="url" type="text" required></label><button class="btn primary" type="submit">'+esc(tr('save'))+'</button>',input);
+  d.dataset.formatDialog='';d.addEventListener('close',()=>{formatLinkOpen=false});d.querySelector('[name=label]').value=selected;d.querySelector('[name=url]').focus();
+  d.querySelector('form').onsubmit=e=>{e.preventDefault();let url=d.querySelector('[name=url]').value.trim();if(!/^[a-z][a-z0-9+.-]*:/i.test(url))url='https://'+url;try{const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol))throw Error();url=parsed.href}catch{d.querySelector('.error').hidden=false;d.querySelector('.error').textContent=tr('invalid_link');return}const label=d.querySelector('[name=label]').value.trim();if(!label)return;d.close();wrap(start,end,'['+label+']('+url+')')};
+ };
+ bar.addEventListener('pointerdown',e=>e.preventDefault());bar.onclick=e=>{const b=e.target.closest('[data-format]');if(b)act(b.dataset.format)};
+ input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.altKey&&['b','i','k'].includes(e.key.toLowerCase())){e.preventDefault();e.stopPropagation();act({b:'bold',i:'italic',k:'link'}[e.key.toLowerCase()])}});
+ return bar;
+}
 function titleCell(t,data){
  if(titleEdit?.id===t.id)return '<span class="title-editor"><input class="title-edit" data-id="'+t.id+'" data-field="title" data-anon-private="value text" maxlength="500" autocomplete="off" value="'+esc(draftValue(t,'title'))+'" aria-label="'+esc(tr('edit_title')+': '+t.title)+'"'+(data.readOnly?' disabled':'')+'><span class="edit-hint">'+esc(tr('title_edit_hint'))+'</span>'+fieldNote(t,'title')+'</span>';
- return '<span class="title-wrap">'+suggestionMark(t,data)+'<button type="button" class="task-title" data-anon-private="text" data-id="'+t.id+'" data-action="title" aria-label="'+esc(tr('edit_title')+': '+t.title)+'" title="'+esc(tr('edit_title_hint'))+'">'+esc(t.title)+'</button></span>'}
-function startTitleEdit(id){const t=task(id),data=flow.snapshot();if(!t||t.pending||data.readOnly||['done','retired'].includes(t.state))return;closeMenu(false);titleEdit={id};render();const input=$('board').querySelector('.title-edit[data-id="'+id+'"]');if(input){input.focus({preventScroll:true});input.select()}}
+ return '<span class="title-wrap">'+suggestionMark(t,data)+'<span class="task-title" tabindex="0" data-title-view data-anon-private="text" data-id="'+t.id+'" data-action="title" aria-label="'+esc(tr('edit_title')+': '+t.title)+'" title="'+esc(tr('edit_title_hint'))+'">'+richText(t.title)+'</span></span>'}
+function startTitleEdit(id){const t=task(id),data=flow.snapshot();if(!t||t.pending||data.readOnly||['done','retired'].includes(t.state))return;closeMenu(false);titleEdit={id};render();const input=$('board').querySelector('.title-edit[data-id="'+id+'"]');if(input){formatInput(input);input.focus({preventScroll:true});input.select()}}
 function commitTitle(id){const d=drafts.get(draftKey(id,'title'));if(d?.conflict||d?.saving)return;titleEdit=null;
  // An emptied title keeps the saved one, as Esc does. A new one leaves before the row is redrawn.
  if(d&&!String(d.value).trim())drafts.delete(draftKey(id,'title'));if(drafts.has(draftKey(id,'title')))saveDraft(id,'title');render();restoreTitleFocus(id)}
@@ -827,6 +873,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
  const foot=retireAsk===t.id?'<div class="inline-confirm" role="alert"><span>'+esc(tr('retire_this_responsibility_it_will_be_kept_s'))+'</span><button type="button" class="btn danger" data-x="retire-yes">'+esc(tr('yes_retire'))+'</button><button type="button" class="btn" data-x="retire-no">'+esc(tr('cancel'))+'</button></div>'
   :'<button type="button" class="btn ghost danger" data-x="retire"'+off+'>'+esc(tr('retire_7ad0e0'))+'</button><button type="button" class="btn ghost" data-x="duplicate"'+off+'>'+esc(tr('duplicate'))+'</button><button type="button" class="btn ghost" data-x="close">'+esc(tr('close_details'))+'</button><span class="saved-note" aria-live="polite">'+(note?checkIcon+esc(note):'')+'</span>';
  return '<div class="expand" data-expand="'+t.id+'"><div class="xgrid">'
+  +'<div class="xfield"><span class="xlabel">'+esc(tr('files_label'))+'</span>'+taskFiles(t,true)+'</div>'
   +field('context','where_i_left_off','<textarea id="'+id('context')+'" data-id="'+t.id+'" data-field="context" data-anon-private="value text" rows="2" maxlength="2000" placeholder="'+esc(tr('where_i_left_off_placeholder'))+'"'+off+'>'+esc(draftValue(t,'context'))+'</textarea>')
   +field('next','next_step','<input type="text" id="'+id('next')+'" data-id="'+t.id+'" data-field="next" data-anon-private="value text" maxlength="2000" autocomplete="off" placeholder="'+esc(tr('next_step_placeholder'))+'" value="'+esc(draftValue(t,'next'))+'"'+off+'>')
   +checklistField(t,off)
@@ -837,7 +884,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
   +'<div class="xfield"><span class="xlabel">'+esc(tr('required_by_label'))+'</span><div class="rel-list">'+relationRows(dependents,'dependent',t,data)+'</div></div>'
   +'<div class="xfield"><span class="xlabel">'+esc(tr('related_label'))+'</span><div class="rel-list">'+relationRows(t.relatedTo,'rel',t,data)+'</div>'+pickerInput(t,'rel',data)+'</div>'
   +scheduleFields(t,data)
-  +'<div class="xfield"><span class="xlabel">'+esc(tr('source_and_dates'))+'</span><dl class="meta-grid">'+source.map(([k,v,typed])=>'<dt>'+esc(k)+'</dt><dd'+(typed?' data-anon-safe="text"':' data-anon-private="text"')+'>'+esc(v)+'</dd>').join('')+'</dl>'+(t.attachmentIds||[]).map(a=>'<a href="/api/attachments/'+esc(a)+'" target="_blank" rel="noopener">'+esc(tr('source_image'))+'</a>').join(' ')+'</div>'
+  +'<div class="xfield"><span class="xlabel">'+esc(tr('source_and_dates'))+'</span><dl class="meta-grid">'+source.map(([k,v,typed])=>'<dt>'+esc(k)+'</dt><dd'+(typed?' data-anon-safe="text"':' data-anon-private="text"')+'>'+esc(v)+'</dd>').join('')+'</dl>'+'</div>'
   +'</div><div class="expand-foot">'+foot+'</div></div>'}
 function toggleExpand(id,open=expanded!==id){const t=task(id);if(open&&(!t||t.pending))return;flush();expanded=open?id:null;retireAsk=null;savedNote=null;render();
  const card=$('board').querySelector('[data-task-id="'+id+'"]');// An instant scroll: a smooth one would keep scrolling and close a menu opened right after.
@@ -943,7 +990,7 @@ $('board').addEventListener('change',e=>{const {field,id}=e.target.dataset||{};i
 $('board').addEventListener('focusin',e=>{if(e.target.dataset?.search){hidePickers(e.target.nextElementSibling);showPicker(e.target)}});
 $('board').addEventListener('focusout',e=>{if(rendering)return;const {field,id,search}=e.target.dataset||{};
  if(search){setTimeout(()=>{const list=e.target.nextElementSibling;if(list&&!list.contains(document.activeElement)&&document.activeElement!==e.target){list.hidden=true;e.target.setAttribute('aria-expanded','false');if(picker?.id===e.target.dataset.pickerTask)picker=null}},150);return}
- if(!field||!id)return;if(field==='title'){if(e.relatedTarget?.closest?.('[data-conflict]'))return;commitTitle(id)}else if(drafts.has(draftKey(id,field)))saveDraft(id,field)});
+ if(!field||!id)return;if(field==='title'){if(formatLinkOpen||e.relatedTarget?.closest?.('[data-conflict],.format-bar,[data-format-dialog]'))return;commitTitle(id)}else if(drafts.has(draftKey(id,field)))saveDraft(id,field)});
 $('board').addEventListener('keydown',e=>{const {field,id,search}=e.target.dataset||{};
  if(field==='title'&&id){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();commitTitle(id)}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelTitle(id)}return}
  if(search&&e.key==='Enter'){e.preventDefault();e.target.nextElementSibling?.querySelector('[data-pick]')?.click();return}
@@ -988,12 +1035,29 @@ function groupMenu(t,data,selected){const off=data.readOnly||t.pending,groups=ra
   +'<div class="menu-scroll">'+groups.map(g=>menuItem('group-toggle',groupDot(g)+esc(groupName(g)),{value:g,checked:taskGroups(t).some(x=>groupKey(x)===groupKey(g)),disabled:off}).replace('menuitemradio','menuitemcheckbox')).join('')+'</div><p class="menu-error" role="alert" hidden></p>'
   +(current?'<div class="menu-sep" role="separator"></div><p class="menu-title">'+esc(tr('group_color_of').replace('{group}',current))+'</p><div class="swatches">'+Object.keys(GROUP_COLORS).map(c=>'<button type="button" class="swatch" role="menuitemradio" aria-checked="'+(groupColor(current)===c)+'" data-menu-act="group-color" data-group-name="'+esc(current)+'" data-value="'+c+'" style="--c:'+GROUP_COLORS[c]+'" aria-label="'+esc(tr('color_'+c))+'"'+(off?' disabled':'')+'></button>').join('')+'</div>':'')}
 function groupDialog(title,body,origin){const d=document.createElement('dialog');d.className='group-dialog';d.innerHTML='<form class="modal-form"><header class="modal-header"><h2>'+esc(title)+'</h2><button type="button" class="btn ghost" data-dismiss aria-label="'+esc(tr('close'))+'">×</button></header><div class="modal-body">'+body+'<p class="error" role="alert" hidden></p></div></form>';document.body.append(d);registerDialog(d);d.querySelector('[data-dismiss]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());openDialog(d,origin);return d}
+function attachmentPicker(host,pasteTarget){
+ const box=document.createElement('div'),input=document.createElement('input'),button=document.createElement('button'),list=document.createElement('div'),error=document.createElement('p');
+ box.className='capture-files';input.type='file';input.multiple=true;input.hidden=true;button.type='button';button.className='btn ghost';button.textContent=tr('attach_files');error.className='error';error.setAttribute('role','alert');box.append(button,input,list,error);host.append(box);
+ let files=[],pending=0;
+ const draw=()=>{list.replaceChildren();for(const file of files){const row=document.createElement('span');row.className='capture-file';row.append(document.createTextNode(file.name+' '));const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label',tr('remove_file').replace('{name}',file.name));remove.onclick=()=>{files=files.filter(f=>f!==file);draw()};row.append(remove);list.append(row)}};
+ const add=async selected=>{error.textContent='';pending++;button.disabled=true;try{for(const file of selected){
+  if(file.size>20*1024*1024)throw Error(tr('file_too_large'));
+  const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});
+  files.push(await deliver('/api/attachments',{name:file.name,mime:file.type||'application/octet-stream',base64,purpose:'task'},undefined,{refresh:false}));draw();
+ }}catch(err){error.textContent=err.message}finally{pending--;button.disabled=!!pending;input.value=''}};
+ button.onclick=()=>input.click();input.onchange=()=>add([...input.files]);
+ pasteTarget?.addEventListener('paste',e=>{const images=[...e.clipboardData.files].filter(f=>f.type.startsWith('image/'));if(images.length){e.preventDefault();add(images)}});
+ return {ids:()=>{if(pending)throw Error(tr('files_uploading'));return files.map(f=>f.id)},clear:ids=>{files=ids?files.filter(f=>!ids.includes(f.id)):[];draw()}};
+}
 function openSectionCapture(origin){
  const group=origin.dataset.sectionAdd||'';
  const dialog=groupDialog(tr('section_add_in').replace('{group}',group||tr('no_group')),
-  '<label class="field"><span>'+esc(tr('section_title'))+'</span><textarea name="title" maxlength="500" rows="3" required></textarea></label><p class="hint">'+esc(tr('section_keys'))+'</p><button type="submit" class="btn primary">'+esc(tr('section_submit'))+'</button>',origin);
+  '<label class="field"><span>'+esc(tr('section_title'))+'</span><textarea name="title" maxlength="500" rows="3" required></textarea></label><p class="hint">'+esc(tr('section_keys'))+'</p>'
+  +'<label class="field"><span>'+esc(tr('priority'))+'</span><select name="priority">'+['urgent','high','medium','low'].map(p=>'<option value="'+p+'"'+(p==='medium'?' selected':'')+'>'+esc(tr('priority_'+p))+'</option>').join('')+'</select></label>'
+  +'<details><summary>'+esc(tr('groups_open'))+'</summary><div class="section-groups">'+rankedGroups().map(g=>'<label><input type="checkbox" name="groups" value="'+esc(g.label)+'"'+(groupKey(g.label)===groupKey(group)?' checked':'')+'>'+esc(g.label)+'</label>').join('')+'</div><label class="field"><span>'+esc(tr('add_group'))+'</span><input name="newgroup" maxlength="120"></label></details>'
+  +'<button type="submit" class="btn primary">'+esc(tr('section_submit'))+'</button>',origin);
  dialog.classList.add('section-capture');
- const form=dialog.querySelector('form'),input=form.elements.title,button=form.querySelector('[type=submit]'),error=form.querySelector('.error');
+ const form=dialog.querySelector('form'),input=form.elements.title,button=form.querySelector('[type=submit]'),error=form.querySelector('.error'),files=attachmentPicker(form.querySelector('.modal-body'),input);
  input.addEventListener('keydown',e=>{
   if(e.key!=='Enter'||e.isComposing||e.shiftKey)return;
   if(e.ctrlKey||e.metaKey){e.preventDefault();input.setRangeText('\n',input.selectionStart,input.selectionEnd,'end');return}
@@ -1002,13 +1066,15 @@ function openSectionCapture(origin){
  form.onsubmit=async e=>{
   e.preventDefault();const title=input.value.trim();if(!title||button.disabled)return;
   button.disabled=true;error.hidden=true;
-  try{const result=await flow.request('task_add',{title,priority:'medium',source:'general',groups:group?[group]:[]});
+  try{const groups=[...form.querySelectorAll('[name=groups]:checked')].map(el=>el.value),newgroup=form.elements.newgroup.value.trim();if(newgroup&&!groups.some(g=>groupKey(g)===groupKey(newgroup)))groups.push(newgroup);if(group&&!rankedGroups().some(g=>groupKey(g.label)===groupKey(group))&&!groups.some(g=>groupKey(g)===groupKey(group)))groups.push(group);
+   const result=await flow.request('task_add',{title,priority:form.elements.priority.value,source:'general',groups,attachmentIds:files.ids()});
    if(result.phase!=='applied')throw Error(tr('reason_not_applied'));
-   input.value='';input.focus();
+   input.value='';files.clear();input.focus();
   }catch(err){error.textContent=err.message;error.hidden=false}
   finally{button.disabled=false}
  };
- input.focus();
+ form.elements.newgroup.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.focus()}});
+ formatInput(input);input.focus();
 }
 const renameViews=new Map();try{for(const [k,v] of JSON.parse(sessionStorage.getItem('day-attendant-rename-views')||'[]'))renameViews.set(k,v)}catch{}
 function saveGroupPreferences(){try{localStorage.setItem('day-attendant-group-filter',groupFilter);localStorage.setItem('day-attendant-folded-groups',JSON.stringify([...foldedGroups]));sessionStorage.setItem('day-attendant-rename-views',JSON.stringify([...renameViews]))}catch{}}
@@ -1136,10 +1202,16 @@ document.addEventListener('keydown',e=>{if(!menu||!menu.node.contains(document.a
 addEventListener('scroll',e=>{if(!menu||menu.node.classList.contains('sheet')||!(e.target===document||e.target.contains?.($('board'))))return;const a=anchorOf(menu.id,menu.action),r=a?.getClientRects().length?a.getBoundingClientRect():null;
  if(menu.point||!r||r.bottom<0||r.top>innerHeight)closeMenu(false);else placeMenu(menu.node,a)},true);addEventListener('resize',()=>{if(!document.activeElement?.matches?.('.menu-input'))closeMenu(false)});
 $('board').addEventListener('contextmenu',e=>{const card=e.target.closest('.task');if(!card)return;if(drag){e.preventDefault();return}e.preventDefault();if(menu?.id===card.dataset.taskId&&performance.now()-menu.at<800)return;openMenu(card.dataset.taskId,'more',{x:e.clientX,y:e.clientY})});
+$('board').addEventListener('dblclick',e=>{const title=e.target.closest('[data-title-view]');if(title&&!e.target.closest('a'))startTitleEdit(title.dataset.id)});
+$('board').addEventListener('keydown',e=>{const title=e.target.closest('[data-title-view]');if(title&&(e.key==='Enter'||e.key==='F2')){e.preventDefault();startTitleEdit(title.dataset.id)}});
+$('board').addEventListener('paste',e=>{const input=e.target.closest('.title-edit');if(!input)return;const files=[...e.clipboardData.files].filter(file=>file.type.startsWith('image/'));if(files.length){e.preventDefault();safely(()=>uploadTaskFiles(input.dataset.id,files))}});
+$('board').addEventListener('dragover',e=>{if(e.target.closest('.title-edit')&&e.dataTransfer.types.includes('Files'))e.preventDefault()});
+$('board').addEventListener('drop',e=>{const input=e.target.closest('.title-edit');if(!input||!e.dataTransfer.files.length)return;e.preventDefault();e.stopPropagation();safely(()=>uploadTaskFiles(input.dataset.id,[...e.dataTransfer.files]))});
+$('board').addEventListener('change',e=>{const input=e.target.closest('[data-file-add]');if(!input||!input.files.length)return;const id=input.dataset.fileAdd,files=[...input.files];input.value='';safely(()=>uploadTaskFiles(id,files))});
 $('board').addEventListener('click',e=>{const b=e.target.closest('[data-action="done"]');if(!b)return;const t=task(b.dataset.id);if(!t?.blockReason||t.state==='done')return;
  e.stopPropagation();e.preventDefault();const r=b.getBoundingClientRect();openMenu(t.id,'blockdone',{x:r.left,y:r.bottom+4})},true);
 function announceBlock(t,reason){const live=document.querySelector('#board-status,[role=status][aria-live]');if(live)live.textContent=reason?tr('block_announce').replace('{title}',t.title).replace('{reason}',reason):tr('block_announce_clear').replace('{title}',t.title)}
-$('board').onclick=e=>{const add=e.target.closest('[data-section-add]');if(add){openSectionCapture(add);return}const fold=e.target.closest('[data-fold]');if(fold){toggleFold(fold.dataset.fold);return}const sb=e.target.closest('[data-suggestion]');if(sb){const {suggestion,suggestionAction}=sb.dataset;bubbleFor=null;safely(async()=>{const accepted=suggestionAction==='accept'&&flow.snapshot().suggestions.find(s=>s.id===suggestion)?.action;if(accepted)await flow.accept(suggestion,accepted);else{const started=performance.now();timed(flow.observe(await api('/api/suggestions/'+suggestion+'/'+suggestionAction,{})),started);await flow.refresh()}render()});return}if(inlineClick(e))return;const b=e.target.closest('[data-action]');if(!b){const card=e.target.closest('.task');if(card&&!e.target.closest('.assistant-bubble'))toggleExpand(card.dataset.taskId);else if(dependencyFocus&&!card)toggleDependencies(dependencyFocus);return}const {id,action}=b.dataset;if(action==='next-up'){const t=task(id);if(t)request('task_update',{uuid:id,nextUp:!t.nextUp});return}if(action==='suggestion'){bubbleFor=bubbleFor===id?null:id;render();$('board').querySelector('[data-id="'+id+'"][data-action="suggestion"]')?.focus({preventScroll:true});return}if(action==='retire'){openMenu(id,'retire');if(menu)retireConfirm()}else if(action==='group'&&b.dataset.renameLabel&&e.detail){clearTimeout(chipTimer);if(e.detail>1)return;chipTimer=setTimeout(()=>{if(inlineRename||!b.isConnected)return;if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action,undefined,b.dataset.groupName)},DOUBLE_CLICK_MS)}else if(['priority','snooze','more','group','due','block'].includes(action)){if(menu?.id===id&&menu.action===action)closeMenu();else{openMenu(id,action,undefined,b.dataset.groupName);if(action==='block')focusBlockInput()}}else if(action==='dependencies'){if(linesFit())toggleDependencies(id);else if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action)}else if(action==='title'){const t=task(id);if(t&&!t.pending&&!flow.snapshot().readOnly)startTitleEdit(id);else toggleExpand(id)}else if(action==='move')return;else if(action==='pending'){const p=flow.snapshot().proposals.find(p=>p.intent.taskId===id);if(p){collapsedProposals.delete(p.id);expandedProposal=p.id;render();$('review-title').scrollIntoView({block:'nearest'});$('review-title').focus()}}else request(action,{taskId:id})};
+$('board').onclick=e=>{const preview=e.target.closest('[data-preview]');if(preview){previewFiles(preview.dataset.fileTask,preview.dataset.preview,preview);return}const remove=e.target.closest('[data-file-remove]');if(remove){const t=task(remove.dataset.fileTask);if(t)safely(()=>flow.request('attachments_update',{uuid:t.id,attachmentIds:t.attachmentIds.filter(id=>id!==remove.dataset.fileRemove)}));return}if(e.target.closest('[data-title-view],.format-bar,.task-files'))return;const add=e.target.closest('[data-section-add]');if(add){openSectionCapture(add);return}const fold=e.target.closest('[data-fold]');if(fold){toggleFold(fold.dataset.fold);return}const sb=e.target.closest('[data-suggestion]');if(sb){const {suggestion,suggestionAction}=sb.dataset;bubbleFor=null;safely(async()=>{const accepted=suggestionAction==='accept'&&flow.snapshot().suggestions.find(s=>s.id===suggestion)?.action;if(accepted)await flow.accept(suggestion,accepted);else{const started=performance.now();timed(flow.observe(await api('/api/suggestions/'+suggestion+'/'+suggestionAction,{})),started);await flow.refresh()}render()});return}if(inlineClick(e))return;const b=e.target.closest('[data-action]');if(!b){const card=e.target.closest('.task');if(card&&!e.target.closest('.assistant-bubble'))toggleExpand(card.dataset.taskId);else if(dependencyFocus&&!card)toggleDependencies(dependencyFocus);return}const {id,action}=b.dataset;if(action==='next-up'){const t=task(id);if(t)request('task_update',{uuid:id,nextUp:!t.nextUp});return}if(action==='suggestion'){bubbleFor=bubbleFor===id?null:id;render();$('board').querySelector('[data-id="'+id+'"][data-action="suggestion"]')?.focus({preventScroll:true});return}if(action==='retire'){openMenu(id,'retire');if(menu)retireConfirm()}else if(action==='group'&&b.dataset.renameLabel&&e.detail){clearTimeout(chipTimer);if(e.detail>1)return;chipTimer=setTimeout(()=>{if(inlineRename||!b.isConnected)return;if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action,undefined,b.dataset.groupName)},DOUBLE_CLICK_MS)}else if(['priority','snooze','more','group','due','block'].includes(action)){if(menu?.id===id&&menu.action===action)closeMenu();else{openMenu(id,action,undefined,b.dataset.groupName);if(action==='block')focusBlockInput()}}else if(action==='dependencies'){if(linesFit())toggleDependencies(id);else if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action)}else if(action==='title'){const t=task(id);if(t&&!t.pending&&!flow.snapshot().readOnly)startTitleEdit(id);else toggleExpand(id)}else if(action==='move')return;else if(action==='pending'){const p=flow.snapshot().proposals.find(p=>p.intent.taskId===id);if(p){collapsedProposals.delete(p.id);expandedProposal=p.id;render();$('review-title').scrollIntoView({block:'nearest'});$('review-title').focus()}}else request(action,{taskId:id})};
 $('board').addEventListener('change',e=>{const el=e.target;
  if(el.dataset.schedEvery){const v=el.value,id=el.dataset.schedEvery;saveSchedule(id,n=>{n.repeat=!v?null:v==='week'?{every:'week',days:[zonedWeekday()]}:v==='days'?{every:'days',n:2}:{every:v}})}
  else if(el.dataset.schedN){const v=Math.max(1,Math.min(365,Number(el.value)||1));saveSchedule(el.dataset.schedN,n=>{n.repeat={every:'days',n:v}})}
@@ -1444,7 +1516,7 @@ safely(boot);
 function poll(){safely(()=>flow.poll()).finally(()=>setTimeout(poll,document.hidden?5000:900))}
 setTimeout(poll,900);document.addEventListener('visibilitychange',()=>{if(!document.hidden)safely(()=>flow.poll())});
 globalThis.daySnapshot=()=>structuredClone(flow.snapshot());
-globalThis.dayUI={short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
+globalThis.dayUI={formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
 const diagnosticsDialog = document.querySelector('#diagnostics-dialog');
 document.querySelector('#diagnostics-open').addEventListener('click', async () => {
   diagnosticsDialog.showModal();

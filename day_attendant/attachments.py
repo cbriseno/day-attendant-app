@@ -18,15 +18,20 @@ def image_type(data):
     raise AssistantError('invalid_image','Select a PNG, JPEG or WebP screenshot; executable and vector formats are not accepted.')
 
 
-def save(app,name,mime,encoded_data,key):
+def save(app,name,mime,encoded_data,key,task_file=False):
     if not isinstance(name,str) or not 1<=len(name)<=200 or not isinstance(encoded_data,str) or not isinstance(key,str) or not 1<=len(key)<=200:
         raise AssistantError('invalid_attachment','Invalid image name, content or delivery key.')
     try:data=base64.b64decode(encoded_data,validate=True)
     except (ValueError,TypeError) as error:raise AssistantError('invalid_attachment','Invalid encoded image.') from error
     # No product size cap: a provider limit surfaces as that turn's visible error.
     if not data:raise AssistantError('invalid_attachment','The image is empty.')
-    actual,suffix=image_type(data)
-    if mime!=actual:raise AssistantError('invalid_image','The declared image type does not match its content.')
+    if task_file:
+        if len(data)>20*1024*1024:raise AssistantError('attachment_too_large','Files may be at most 20 MB.')
+        try:actual,suffix=image_type(data)
+        except AssistantError:actual,suffix='application/octet-stream','.bin'
+    else:
+        actual,suffix=image_type(data)
+        if mime!=actual:raise AssistantError('invalid_image','The declared image type does not match its content.')
     digest=hashlib.sha256(data).hexdigest()
     with app.store.lock(),app.store.connect() as con:
         app.store.assert_writable()
@@ -45,7 +50,7 @@ def save(app,name,mime,encoded_data,key):
             con.execute('INSERT INTO attachment_requests VALUES(?,?,?)',(key,digest,identity))
         except BaseException:
             path.unlink(missing_ok=True);raise
-        return {'id':identity,'name':Path(name).name,'mime':actual,'sha256':digest}
+        return {'id':identity,'name':Path(name).name,'mime':actual,'sha256':digest,'size':len(data)}
 
 
 def load(app,identity):

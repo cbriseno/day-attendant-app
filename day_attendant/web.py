@@ -209,9 +209,9 @@ class Handler(BaseHTTPRequestHandler):
             if self.path=='/api/diagnostics/export':
                 result={'file':str(diagnostics.export(['day-attendant']))}
             elif self.path=='/api/attachments':
-                if set(body)!={'name','mime','base64','key'}:raise ValueError('fields')
+                if set(body)-{'purpose'}!={'name','mime','base64','key'} or body.get('purpose','image') not in ('image','task'):raise ValueError('fields')
                 from .attachments import save
-                result=save(board.app,body['name'],body['mime'],body['base64'],body['key'])
+                result=save(board.app,body['name'],body['mime'],body['base64'],body['key'],task_file=body.get('purpose')=='task')
             elif self.path=='/api/proposals':
                 if set(body)-{'action','payload','key','expected_revision'}:raise ValueError('fields')
                 result=board.announced(board.request(body['action'],body['payload'],body['key'],origin='cli' if self.headers.get('Authorization','').startswith('Bearer ') else 'ui',expected_revision=body.get('expected_revision')))

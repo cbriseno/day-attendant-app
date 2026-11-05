@@ -261,6 +261,15 @@ class Assistant:
             self.fault("after_intent")
             return self._apply(key, plan)
 
+    def attachment_ids(self, refs):
+        if not isinstance(refs,list) or len(refs)>50 or any(not isinstance(ref,str) for ref in refs):
+            raise AssistantError('invalid_attachments','Choose up to 50 uploaded files.')
+        wanted=sorted(set(refs))
+        with self.store.connect() as con:
+            known={r[0] for r in con.execute('SELECT id FROM attachments')}
+        if set(wanted)-known:raise AssistantError('attachment_not_found','Upload files before linking them.')
+        return wanted
+
     def _plan(self, action, p, key):
         now = self.now()
         plan = {"steps": [], "effect": {}, "result": {}}
@@ -301,6 +310,8 @@ class Assistant:
             plan["steps"].append({"uuid": uid, "before": None, "after": row, "create": row})
             plan["effect"] = {"meta_add": [uid, p.get("source", "general"), p.get("person"),
                 p.get("reference"), observed, now, now, p.get("zone"), p.get("estimate_minutes")]}
+            if p.get('attachmentIds'):
+                plan['effect']['attachments_link']=[uid,self.attachment_ids(p['attachmentIds'])]
             continuation=continuity_values(p)
             if continuation and not (self.store.state_value('synthetic_bootstrap',False) or self.store.state_value('connected',False)):
                 raise AssistantError('proposal_required','Continuity capture requires an initialized connected workspace.')
@@ -417,6 +428,12 @@ class Assistant:
             with self.store.connect() as con:
                 current=sorted(r['b'] if r['a']==uid else r['a'] for r in con.execute('SELECT * FROM related WHERE a=? OR b=?',(uid,uid)))
             if current!=wanted:plan['effect']['related_set']=[uid,wanted]
+            plan['result']={'uuid':uid}
+        elif action=='attachments_update':
+            uid=self.required(p['uuid'])['uuid']; wanted=self.attachment_ids(p['attachmentIds'])
+            with self.store.connect() as con:
+                current=sorted(r[0] for r in con.execute('SELECT attachment_id FROM item_attachments WHERE entity_uuid=?',(uid,)))
+            if current!=wanted:plan['effect']['attachments_set']=[uid,wanted]
             plan['result']={'uuid':uid}
         elif action=='order_update':
             # A display order only; it never changes a task's priority, group or state.
@@ -671,6 +688,9 @@ class Assistant:
             with self.store.connect() as con:
                 if "meta_add" in effect:
                     con.execute("INSERT INTO task_meta VALUES(?,?,?,?,?,?,?,?,?)", effect["meta_add"])
+                if 'attachments_set' in effect:
+                    uid,refs=effect['attachments_set'];con.execute('DELETE FROM item_attachments WHERE entity_uuid=?',(uid,))
+                    for ref in refs:con.execute('INSERT INTO item_attachments VALUES(?,?)',(uid,ref))
                 if 'attachments_link' in effect:
                     uid,refs=effect['attachments_link']
                     for ref in refs:con.execute('INSERT OR IGNORE INTO item_attachments VALUES(?,?)',(uid,ref))

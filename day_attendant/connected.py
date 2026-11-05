@@ -38,7 +38,7 @@ FOLLOWUP_PROMPT = """Look at changes the person already made. They are saved; yo
 """
 
 ALLOWED = {
-    "task_add": {"title", "priority", "due", "source", "zone", "person", "reference", "observed_at", "estimate_minutes", "remainingMinutes", "awaiting", "context", "next", "group", "groups"},
+    "task_add": {"title", "priority", "due", "source", "zone", "person", "reference", "observed_at", "estimate_minutes", "remainingMinutes", "awaiting", "context", "next", "group", "groups", "attachmentIds"},
     "task_update": {"uuid", "title", "nextUp", "priority", "due", "zone", "progress", "context", "next", "awaiting", "remainingMinutes", "group", "groups", "order"},
     "front_activate": {"uuid", "order"}, "front_todo": {"uuid", "order"}, "front_retire": {"uuid"},
     "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"},
@@ -47,6 +47,7 @@ ALLOWED = {
     "dependency_update": {"uuid","dependsOn"},
     "related_update": {"uuid","relatedTo"},
     "schedule_update": {"uuid","repeat","reminders"},
+    "attachments_update": {"uuid","attachmentIds"},
     "order_update": {"order"},
     "group_rename": {"group", "to"},
     "group_color_update": {"group", "color"},
@@ -70,7 +71,7 @@ FOLLOWUP_ACTIONS = ("front_activate", "front_todo", "task_snooze", "task_update"
 BASIS = ("state", "until", "due", "priority", "groups", "dependsOn", "blockedBy", "remainingMinutes", "awaiting")
 CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "checklist": [], "blockReason": "", "blockedSince": None}
 # Effects whose previous value a fact keeps, so Undo can restore them.
-RESTORABLE = {"schedule_set", "order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link"}
+RESTORABLE = {"schedule_set", "order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link", "attachments_set"}
 # Inverse-only actions: Undo reaches them, never a request of their own.
 RESTORE = ("task_restore", "event_restore", "group_restore")
 
@@ -341,6 +342,11 @@ class Connected:
             continuation = {r["uuid"]: json.loads(r["data"]) for r in con.execute("SELECT * FROM continuity")}
             related=[dict(r) for r in con.execute('SELECT * FROM related ORDER BY a,b')]
             image_links=[dict(r) for r in con.execute('SELECT * FROM item_attachments')]
+            files={}
+            for r in con.execute('SELECT i.entity_uuid,a.id,a.name,a.mime,a.relative_path FROM item_attachments i JOIN attachments a ON a.id=i.attachment_id ORDER BY a.created_at,a.id'):
+                try:size=(self.store.path/r['relative_path']).stat().st_size
+                except OSError:size=None
+                files.setdefault(r['entity_uuid'],[]).append({'id':r['id'],'name':r['name'],'mime':r['mime'],'size':size})
         tasks = []
         for row in rows:
             extra = continuation.get(row["uuid"], {})
@@ -352,6 +358,7 @@ class Connected:
                 "blocked": bool(row['blockedBy']), "dependsOn":row['dependsOn'],"blockedBy":row['blockedBy'],
                 "relatedTo":[r['b'] if r['a']==row['uuid'] else r['a'] for r in related if row['uuid'] in (r['a'],r['b'])],
                 "attachmentIds":[r['attachment_id'] for r in image_links if r['entity_uuid']==row['uuid']],
+                "files":files.get(row["uuid"],[]),
                 "source":row['metadata'].get('source','general'),"person":row['metadata'].get('person'),"reference":row['metadata'].get('reference'),
                 "observedAt":row['metadata'].get('observed_at'),"capturedAt":row['metadata'].get('captured_at'),
                 "context": extra.get("context", ""), "next": extra.get("next", ""),
@@ -492,6 +499,9 @@ class Connected:
                 row=con.execute("SELECT data FROM continuity WHERE uuid=?",(uid,)).fetchone()
                 previous=json.loads(row[0]) if row else {}
                 inverse["continuity"]=[uid,{k:previous.get(k,CONTINUITY_DEFAULTS[k]) for k in value}]
+            if "attachments_set" in effect:
+                uid=effect["attachments_set"][0]
+                inverse["attachments"]=[uid,sorted(r[0] for r in con.execute("SELECT attachment_id FROM item_attachments WHERE entity_uuid=?",(uid,)))]
             if "related_set" in effect:
                 uid=effect["related_set"][0]
                 inverse["related"]=[uid,sorted(r["b"] if r["a"]==uid else r["a"] for r in con.execute("SELECT * FROM related WHERE a=? OR b=?",(uid,uid)))]
@@ -589,7 +599,7 @@ class Connected:
             plan = self._plan(intent, key)  # Validate before superseding any prior intent.
             if validate_only:return {'intent':intent,'validated':True}
             identity = str(uuid.uuid4())
-            prefix='calendar:' if action.startswith('event_') else 'dependencies:' if action=='dependency_update' else 'related:' if action=='related_update' else 'schedule:' if action=='schedule_update' else 'metadata:' if action in ('continuity_update','provenance_update') else 'task:'
+            prefix='calendar:' if action.startswith('event_') else 'dependencies:' if action=='dependency_update' else 'attachments:' if action=='attachments_update' else 'related:' if action=='related_update' else 'schedule:' if action=='schedule_update' else 'metadata:' if action in ('continuity_update','provenance_update') else 'task:'
             entity=prefix+payload['uuid'] if payload.get('uuid') else 'context' if action=='context_update' else 'order' if action=='order_update' else 'group:'+group_key(payload['group']) if action=='group_color_update' else 'new:'+key
             changed=bool(plan["steps"] or plan["effect"])
             waits=changed and origin=='chat' and action in CONFIRM_FROM_CHAT
@@ -802,6 +812,10 @@ class Connected:
             expect_continuity()
             return "continuity_update",dict(inverse["continuity"][1],uuid=inverse["continuity"][0],undo_of=fact_id)
         with self.store.connect() as con:
+            if "attachments_set" in effect:
+                uid,wanted=effect["attachments_set"]
+                if sorted(r[0] for r in con.execute("SELECT attachment_id FROM item_attachments WHERE entity_uuid=?",(uid,)))!=sorted(wanted):raise conflict
+                return "attachments_update",{"uuid":uid,"attachmentIds":inverse["attachments"][1],"undo_of":fact_id}
             if "related_set" in effect:
                 uid,wanted=effect["related_set"]
                 if sorted(r["b"] if r["a"]==uid else r["a"] for r in con.execute("SELECT * FROM related WHERE a=? OR b=?",(uid,uid)))!=sorted(wanted):raise conflict
