@@ -822,7 +822,7 @@ function formatInput(input){
  return bar;
 }
 function titleCell(t,data){
- if(titleEdit?.id===t.id)return '<span class="title-editor"><input class="title-edit" data-id="'+t.id+'" data-field="title" data-anon-private="value text" maxlength="500" autocomplete="off" value="'+esc(draftValue(t,'title'))+'" aria-label="'+esc(tr('edit_title')+': '+t.title)+'"'+(data.readOnly?' disabled':'')+'><span class="edit-hint">'+esc(tr('title_edit_hint'))+'</span>'+fieldNote(t,'title')+'</span>';
+ if(titleEdit?.id===t.id)return '<span class="title-editor"><input class="title-edit" data-id="'+t.id+'" data-field="title" data-anon-private="value text" maxlength="2000" autocomplete="off" value="'+esc(draftValue(t,'title'))+'" aria-label="'+esc(tr('edit_title')+': '+t.title)+'"'+(data.readOnly?' disabled':'')+'><span class="edit-hint">'+esc(tr('title_edit_hint'))+'</span>'+fieldNote(t,'title')+'</span>';
  return '<span class="title-wrap">'+suggestionMark(t,data)+'<span class="task-title" tabindex="0" data-title-view data-anon-private="text" data-id="'+t.id+'" data-action="title" aria-label="'+esc(tr('edit_title')+': '+t.title)+'" title="'+esc(tr('edit_title_hint'))+'">'+richText(t.title)+'</span></span>'}
 function startTitleEdit(id){const t=task(id),data=flow.snapshot();if(!t||t.pending||data.readOnly||['done','retired'].includes(t.state))return;closeMenu(false);titleEdit={id};render();const input=$('board').querySelector('.title-edit[data-id="'+id+'"]');if(input){formatInput(input);input.focus({preventScroll:true});input.select()}}
 function commitTitle(id){const d=drafts.get(draftKey(id,'title'));if(d?.conflict||d?.saving)return;titleEdit=null;
@@ -874,6 +874,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
   :'<button type="button" class="btn ghost danger" data-x="retire"'+off+'>'+esc(tr('retire_7ad0e0'))+'</button><button type="button" class="btn ghost" data-x="duplicate"'+off+'>'+esc(tr('duplicate'))+'</button><button type="button" class="btn ghost" data-x="close">'+esc(tr('close_details'))+'</button><span class="saved-note" aria-live="polite">'+(note?checkIcon+esc(note):'')+'</span>';
  return '<div class="expand" data-expand="'+t.id+'"><div class="xgrid">'
   +'<div class="xfield"><span class="xlabel">'+esc(tr('files_label'))+'</span>'+taskFiles(t,true)+'</div>'
+  +(t.assistantNotes?'<div class="xfield"><span class="xlabel">'+esc(tr('assistant_notes'))+'</span><p>'+esc(t.assistantNotes)+'</p></div>':'')+(t.original?'<div class="xfield"><span class="xlabel">'+esc(tr('original_capture'))+'</span><p>'+esc(t.original)+'</p></div>':'')+(t.captureError?'<p class="error" role="status">'+esc(tr('capture_failed'))+': '+esc(t.captureError)+'</p>':'')
   +field('notes','general_notes','<textarea id="'+id('notes')+'" data-id="'+t.id+'" data-field="notes" data-anon-private="value text" rows="3" maxlength="2000"'+off+'>'+esc(draftValue(t,'notes'))+'</textarea>'+(t.notes?'<div class="note-preview" data-anon-private="text">'+richText(t.notes)+'</div>':''))
   +field('context','where_i_left_off','<textarea id="'+id('context')+'" data-id="'+t.id+'" data-field="context" data-anon-private="value text" rows="2" maxlength="2000" placeholder="'+esc(tr('where_i_left_off_placeholder'))+'"'+off+'>'+esc(draftValue(t,'context'))+'</textarea>')
   +field('next','next_step','<input type="text" id="'+id('next')+'" data-id="'+t.id+'" data-field="next" data-anon-private="value text" maxlength="2000" autocomplete="off" placeholder="'+esc(tr('next_step_placeholder'))+'" value="'+esc(draftValue(t,'next'))+'"'+off+'>')
@@ -1054,7 +1055,7 @@ function attachmentPicker(host,pasteTarget){
 function openSectionCapture(origin){
  const group=origin.dataset.sectionAdd||'';
  const dialog=groupDialog(tr('section_add_in').replace('{group}',group||tr('no_group')),
-  '<label class="field"><span>'+esc(tr('section_title'))+'</span><textarea name="title" maxlength="500" rows="3" required></textarea></label><p class="hint">'+esc(tr('section_keys'))+'</p>'
+  '<label class="field"><span>'+esc(tr('section_title'))+'</span><textarea name="title" maxlength="2000" rows="3" required></textarea></label><p class="hint">'+esc(tr('section_keys'))+'</p>'
   +'<label class="field"><span>'+esc(tr('priority'))+'</span><select name="priority">'+['urgent','high','medium','low'].map(p=>'<option value="'+p+'"'+(p==='medium'?' selected':'')+'>'+esc(tr('priority_'+p))+'</option>').join('')+'</select></label>'
   +'<details><summary>'+esc(tr('groups_open'))+'</summary><div class="section-groups">'+rankedGroups().map(g=>'<label><input type="checkbox" name="groups" value="'+esc(g.label)+'"'+(groupKey(g.label)===groupKey(group)?' checked':'')+'>'+esc(g.label)+'</label>').join('')+'</div><label class="field"><span>'+esc(tr('add_group'))+'</span><input name="newgroup" maxlength="120"></label></details>'
   +'<button type="submit" class="btn primary">'+esc(tr('section_submit'))+'</button>',origin);

@@ -216,6 +216,9 @@ class Handler(BaseHTTPRequestHandler):
                 if set(body)-{'action','payload','key','expected_revision'}:raise ValueError('fields')
                 result=board.announced(board.request(body['action'],body['payload'],body['key'],origin='cli' if self.headers.get('Authorization','').startswith('Bearer ') else 'ui',expected_revision=body.get('expected_revision')))
                 review=True
+                if body['action']=='task_add' and result.get('phase')=='applied' and len(body['payload'].get('title',''))>120:
+                    uid=result.get('result',{}).get('uuid');revision=result.get('result',{}).get('revision')
+                    if uid and revision is not None:self.server.pool.submit(board.normalize_capture,uid,body['payload']['title'].strip(),revision)
             elif match:=re.fullmatch(r'/api/proposals/([a-f0-9-]+)/(?P<action>confirm|cancel|retry)',self.path):
                 identity=match[1];action=match['action']
                 if action=='confirm':result=board.confirm(identity,body['generation'],without_review=body.get('without_review',False) is True);review=True

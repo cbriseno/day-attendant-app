@@ -871,3 +871,6 @@ Object.assign(globalThis.dayTranslations.es,{files_label:'Adjuntos',file_preview
 
 Object.assign(globalThis.dayTranslations.en,{general_notes:'Notes',field_notes:'Notes'});
 Object.assign(globalThis.dayTranslations.es,{general_notes:'Notas generales',field_notes:'Notas generales'});
+
+Object.assign(globalThis.dayTranslations.en,{assistant_notes:'Assistant notes',original_capture:'Your original text',capture_failed:'Could not organize this capture'});
+Object.assign(globalThis.dayTranslations.es,{assistant_notes:'Notas del asistente',original_capture:'Tu texto original',capture_failed:'No se pudo organizar esta captura'});
