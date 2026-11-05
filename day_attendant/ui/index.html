@@ -89,10 +89,13 @@ html[data-theme=dark] .row-menu{box-shadow:0 10px 30px #0000004d}
 /* Phone widths: the title gets the whole first line; its data and three actions share the second.
    ⋯ is a long press there. Targets reach 34 px through their hit area, so rows stay short. */
 @container tasks (max-width:600px){
- .board.is-list .row-main,.board:not(.is-list) .row-main{grid-template-columns:28px minmax(0,1fr) auto;grid-template-areas:"check reason reason" "check title title" "check meta actions";gap:1px 6px;align-items:center;padding:4px 5px 4px 2px}
+ .board.is-list .row-main,.board:not(.is-list) .row-main{grid-template-columns:28px minmax(0,1fr) auto 28px;grid-template-areas:"check reason reason reason" "check title title title" "check meta actions port";gap:1px 6px;align-items:center;padding:4px 5px 4px 2px}
  .board .row-text{display:contents}.title-wrap{grid-area:title}.row-meta{grid-area:meta;gap:2px 6px}.suggestion-reason{grid-area:reason}
  .board.is-list .check,.board:not(.is-list) .check{align-self:start;width:34px;height:34px;margin:-7px -3px 0}.check .box{width:22px;height:22px}
- .row-grip,.port-slot{display:none}.ib{width:34px;height:34px}.row-actions{gap:4px}.row-actions .priority-pill{min-width:0;min-height:34px;padding:2px 9px}
+ .row-grip{display:none}
+ /* #44: the dependency connector stays reachable on narrow rows: its own 28px column, a 34px hit area, visible without hover. */
+ .board.is-list .port-slot,.board:not(.is-list) .port-slot{grid-area:port;position:static;margin:0;width:28px;height:34px;align-self:center}
+ .port-slot .port{position:relative;opacity:.75}.port-slot .port::after{content:'';position:absolute;inset:-11px -8px}.ib{width:34px;height:34px}.row-actions{gap:4px}.row-actions .priority-pill{min-width:0;min-height:34px;padding:2px 9px}
  .task-title,.dependency-chip,.pending-badge{position:relative}.task-title::after,.dependency-chip::after,.pending-badge::after{content:'';position:absolute;inset:-7px -2px}
  .ib.more{position:absolute;width:1px;height:1px;border:0;overflow:hidden;clip-path:inset(50%);opacity:1}
  .title-wrap{justify-self:start}.title-wrap .assistant-mark{left:calc(100% - 14px);width:40px;height:40px;margin-top:-20px}

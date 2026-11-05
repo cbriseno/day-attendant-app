@@ -277,7 +277,7 @@ function buildRow(t,s,data,proposal){
   +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+(t.nextUp?'★':'☆')+'</button>':'')+priorityButton(t,off)+''
   +state+'<button type="button" class="ib" data-id="'+t.id+'" data-action="snooze" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('snooze'))+'" title="'+esc(tr('snooze'))+'"'+(off?' disabled':'')+'>'+clockIcon+'</button>'
   +'<button type="button" class="ib more" data-id="'+t.id+'" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('more_actions'))+'" title="'+esc(tr('more_actions_hint'))+'">'+moreIcon+'</button></div>'
-  +'<span class="port-slot">'+(off?'':'<button type="button" class="port" data-id="'+t.id+'" tabindex="-1" aria-hidden="true" title="'+esc(tr('port_hint'))+'"></button>')+'</span></div>'+suggestionBubble(t,data)+(open?expandView(t,data):'')+'</article>'}
+  +'<span class="port-slot">'+(off?'':'<button type="button" class="port" data-id="'+t.id+'" aria-label="'+esc(tr('port_hint'))+'" title="'+esc(tr('port_hint'))+'"></button>')+'</span></div>'+suggestionBubble(t,data)+(open?expandView(t,data):'')+'</article>'}
 // Focus keeps only the immediate actions and the reason this task is here.
 function focusRow(t,data,big){
  const off=data.readOnly||t.pending,reason=[],blocked=(t.dependsOn||t.blockedBy||[]).some(id=>data.tasks.find(r=>r.id===id)?.state!=='done');
@@ -446,12 +446,14 @@ let linkCursor=null;
 function linkCursorAt(x,y){const hit=document.elementFromPoint(x,y);if(hit===linkCursor)return;linkCursor?.style.removeProperty('cursor');linkCursor=null;if(hit&&document.body.contains(hit)&&getComputedStyle(hit).cursor!=='crosshair'){hit.style.setProperty('cursor','crosshair','important');linkCursor=hit}}
 function linkingStyle(on){document.body.classList.toggle('linking',on);document.body.style.cursor=on?'crosshair':'';if(!on){linkCursor?.style.removeProperty('cursor');linkCursor=null}}
 function startConnect(e,from,retarget=null){if(connectDrag||drag||flow.snapshot().readOnly||task(from)?.pending)return;e.preventDefault();e.stopPropagation();closeMenu(false);endConnectMode();
- connectDrag={from,retarget,pointer:e.pointerId,path:'',x:e.clientX,y:e.clientY};linkingStyle(true);swallowClick=true;showDependencies()}
+ connectDrag={from,retarget,pointer:e.pointerId,path:'',x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY};linkingStyle(true);swallowClick=true;showDependencies()}
 function moveConnect(){const d=connectDrag;if(!d)return;d.frame=0;const box=$('board').getBoundingClientRect(),a=portAt(d.from,'right',box);if(!a)return;
  const b={x:d.x-box.left,y:d.y-box.top};d.path=curve(a,b,$('board').classList.contains('is-list')||Math.abs(b.x-a.x)<60);
  const over=rowAt(d.x,d.y);for(const c of $('board').querySelectorAll('.connect-target'))if(c!==over)c.classList.remove('connect-target');if(over&&over.dataset.taskId!==d.from)over.classList.add('connect-target');
  drawDependencies();linkCursorAt(d.x,d.y)}
 function finishConnect(e,commit){const d=connectDrag;if(!d)return;connectDrag=null;cancelAnimationFrame(d.frame);
+ // #44: a tap on the connector (no drag) starts «connect» mode, so touch and narrow screens can pick the other task.
+ if(commit&&!d.retarget&&Math.hypot(e.clientX-d.sx,e.clientY-d.sy)<6){for(const c of $('board').querySelectorAll('.connect-target'))c.classList.remove('connect-target');setTimeout(()=>swallowClick=false);linkingStyle(false);showDependencies();startConnectMode(d.from,'blocks');return}
  for(const c of $('board').querySelectorAll('.connect-target'))c.classList.remove('connect-target');setTimeout(()=>swallowClick=false);
  const to=commit?rowAt(e.clientX,e.clientY)?.dataset.taskId:null;
  if(to&&d.retarget){if(retargetLink(d.retarget,to))selectedLink=null}else if(to)addLink(d.from,to);
@@ -481,6 +483,7 @@ function startConnectMode(id,dir){const t=task(id);if(!t||t.pending||flow.snapsh
  connectBanner.hidden=false;document.body.classList.add('connecting');showDependencies();connectBanner.scrollIntoView({block:'nearest'});connectBanner.querySelector('button').focus({preventScroll:true})}
 function endConnectMode(){if(!connectFrom)return;const id=connectFrom;connectFrom=null;connectBanner.hidden=true;document.body.classList.remove('connecting');showDependencies();return id}
 connectBanner.addEventListener('click',e=>{if(e.target.closest('[data-connect-cancel]')){const id=endConnectMode();if(id)restoreTitleFocus(id)}});
+$('board').addEventListener('click',e=>{const port=e.target.closest('.port');if(!port||e.detail!==0)return;e.preventDefault();e.stopImmediatePropagation();startConnectMode(port.dataset.id,'blocks')},true);
 $('board').addEventListener('click',e=>{if(!connectFrom)return;const card=e.target.closest('.task[data-task-id]');if(!card)return;e.preventDefault();e.stopPropagation();
  const dir=connectDir,from=endConnectMode(),to=card.dataset.taskId;if(dir==='needs')addLink(to,from);else addLink(from,to)},true);
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||document.querySelector('dialog[open]')||menu)return;

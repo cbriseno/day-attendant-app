@@ -611,14 +611,14 @@ Object.assign(globalThis.dayTranslations.en,{drop_moved:'Moved to {lane}',drop_s
 Object.assign(globalThis.dayTranslations.es,{drop_moved:'Movida a {lane}',drop_snoozed:'Pospuesta hasta {time}',drop_priority:'Prioridad: {priority}',
  drop_group:'Grupo: {group}',drop_no_group:'Sin grupo',drop_blocked:'Espera a sus requisitos, así que se quedó donde estaba.'});
 // Connectors and the links sheet.
-Object.assign(globalThis.dayTranslations.en,{port_hint:'Drag to another task to make it wait for this one',
+Object.assign(globalThis.dayTranslations.en,{port_hint:'Drag to another task, or tap and pick one, to make it wait for this one',
  link_make_related:'Make related',link_make_blocking:'Make blocking',link_remove:'Remove',
  link_created:'«{a}» now blocks «{b}»',link_removed:'Link removed',link_now_related:'Changed to related',link_now_blocking:'Changed to blocking',link_moved:'Moved: it now points to «{b}»',
  link_self:'Not linked: a task cannot be linked to itself.',link_duplicate:'Not linked: «{a}» and «{b}» are already linked.',link_cycle:'Not linked: «{a}» already waits, directly or not, for «{b}»; that would make a loop.',
  see_links:'See links…',connect_to:'Connect to…',links_of:'Links of «{title}»',links_blocked_by:'Blocked by (do these first)',links_blocks:'This one blocks',links_related:'Related (does not block)',links_none:'None',
  add_requirement:'Add a requirement…',this_blocks:'This one blocks…',
  connect_pick_prerequisite:'Tap the task that must be finished before «{title}»',connect_pick_dependent:'Tap the task that must wait for «{title}»'});
-Object.assign(globalThis.dayTranslations.es,{port_hint:'Arrastra hasta otra tarea para que espere a esta',
+Object.assign(globalThis.dayTranslations.es,{port_hint:'Arrastra hasta otra tarea, o tócalo y elige una, para que espere a esta',
  link_make_related:'Hacer relacionada',link_make_blocking:'Hacer bloqueante',link_remove:'Quitar',
  link_created:'«{a}» ahora bloquea a «{b}»',link_removed:'Relación quitada',link_now_related:'Cambiada a relacionada',link_now_blocking:'Cambiada a bloqueante',link_moved:'Movida: ahora apunta a «{b}»',
  link_self:'No se conectó: una tarea no puede conectarse consigo misma.',link_duplicate:'No se conectó: «{a}» y «{b}» ya están conectadas.',link_cycle:'No se conectó: «{a}» ya espera, directa o indirectamente, a «{b}»; haría un ciclo.',
