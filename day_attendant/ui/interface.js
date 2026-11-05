@@ -379,13 +379,44 @@ function shownLinks(data){if(taskView==='focus'||!linesFit()||drag?.active)retur
 // Where a line meets a task: its port on the right, or the card's left edge for a column to its left.
 function portAt(id,side,box){const card=cardOf(id);if(!card?.getClientRects().length)return null;const r=card.getBoundingClientRect(),port=card.querySelector('.port'),p=port?.getClientRects().length?port.getBoundingClientRect():null;
  if(side==='left')return {x:r.left-box.left,y:r.top+r.height/2-box.top,col:r.left};
- return {x:(p?p.left+p.width/2:r.right)-box.left,y:(p?p.top+p.height/2:r.top+Math.min(r.height,42)/2)-box.top,col:r.left}}
+ return {x:(p?p.left+p.width/2:r.right)-box.left,y:(p?p.top+p.height/2:r.top+Math.min(r.height,42)/2)-box.top,col:r.left,edge:r.right-box.left}}
 function curve(a,b,side){if(side){const dx=Math.min(34,18+Math.abs(b.y-a.y)*.12);return 'M'+a.x+' '+a.y+'C'+(a.x+dx)+' '+a.y+' '+(b.x+dx)+' '+b.y+' '+b.x+' '+b.y}
  const mx=(a.x+b.x)/2;return 'M'+a.x+' '+a.y+'C'+mx+' '+a.y+' '+mx+' '+b.y+' '+b.x+' '+b.y}
 function endpoints(l,box){let a=portAt(l.from,'right',box),b=portAt(l.to,'right',box);if(!a||!b)return null;
  const across=!$('board').classList.contains('is-list')&&Math.abs(a.col-b.col)>=30;
  if(across){if(a.col<b.col)b=portAt(l.to,'left',box);else a=portAt(l.from,'left',box)}
  return {a,b,d:curve(a,b,!across)}}
+let hotLink=null;
+// Orthogonal routing in the gutter: one vertical lane per line (shorter spans closer to the tasks),
+// endpoints spread along the task's edge so lines never meet at one point, rounded corners.
+const LANE_GAP=7,SLOT_GAP=9,CORNER=5;
+function laneFor(lanes,lo,hi){for(let i=0;;i++){const used=lanes[i]||(lanes[i]=[]);if(!used.some(([a,b])=>lo<b+8&&hi>a-8)){used.push([lo,hi]);return i}}}
+function elbow(points){let d='M'+points[0].x+' '+points[0].y;for(let i=1;i<points.length-1;i++){const p=points[i],a=points[i-1],b=points[i+1];
+  const r=Math.min(CORNER,Math.abs(p.x-a.x+p.y-a.y)/2,Math.abs(b.x-p.x+b.y-p.y)/2),ux=Math.sign(p.x-a.x),uy=Math.sign(p.y-a.y),vx=Math.sign(b.x-p.x),vy=Math.sign(b.y-p.y);
+  d+=' L'+(p.x-ux*r)+' '+(p.y-uy*r)+' Q'+p.x+' '+p.y+' '+(p.x+vx*r)+' '+(p.y+vy*r)}
+ const z=points.at(-1);return d+' L'+z.x+' '+z.y}
+function routeLinks(links,box){
+ const list=$('board').classList.contains('is-list'),items=[];
+ for(const l of links){let a=portAt(l.from,'right',box),b=portAt(l.to,'right',box);if(!a||!b)continue;
+  const across=!list&&Math.abs(a.col-b.col)>=30;if(across){if(a.col<b.col)b=portAt(l.to,'left',box);else a=portAt(l.from,'left',box)}
+  items.push({l,a,b,across,lo:Math.min(a.y,b.y),hi:Math.max(a.y,b.y)})}
+ // Lanes per gutter: one shared set of lanes for every line that runs down the same gap (to the right of a column).
+ const gutters=new Map();
+ for(const it of items){it.edge=it.across?(it.a.edge??it.b.edge):Math.max(it.a.edge,it.b.edge);const gx=Math.round(it.edge);
+  if(!gutters.has(gx))gutters.set(gx,[]);gutters.get(gx).push(it)}
+ for(const [gx,group] of gutters){const lanes=[];group.sort((p,q)=>(p.hi-p.lo)-(q.hi-q.lo));
+  for(const it of group)it.lane=laneFor(lanes,it.lo,it.hi);
+  // A list has a wide margin; between board columns the lanes squeeze into the gap.
+  const room=list?40:12,gap=Math.max(3,Math.min(LANE_GAP,room/Math.max(1,lanes.length)));
+  for(const it of group)it.x=Math.round(gx+(list?6:4)+it.lane*gap)}
+ // Slots: on each task edge, lines heading up sit above lines heading down; outer lanes sit nearer the middle.
+ const slots=new Map(),key=(id,side)=>id+'|'+side;
+ for(const it of items)for(const [end,id] of [['a',it.l.from],['b',it.l.to]]){const side=it[end].x<it.x?'right':'left',k=key(id,side+Math.round(it[end].x));
+  if(!slots.has(k))slots.set(k,[]);slots.get(k).push({it,end,up:(end==='a'?it.b.y:it.a.y)<it[end].y})}
+ for(const group of slots.values()){group.sort((p,q)=>p.up!==q.up?(p.up?-1:1):p.up?p.it.lane-q.it.lane:q.it.lane-p.it.lane);
+  group.forEach((s,i)=>{s.it[s.end]={...s.it[s.end],y:s.it[s.end].y+(i-(group.length-1)/2)*SLOT_GAP}})}
+ return items.map(it=>{const {a,b,x}=it,pts=Math.abs(a.y-b.y)<1?[a,b]:[a,{x,y:a.y},{x,y:b.y},b];return {l:it.l,lane:it.lane,e:{a,b,d:elbow(pts)}}})
+  .sort((p,q)=>p.lane-q.lane)}
 function drawDependencies(data=flow.snapshot()){
  const board=$('board'),svg=dependencyLines,links=shownLinks(data);
  // A change in two steps (blocking to related) is briefly in neither state; the selection waits for it.
@@ -393,13 +424,15 @@ function drawDependencies(data=flow.snapshot()){
  if(!links.length&&!connectDrag?.path){if(svg.style.display!=='none'){svg.replaceChildren();svg.style.display='none'}placeLineBar(null);return}
  const box=board.getBoundingClientRect(),area=svg.parentElement.getBoundingClientRect();
  Object.assign(svg.style,{display:'block',left:box.left-area.left+'px',top:box.top-area.top+'px',width:box.width+'px',height:box.height+'px'});
- const arrow=(id)=>'<marker id="'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z"/></marker>';
- let out='<defs>'+arrow('link-arrow')+arrow('link-arrow-selected')+'</defs>',bar=null;
- for(const l of links){const e=endpoints(l,box);if(!e)continue;const selected=sameLink(l,selectedLink)&&!connectDrag;
-  out+='<path class="link-line '+l.type+(selected?' selected':'')+'" d="'+e.d+'"'+(l.type==='dep'?' marker-end="url(#link-arrow'+(selected?'-selected':'')+')"':'')+'/><path class="link-hit" d="'+e.d+'" data-link="'+l.from+'|'+l.to+'|'+l.type+'"/>';
+ const arrow=(id)=>'<marker id="'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z"/></marker>';
+ let out='<defs>'+arrow('link-arrow')+arrow('link-arrow-selected')+arrow('link-arrow-dim')+'</defs>',bar=null;
+ // Each line gets its own lane in the gutter and its own slot on the task, so no two share a stretch (as in Captain's Deck).
+ const routed=routeLinks(links,box),anyHot=!!hotLink&&routed.some(({l})=>sameLink(l,hotLink));
+ for(const {l,e} of routed){const selected=sameLink(l,selectedLink)&&!connectDrag,hot=hotLink&&sameLink(l,hotLink);
+  out+='<path class="link-halo" d="'+e.d+'"/><path class="link-line '+l.type+(selected?' selected':'')+(hot?' hot':'')+'" d="'+e.d+'"'+(l.type==='dep'?' marker-end="url(#link-arrow'+(selected?'-selected':anyHot&&!hot?'-dim':'')+')"':'')+'/><path class="link-hit" d="'+e.d+'" data-link="'+l.from+'|'+l.to+'|'+l.type+'"/>';
   if(selected){out+='<circle class="link-knob" cx="'+e.b.x+'" cy="'+e.b.y+'" r="7"/>';bar={x:box.left-area.left+(e.a.x+e.b.x)/2,y:box.top-area.top+(e.a.y+e.b.y)/2,link:l}}}
  if(connectDrag?.path)out+='<path class="link-draft" d="'+connectDrag.path+'"/>';
- svg.innerHTML=out;placeLineBar(bar)}
+ svg.classList.toggle('has-hot',anyHot);svg.innerHTML=out;placeLineBar(bar)}
 function toggleDependencies(id){dependencyFocus=dependencyFocus===id?null:id;showDependencies()}
 // A selected line offers its two changes beside it; its tip can be dragged to another task.
 const lineBar=document.createElement('div');lineBar.className='line-bar';lineBar.hidden=true;$('board').after(lineBar);
@@ -465,6 +498,8 @@ dependencyLines.addEventListener('pointerdown',e=>{if(e.target.closest('.link-kn
 document.addEventListener('pointermove',e=>{if(e.pointerId!==connectDrag?.pointer)return;e.preventDefault();connectDrag.x=e.clientX;connectDrag.y=e.clientY;if(!connectDrag.frame)connectDrag.frame=requestAnimationFrame(moveConnect)},{passive:false});
 document.addEventListener('pointerup',e=>{if(e.pointerId===connectDrag?.pointer)finishConnect(e,true)});
 document.addEventListener('pointercancel',e=>{if(e.pointerId===connectDrag?.pointer)finishConnect(e,false)});
+dependencyLines.addEventListener('pointerover',e=>{const hit=e.target.closest('[data-link]');const [from,to,type]=hit?hit.dataset.link.split('|'):[];const next=hit?{from,to,type}:null;if(!sameLink(next,hotLink)&&(next||hotLink)){hotLink=next;drawDependencies()}});
+dependencyLines.addEventListener('pointerout',e=>{if(hotLink&&!e.relatedTarget?.closest?.('[data-link]')){hotLink=null;drawDependencies()}});
 dependencyLines.addEventListener('click',e=>{const hit=e.target.closest('[data-link]');if(!hit)return;const [from,to,type]=hit.dataset.link.split('|');selectedLink={from,to,type};hoverKeep=from;drawDependencies()});
 // Its label changes under the click, so the click stops here rather than reading as one outside.
 lineBar.addEventListener('click',e=>{e.stopPropagation();const b=e.target.closest('[data-line]');if(!b||!selectedLink)return;if(b.dataset.line==='remove'){const l=selectedLink;selectedLink=null;removeLink(l)}else selectedLink=toggleLink(selectedLink);drawDependencies()});

@@ -25,6 +25,7 @@ dialog{color:var(--ink);background:var(--surface);border:1px solid var(--line);b
 .task.connect-target{background:var(--tint)}.task.connect-source{background:color-mix(in srgb,var(--tint) 60%,var(--surface))}
 body.connecting .task{cursor:copy}
 .dependency-lines .link-line{fill:none;stroke-width:2;transition:stroke .15s}.dependency-lines .link-line.dep{stroke:var(--accent)}.dependency-lines .link-line.rel{stroke:var(--control-line);stroke-dasharray:5 4}.dependency-lines .link-line.selected{stroke:var(--danger);stroke-width:3}
+.dependency-lines .link-halo{fill:none;stroke:var(--bg);stroke-width:6;stroke-linecap:round;opacity:.9}.dependency-lines .link-line.hot{stroke-width:3}.dependency-lines.has-hot .link-line:not(.hot){opacity:.22}#link-arrow-dim path{fill:var(--accent);opacity:.22}html[data-theme=dark] #link-arrow-dim path{fill:var(--accent-text)}.dependency-lines .link-line{transition:stroke .15s,opacity .15s}
 .dependency-lines .link-hit{fill:none;stroke:transparent;stroke-width:14;pointer-events:stroke;cursor:pointer}.dependency-lines .link-draft{fill:none;stroke:var(--accent);stroke-width:2;stroke-dasharray:4 4}
 .dependency-lines .link-knob{fill:var(--surface);stroke:var(--danger);stroke-width:2.5;pointer-events:all;cursor:grab}
 .dependency-lines marker path{stroke:none}#link-arrow path{fill:var(--accent)}#link-arrow-selected path{fill:var(--danger)}
