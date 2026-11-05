@@ -163,7 +163,7 @@ class Assistant:
 
     def blockers(self,row,by_id,connected=None):
         if connected is None:connected=self.store.state_value('connected',False)
-        if connected:return [dep for dep in row.get('depends',[]) if by_id.get(dep,{}).get('status')!='completed']
+        if connected:return [dep for dep in row.get('depends',[]) if by_id.get(dep,{}).get('status') not in ('completed','canceled')]
         return [dep for dep in row.get('depends',[]) if by_id.get(dep,{}).get('status') in ('pending','recurring')]
 
     def raise_blockers(self, row, priority, patch, plan):
@@ -317,7 +317,7 @@ class Assistant:
                 raise AssistantError('proposal_required','Continuity capture requires an initialized connected workspace.')
             if continuation:plan['effect']['continuity_set']=[uid,continuation,now]
             plan["result"] = {"uuid": uid}
-        elif action in ("task_update", "task_snooze", "task_done", "front_activate", "front_todo", "front_retire", "task_restore", "dependency_update", "task_reopen"):
+        elif action in ("task_update", "task_snooze", "task_done", "front_activate", "front_todo", "front_retire", "task_restore", "dependency_update", "task_reopen", "task_cancel"):
             row = self.required(p["uuid"])
             changes = {}
             if action == "task_restore":
@@ -325,7 +325,7 @@ class Assistant:
                     raise AssistantError("undo_conflict", "The responsibility changed after this fact; nothing was overwritten.")
                 changes = dict(p["patch"])
                 if isinstance(changes.get("project"),str):changes["project"]=[changes["project"]] if changes["project"] else None
-                if not changes or set(changes) - {"description", "priority", "due", "wait", "start", "status", "end", "depends", "project", "lastActive", "groupChanged", "nextUp"}:
+                if not changes or set(changes) - {"description", "priority", "due", "wait", "start", "status", "end", "depends", "project", "lastActive", "groupChanged", "nextUp", "cancelReason"}:
                     raise AssistantError("invalid_restore", "The inverse exceeds the fields of that decision.")
                 if changes.get('status') == 'completed' and self.blockers(dict(row, depends=changes.get('depends', row.get('depends')) or []), {item['uuid']: item for item in self.tasks.rows()}):
                     raise AssistantError('not_actionable', 'Complete the pending prerequisites first.')
@@ -342,11 +342,17 @@ class Assistant:
                     changes = {"start": None, "wait": None}
                 else:
                     changes = {"status": "deleted", "end": wire(now), "start": None, "wait": None}
+            elif action=='task_cancel':
+                if self.tasks.schema() < 4:raise AssistantError('task_upgrade_required','Upgrade the profile before canceling a task.')
+                if row['status'] != 'pending':raise AssistantError('terminal_task','Only pending responsibilities can be canceled.')
+                reason=p.get('reason','')
+                if not isinstance(reason,str) or len(reason)>500:raise AssistantError('invalid_reason','Cancellation reason must be at most 500 characters.')
+                changes={'status':'canceled','end':wire(now),'start':None,'wait':None,'cancelReason':reason.strip() or None}
             elif action=='task_reopen':
-                if row['status'] not in ('completed','deleted'):raise AssistantError('not_closed','Only a completed or retired responsibility can be reopened.')
-                changes={'status':'pending','end':None,'start':None,'wait':None}
+                if row['status'] not in ('completed','deleted','canceled'):raise AssistantError('not_closed','Only a completed or retired responsibility can be reopened.')
+                changes={'status':'pending','end':None,'start':None,'wait':None,'cancelReason':None}
             elif action == "task_done":
-                if row['status']=='deleted':
+                if row['status'] in ('deleted','canceled'):
                     raise AssistantError('terminal_task','Restore a retired responsibility before marking it complete.')
                 if row['status'] != 'completed' and self.blockers(row, {item['uuid']: item for item in self.tasks.rows()}):
                     raise AssistantError('not_actionable', 'Complete the pending prerequisites first.')
@@ -393,7 +399,7 @@ class Assistant:
                     if any(previous.get(k)!=v for k,v in continuation.items()):plan['effect']['continuity_set']=[row['uuid'],continuation,now]
                 if not changes and not plan["effect"]:
                     raise AssistantError("empty_update", "No change was supplied.")
-            if action in ("front_todo","task_snooze","task_done","front_retire") and row.get("start"):
+            if action in ("front_todo","task_snooze","task_done","front_retire","task_cancel") and row.get("start"):
                 changes["lastActive"]=row["start"]
             patch(row, changes)
             plan["result"] = {"uuid": row["uuid"]}
@@ -863,18 +869,18 @@ class Assistant:
                          "number": aliases.get(row["uuid"]), "startedAt": stamp(parse(row["start"])) if row.get("start") else None,
                          "lastActiveAt": stamp(parse(row["lastActive"])) if row.get("lastActive") else None,
                          "groupChangedAt": stamp(parse(row["groupChanged"])) if row.get("groupChanged") else None, "created_at": stamp(parse(row["entry"])) if row.get("entry") else None,
-                         "closed_at": stamp(parse(row["end"])) if row.get("end") and row["status"] in ("completed", "deleted") else None,
+                         "closed_at": stamp(parse(row["end"])) if row.get("end") and row["status"] in ("completed", "deleted", "canceled") else None,
                          "due_at": stamp(parse(row["due"])) if row.get("due") else None,
                          "snoozed_until": stamp(parse(row["wait"])) if row.get("wait") else None,
                          "focused": bool(row.get("start")) and row["status"]=="pending" if connected else uid==focused and bool(row.get("start")) and status=="pending",
                          "dependsOn":row.get('depends',[]),"blockedBy":self.blockers(row,by_id,connected) if row['status']=='pending' else [],
-                         "metadata": meta.get(uid, {})})
+                         "cancelReason": row.get("cancelReason", ""), "metadata": meta.get(uid, {})})
         return view
 
     def list(self, include_completed=False):
         with self.store.lock():
             rows = self._view()
-            return {"revision": self.store.revision(), "tasks": [r for r in rows if include_completed or r["status"] not in ("completed", "deleted")]}
+            return {"revision": self.store.revision(), "tasks": [r for r in rows if include_completed or r["status"] not in ("completed", "deleted", "canceled")]}
 
     def _candidates(self, view):
         now = self.clock()
@@ -884,7 +890,7 @@ class Assistant:
         kinds = (self.store.state_value('notification_policy') or {}).get('kinds') or {}
         zone = self.store.state_value('timezone', 'UTC')
         for task in view:
-            if task["status"] in ("completed", "deleted", "waiting"):
+            if task["status"] in ("completed", "deleted", "canceled", "waiting"):
                 continue
             uid = task["uuid"]
             def add(kind, episode, title):

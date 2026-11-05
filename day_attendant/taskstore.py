@@ -34,7 +34,7 @@ def canonical(row):
 
 # Schema 1 holds only high, medium and low. Schema 2 has the same rows and also admits
 # urgent. Schema 3 adds list memberships and the permanent alias registry; older releases refuse it.
-SCHEMA = 3
+SCHEMA = 4
 
 
 class TaskStore:
@@ -59,7 +59,7 @@ class TaskStore:
                     con.execute('CREATE TABLE tasks(uuid TEXT PRIMARY KEY NOT NULL, data TEXT NOT NULL)')
                     con.execute(f'PRAGMA user_version={SCHEMA}')
                     con.execute('CREATE TABLE aliases(number INTEGER PRIMARY KEY AUTOINCREMENT, uuid TEXT UNIQUE NOT NULL)')
-                elif version not in (1, 2, SCHEMA):
+                elif version not in (1, 2, 3, SCHEMA):
                     raise AssistantError('unsupported_task_schema', 'The task store has an unsupported schema; no tasks were replaced.')
             self.database.chmod(0o600)
             if self.schema()>=3:self.validate_aliases()
@@ -93,7 +93,7 @@ class TaskStore:
                 raise ValueError('uuid')
             if not isinstance(row['description'], str) or not row['description'].strip():
                 raise ValueError('description')
-            if row.get('status') not in ('pending', 'completed', 'deleted', 'recurring'):
+            if row.get('status') not in ('pending', 'completed', 'deleted', 'recurring', 'canceled'):
                 raise ValueError('status')
             for field in ('entry', 'due', 'wait', 'start', 'end', 'lastActive', 'groupChanged'):
                 if field in row:

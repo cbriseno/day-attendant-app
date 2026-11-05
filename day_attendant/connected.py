@@ -41,7 +41,7 @@ ALLOWED = {
     "task_add": {"title", "priority", "due", "source", "zone", "person", "reference", "observed_at", "estimate_minutes", "remainingMinutes", "awaiting", "context", "next", "group", "groups", "attachmentIds", "organize", "captureText"},
     "task_update": {"uuid", "title", "nextUp", "priority", "due", "zone", "progress", "context", "next", "awaiting", "remainingMinutes", "original", "assistantNotes", "group", "groups", "order"},
     "front_activate": {"uuid", "order"}, "front_todo": {"uuid", "order"}, "front_retire": {"uuid"},
-    "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"},
+    "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"}, "task_cancel":{"uuid","reason"},
     "context_update": {"availableMinutes", "availableUntil", "rest"},
     "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "notes", "original", "assistantNotes", "checklist", "blockReason"},
     "dependency_update": {"uuid","dependsOn"},
@@ -352,11 +352,11 @@ class Connected:
         tasks = []
         for row in rows:
             extra = continuation.get(row["uuid"], {})
-            state = "done" if row["status"] == "completed" else "retired" if row["status"] == "deleted" else "snoozed" if row["status"] == "waiting" else "active" if row["focused"] else "todo"
+            state = "done" if row["status"] == "completed" else "canceled" if row["status"] == "canceled" else "retired" if row["status"] == "deleted" else "snoozed" if row["status"] == "waiting" else "active" if row["focused"] else "todo"
             tasks.append({"id": row["uuid"], "title": row["title"], "state": state,
                 "priority": row["priority"], "nextUp": row["nextUp"], "group": row["group"], "groups": row["groups"], "number": row["number"],
                 "startedAt":row["startedAt"], "lastActiveAt":row["lastActiveAt"], "groupChangedAt":row["groupChangedAt"], "createdAt": row["created_at"], "closedAt": row["closed_at"],
-                "due": row["due_at"], "until": row["snoozed_until"],
+                "due": row["due_at"], "until": row["snoozed_until"], "cancelReason": row["cancelReason"],
                 "blocked": bool(row['blockedBy']), "dependsOn":row['dependsOn'],"blockedBy":row['blockedBy'],
                 "relatedTo":[r['b'] if r['a']==row['uuid'] else r['a'] for r in related if row['uuid'] in (r['a'],r['b'])],
                 "attachmentIds":[r['attachment_id'] for r in image_links if r['entity_uuid']==row['uuid']],
@@ -889,7 +889,7 @@ class Connected:
         by_id={t['id']:t for t in tasks};result=[]
         for r in con.execute("SELECT * FROM suggestions ORDER BY created_at DESC,rowid DESC LIMIT 20"):
             task=by_id.get(r['task_uuid'])
-            current=r['status']=='open' and bool(task) and task['state'] not in ('done','retired') and self._basis(task,context,r['code'])==r['basis']
+            current=r['status']=='open' and bool(task) and task['state'] not in ('done','retired','canceled') and self._basis(task,context,r['code'])==r['basis']
             result.append({'id':r['id'],'taskId':r['task_uuid'],'code':r['code'],'origin':r['origin'],'message':r['message'],
                 'messageKey':r['message_key'],'messageParams':json.loads(r['message_params'] or '{}'),
                 'action':json.loads(r['action']) if r['action'] else None,'status':r['status'],'current':current,
@@ -923,7 +923,7 @@ class Connected:
             self.store.assert_writable();self.app.clean_read()
             task=next((t for t in self._tasks() if t['id']==row['task_uuid']),None)
             context=self.store.state_value("day_context",{})
-            if not task or task['state'] in ('done','retired') or self._basis(task,context,row['code'])!=row['basis']:
+            if not task or task['state'] in ('done','retired','canceled') or self._basis(task,context,row['code'])!=row['basis']:
                 raise AssistantError('suggestion_stale','The responsibility changed after this suggestion.')
             action=json.loads(row['action'])
             proposal=self.request(action['action'],action['payload'],key,request_text='Suggestion '+identity,_lock_held=True)
@@ -952,7 +952,7 @@ class Connected:
     def _findings(self, snapshot, changes):
         """What the service itself notices after changes, from known facts only; no model is involved."""
         tasks={t['id']:t for t in snapshot['tasks']};context=snapshot['context'];now=self.app.clock();found=[]
-        is_open=lambda t:t['state'] not in ('done','retired')
+        is_open=lambda t:t['state'] not in ('done','retired','canceled')
         dependents=lambda uid:[d for d in tasks.values() if uid in d['dependsOn'] and is_open(d)]
         def add(code,task,key,params,action,*identity):
             found.append({'signature':fingerprint([code,task['id'],*identity]),'task':task['id'],'code':code,'origin':'rules',
@@ -1002,13 +1002,13 @@ class Connected:
         for uid in touched:linked|=set(tasks[uid]['dependsOn'])|{t['id'] for t in tasks.values() if uid in t['dependsOn']}
         for change in changes:linked|={u for side in change['fields'].get('dependsOn') or [] for u in side or [] if u in tasks}
         fields=('id','number','title','state','priority','group','groups','due','until','blocked','blockedBy','dependsOn','awaiting','remainingMinutes','context','next')
-        relevant=[t for t in snapshot['tasks'] if t['state'] not in ('done','retired') and (t['id'] in touched|linked or t['state']=='active')]
+        relevant=[t for t in snapshot['tasks'] if t['state'] not in ('done','retired','canceled') and (t['id'] in touched|linked or t['state']=='active')]
         suggest_for=sorted(t['id'] for t in relevant if t['id'] in touched|linked)
         with self.store.connect() as con:
             open_=[{'taskId':r['task_uuid'],'message':r['message'] or r['message_key']} for r in con.execute("SELECT task_uuid,message,message_key FROM suggestions WHERE status='open' ORDER BY created_at DESC LIMIT 20")]
         return {'now':snapshot['now'],'timezone':snapshot['timezone'],'changes':changes[-30:],
                 'tasks':[{k:t.get(k) for k in fields} for t in relevant][:60],'suggest_for':suggest_for,
-                'closed':[{k:tasks[u][k] for k in ('id','title','state')} for u in sorted(touched|linked) if tasks[u]['state'] in ('done','retired')],
+                'closed':[{k:tasks[u][k] for k in ('id','title','state')} for u in sorted(touched|linked) if tasks[u]['state'] in ('done','retired','canceled')],
                 'context':{k:snapshot['context'].get(k) for k in ('availableMinutes','availableUntil','rest')},
                 'calendar_events':[{k:e[k] for k in ('title','start_at','end_at')} for e in snapshot['calendar_events']
                                    if parse(e['end_at'])>now and parse(e['start_at'])<=now+timedelta(days=7)][:20],
@@ -1099,7 +1099,7 @@ class Connected:
                 shown={(r['task_uuid'],r['basis']) for r in con.execute("SELECT task_uuid,basis FROM suggestions WHERE status='open'")}
                 for item in findings+(proposed if fresh else []):
                     task=current.get(item['task'])
-                    if not task or task['state'] in ('done','retired') or self._basis(task,context,item['code'])!=item['basis']:continue
+                    if not task or task['state'] in ('done','retired','canceled') or self._basis(task,context,item['code'])!=item['basis']:continue
                     # One note per card: the assistant never repeats what is already shown there.
                     if item['origin']=='assistant' and any(uid==item['task'] and basis==self._basis(task,context,'assistant') for uid,basis in shown):continue
                     # A dismissed or applied suggestion stays closed; an open one is refreshed, and a newer

@@ -142,6 +142,8 @@ Never commit installation environments, profiles, credentials or real captures.
 Task writes use UUIDs, stable request keys and observed revisions. See the
 [operation guide](docs/daily-operation.md) for actions, recovery and reminders.
 
+A canceled task stays separate from completed work and stops producing reminders; its checklist is retained for reactivation. A canceled prerequisite no longer blocks dependents because the requirement was withdrawn; reactivating it restores the dependency. Its repeat and reminder settings remain saved but inactive until reactivation.
+
 ## Backup and recovery
 
 Manual snapshots coherently include both databases and selected attachments,

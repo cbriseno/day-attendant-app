@@ -102,7 +102,7 @@ $('error-close').onclick=()=>{$('save-error').hidden=true};
 function renderUndo(data){const top=data.undoStack?.[0];$('undo').disabled=!top||data.readOnly||flow?.sending>0;$('undo').dataset.event=top?.id??'';$('undo').title=top?tr('undo')+' · '+(actionLabel[top.kind||aliases[top.action]||top.action]||tr('change_saved'))+(top.target?' · '+(data.tasks.find(t=>t.id===top.target)?.title||''):''):tr('undo_empty')}
 const task=id=>flow.snapshot().tasks.find(t=>t.id===id);
 const safely=async fn=>{try{return await fn()}catch(error){notice(error.message);return null}};
-let actionLabel,phaseLabel;function refreshLabels(){actionLabel={activate:tr("start"),snooze:tr("snooze"),todo:tr("back_to_to_do"),done:tr("complete"),retire:tr("retire"),restore:tr("undo"),declaration:tr("declaration_updated"),block:tr('block_changed'),add:tr("create"),update:tr("update"),reopen:tr("reopen"),dependency:tr("dependency_update"),related:tr("related_update"),schedule:tr("schedule_saved"),group_color:tr("group_color_saved"),group_rename:tr('rename_group'),order:tr('order_saved'),event_add:tr('create'),event_update:tr('update'),event_cancel:tr('event_canceled')};
+let actionLabel,phaseLabel;function refreshLabels(){actionLabel={activate:tr("start"),snooze:tr("snooze"),todo:tr("back_to_to_do"),done:tr("complete"),retire:tr("retire"),cancel_task_action:tr("cancel_task_action"),restore:tr("undo"),declaration:tr("declaration_updated"),block:tr('block_changed'),add:tr("create"),update:tr("update"),reopen:tr("reopen"),dependency:tr("dependency_update"),related:tr("related_update"),schedule:tr("schedule_saved"),group_color:tr("group_color_saved"),group_rename:tr('rename_group'),order:tr('order_saved'),event_add:tr('create'),event_update:tr('update'),event_cancel:tr('event_canceled')};
 phaseLabel={evaluating:tr("the_assistant_is_reviewing"),review:tr("phase_waits_for_you"),unavailable:tr("phase_left_waiting"),stale:tr("context_changed"),invalid:tr("phase_not_applied")};
 }
 refreshLabels();
@@ -171,12 +171,12 @@ function morphBoard(lanes,data){
   wanted.forEach((node,j)=>{if(box.children[j]!==node)box.insertBefore(node,box.children[j]||null)});
  });
  while(board.children.length>lanes.length)board.lastElementChild.remove();
- const openIds=new Set(data.tasks.filter(t=>!['done','retired'].includes(t.state)).map(t=>t.id));for(const id of groupViewNodes.keys())if(!openIds.has(id.split('|')[0]))groupViewNodes.delete(id);
+ const openIds=new Set(data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)).map(t=>t.id));for(const id of groupViewNodes.keys())if(!openIds.has(id.split('|')[0]))groupViewNodes.delete(id);
  if(!animate||!first.size)return;
  // A capture shown before its answer comes back under its saved id: it stays where it was.
  const drafts=[...old].filter(([id])=>id.startsWith('draft:'));
  // Filtering only hides open tasks: it must not clone hundreds of rows as if they were completed.
- const closed=new Set(data.tasks.filter(t=>['done','retired'].includes(t.state)).map(t=>t.id));
+ const closed=new Set(data.tasks.filter(t=>['done','retired','canceled'].includes(t.state)).map(t=>t.id));
  for(const [id,node] of old){if(id.startsWith('draft:')||!first.has(id)||!closed.has(node.dataset.taskId))continue;leave(node,first.get(id),data.tasks.find(t=>t.id===node.dataset.taskId)?.state==='done')}
  for(const [id] of drafts){const title=data.tasks.find(t=>t.id===id)?.title??old.get(id).querySelector('.task-title')?.textContent,saved=data.tasks.find(t=>!first.has(t.id)&&t.title===title&&!t.id.startsWith('draft:'));if(saved)first.set(saved.id,first.get(id))}
  const closing=[...old.keys()].some(id=>closed.has(id.split('|')[0])&&first.has(id));
@@ -221,7 +221,7 @@ function toggleFold(key){if(!foldedGroups.delete(key))foldedGroups.add(key);try{
  for(const a of section.getAnimations({subtree:true}))a.cancel();const folded=foldedGroups.has(key),button=section.querySelector('[data-fold]');section.classList.toggle('collapsed',folded);button.setAttribute('aria-expanded',String(!folded));button.setAttribute('aria-label',tr(folded?'group_expand':'group_collapse').replace('{group}',section.querySelector('h2').textContent));section.querySelector('.group-folded').textContent=folded?' · '+tr('group_folded'):'';section.firstElementChild._html=null;drawDependencies()}
 function groupInventory(data=flow.snapshot()){const groups=new Map();for(const t of data.tasks)for(const label of taskGroups(t)){const key=groupKey(label),g=groups.get(key)||{label,n:0,recent:''};g.n++;g.recent=[g.recent,t.groupChangedAt||t.createdAt||''].sort().at(-1);groups.set(key,g)}return [...groups.values()]}
 function rankedGroups(data=flow.snapshot()){const all=groupInventory(data),used=[...all].sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label)),recent=[...all].sort((a,b)=>b.recent.localeCompare(a.recent));return [...new Map([...used.slice(0,2),...recent.filter(g=>!used.slice(0,2).includes(g)).slice(0,2),...used].map(g=>[groupKey(g.label),g])).values()]}
-function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired'].includes(t.state)),groups=groupInventory({...data,tasks:open.map(t=>({...t,groups:[...new Set(taskGroups(t).map(groupParent))]}))}).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label));
+function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)),groups=groupInventory({...data,tasks:open.map(t=>({...t,groups:[...new Set(taskGroups(t).map(groupParent))]}))}).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label));
  if(groupFilter==='group:'&&open.some(t=>!taskGroups(t).length))groups.push({label:'',n:open.filter(t=>!taskGroups(t).length).length});
  if(!groups.length)return '';
  const selected=groups.find(g=>'group:'+groupKey(g.label)===groupFilter),limit=innerWidth<=600?2:3,visible=groups.slice(0,limit);
@@ -245,7 +245,7 @@ function groupLanes(data,proposals){
   const sub=groupSub(s.label),parentKey=groupKey(groupParent(s.label)),key=groupKey(s.label),name=s.label?(sub?'› '+sub:s.label):tr('no_group'),folded=foldedGroups.has(key),parentFolded=!!sub&&foldedGroups.has(parentKey);
   const inParent=t=>taskGroups(t).some(g=>groupKey(g)===key||!sub&&groupKey(groupParent(g))===key);
   const tasks=[...s.tasks].sort((a,b)=>STATE_RANK[a.state]-STATE_RANK[b.state]),count=sub?tasks.length:open.filter(inParent).length;
-  const members=data.tasks.filter(t=>t.state!=='retired'&&(inParent(t)||!taskGroups(t).length&&!key)),done=members.filter(t=>t.state==='done').length,pct=members.length?Math.round(100*done/members.length):0;
+  const members=data.tasks.filter(t=>!['retired','canceled'].includes(t.state)&&(inParent(t)||!taskGroups(t).length&&!key)),done=members.filter(t=>t.state==='done').length,pct=members.length?Math.round(100*done/members.length):0;
   const next=tasks.filter(t=>t.due).sort((a,b)=>new Date(a.due)-new Date(b.due))[0],progress=formatted('group_progress',{done,total:members.length});
   const head='<button type="button" class="ib fold" data-fold="'+esc(key)+'" aria-expanded="'+!folded+'" aria-label="'+esc(tr(folded?'group_expand':'group_collapse').replace('{group}',name))+'">'+chevronIcon+'</button>'
    +'<h2'+(s.label?' data-anon-private="text" tabindex="0" aria-keyshortcuts="F2" data-rename-label="'+esc(s.label)+'" title="'+esc(tr('group_label_hint'))+'"':'')+'>'+(s.label?groupDot(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>')+esc(name)+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+count+'</span>'+sectionAdd(s.label,data)
@@ -353,7 +353,7 @@ let chainJustDone=null;
 // In this view, finishing a step says what it frees; finishing one that still waits asks first (#32 makes that a hard rule).
 $('board').addEventListener('click',e=>{if(orderView!=='chains')return;const close=e.target.closest('[data-chain-notice-close]');if(close){e.stopPropagation();chainJustDone=null;render();return}
  const b=e.target.closest('[data-action="done"]');if(!b)return;const data=flow.snapshot(),t=data.tasks.find(x=>x.id===b.dataset.id);if(!t)return;
- const waiting=(t.dependsOn||[]).map(id=>data.tasks.find(x=>x.id===id)).filter(x=>x&&!['done','retired'].includes(x.state));
+ const waiting=(t.dependsOn||[]).map(id=>data.tasks.find(x=>x.id===id)).filter(x=>x&&!['done','retired','canceled'].includes(x.state));
  if(waiting.length)return
  chainJustDone={id:t.id}},true);
 const PRIORITIES=globalThis.dayOrdering.PRIORITIES;
@@ -416,7 +416,7 @@ function focusRow(t,data,big){
  if(t.state==='active')reason.push(tr('focus_in_progress'));
  if(t.priority==='urgent')reason.push(tr('priority_urgent'));
  if(t.due)reason.push(tr(new Date(t.due)<NOW?'meta_overdue':'meta_due').replace('{time}',short(t.due)));
- const n=data.tasks.filter(r=>!['done','retired'].includes(r.state)&&(r.dependsOn||r.blockedBy||[]).includes(t.id)).length;
+ const n=data.tasks.filter(r=>!['done','retired','canceled'].includes(r.state)&&(r.dependsOn||r.blockedBy||[]).includes(t.id)).length;
  if(n)reason.push(formatted(n===1?'focus_unlocks_one':'focus_unlocks',{n}));
  if(t.awaiting)reason.push(tr('meta_waiting'));
  if(t.state==='snoozed'&&t.until)reason.push(tr('meta_resumes').replace('{time}',short(t.until)));
@@ -424,7 +424,7 @@ function focusRow(t,data,big){
  const button=(action,label,icon)=>'<button type="button" class="btn" data-id="'+t.id+'" data-action="'+action+'"'+(['snooze','retire'].includes(action)?' aria-haspopup="menu" aria-expanded="false"':'')+' aria-label="'+esc(label+': '+t.title)+'"'+(off||action==='activate'&&blocked?' disabled':'')+'>'+icon+esc(label)+'</button>';
  return '<article class="task focus-item'+(big?' big':'')+'" data-task-id="'+t.id+'"><div class="row-main"><button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+esc(tr('complete')+': '+t.title)+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button><div class="row-text">'+titleCell(t,data)+'<p class="focus-reason" data-anon-safe="text title aria-label">'+esc(reason.join(' · '))+' · '+numberButton(t)+creationTime(t)+activityTime(t)+'</p>'+(t.next?'<p class="focus-next"><b>'+esc(tr('next_step'))+':</b> '+esc(t.next)+'</p>':'')+'</div><div class="focus-actions">'+priorityButton(t,off)+(t.state==='active'?button('todo',tr('pause'),pauseIcon):button('activate',tr(t.state==='snoozed'?'resume_now':'start'),playIcon))+button('snooze',tr('snooze'),clockIcon)+button('retire',tr('retire_7ad0e0'),'')+'</div></div>'+(expanded===t.id?expandView(t,data):'')+'</article>';
 }
-function focusLanes(data){const selected=globalThis.dayOrdering.focus(data.tasks,NOW.getTime()),sections=[['active',selected.active],['next',selected.next],['soon',selected.soon]],shown=sections.reduce((n,[,rows])=>n+rows.length,0),hidden=data.tasks.filter(t=>!['done','retired'].includes(t.state)).length-shown;let first=true;
+function focusLanes(data){const selected=globalThis.dayOrdering.focus(data.tasks,NOW.getTime()),sections=[['active',selected.active],['next',selected.next],['soon',selected.soon]],shown=sections.reduce((n,[,rows])=>n+rows.length,0),hidden=data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)).length-shown;let first=true;
  const lanes=[{id:'focus:intro',head:'',items:[{key:'intro',html:'<p class="focus-intro" data-anon-safe="text title aria-label">'+esc(shown?formatted('focus_intro',{n:hidden}):tr('focus_empty'))+' <button type="button" class="link-button" data-exit-focus>'+esc(tr('focus_all'))+'</button></p>'}]}];
  for(const [key,rows] of sections)if(rows.length)lanes.push({id:'focus:'+key,cls:' focus-section',head:'<h2>'+esc(tr('focus_'+key))+'</h2>'+(key==='next'?sectionAdd('',data):''),items:rows.map(t=>{const big=first;first=false;return {id:t.id,html:focusRow(t,data,big)}})});
  if(shown)lanes.push({id:'focus:rest',head:'',items:[{key:'rest',html:'<p class="focus-rest">'+esc(tr('focus_rest'))+'</p>'}]});return lanes;
@@ -467,12 +467,12 @@ function orderNote(data){
  if(orderView!=='suggested')return '';
  const s=data.orderSuggestion,result=s?.result,pending=s?.request?.status==='pending',failed=s?.request?.status==='incomplete';
  const text=(result?tr('suggestion_from').replace('{time}',short(result.at))+(s.stale?' '+tr('suggestion_stale'):''):tr('suggestion_none'))+(pending?' '+tr('suggestion_pending'):failed?' '+tr('suggestion_failed')+(known(s.request.code)?tr('error_'+s.request.code):tr('chat_failed_generic')):'');
- const disabled=data.readOnly||pending||!data.agent?.connected||!data.tasks.some(t=>!['done','retired'].includes(t.state));
+ const disabled=data.readOnly||pending||!data.agent?.connected||!data.tasks.some(t=>!['done','retired','canceled'].includes(t.state));
  return '<p>'+esc(text)+'</p><button type="button" class="btn ghost" id="suggest-order"'+(disabled?' disabled':'')+(data.agent?.connected?'':' title="'+esc(tr('agent_temporarily_unavailable'))+'"')+'>'+esc(tr(result?'suggest_again':'suggest_order'))+'</button>'+(result?.message?'<p class="suggestion-message">'+esc(result.message)+'</p>':'');
 }
 const sectionIds=section=>[...$('board').querySelectorAll('.task')].filter(c=>c.dataset.section===section).map(c=>c.dataset.taskId);
 // The visible order applies at once; saving waits for a pause and keeps the revision the person saw.
-const currentOrder=(data=flow.snapshot())=>globalThis.dayOrdering.manualIds(data.tasks.filter(t=>!['done','retired'].includes(t.state)),localOrder||data.taskOrder||[]);
+const currentOrder=(data=flow.snapshot())=>globalThis.dayOrdering.manualIds(data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)),localOrder||data.taskOrder||[]);
 function placeOrder(id,ids,to){return setOrder(globalThis.dayOrdering.move(currentOrder(),ids,id,to),id)}
 // A new order leaves at once, before it is drawn; moves made while one is on its way follow it as one change.
 // Moves close together are one change to undo, however many saves they took; Undo puts the board back at once.
@@ -677,11 +677,11 @@ function render(data=flow.snapshot()) {
  phaseCache=new Map(proposals.map(p=>[p.id,p.phase]));
  // Writing the same text still marks the page for layout, which the next position read then pays for.
  const same=(node,text)=>{if(node.textContent!==text)node.textContent=text};
- same($('task-count'),data.tasks.filter(t=>!['done','retired'].includes(t.state)).length+tr("open"));
+ same($('task-count'),data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)).length+tr("open"));
  same($('context-open'),data.context.availableMinutes!==null?data.context.availableMinutes+tr("min_available"):tr("my_context"));
  const note=orderNote(data);if($('order-note')._html!==note){$('order-note').innerHTML=note;$('order-note')._html=note}
- if(expanded&&!data.tasks.some(t=>t.id===expanded&&!t.pending&&!['done','retired'].includes(t.state)))expanded=null;
- if(titleEdit&&!data.tasks.some(t=>t.id===titleEdit.id&&!['done','retired'].includes(t.state)))titleEdit=null;
+ if(expanded&&!data.tasks.some(t=>t.id===expanded&&!t.pending&&!['done','retired','canceled'].includes(t.state)))expanded=null;
+ if(titleEdit&&!data.tasks.some(t=>t.id===titleEdit.id&&!['done','retired','canceled'].includes(t.state)))titleEdit=null;
  const typing=typingState();rendering=true;startRows(data);
  const marked=data.tasks.filter(t=>isNextUp(t)&&!isBlocked(t)&&shownByFilter(t));
  const nextLane=marked.length?[{id:'next-up',head:'<h2>'+esc(tr('next_up'))+'</h2><span class="lane-count">'+marked.length+'</span>',items:marked.map(t=>({id:t.id,rowKey:t.id+'|next-up',html:taskRow(t,{key:'next-up',draggable:false},data,proposals.find(p=>p.intent.taskId===t.id))}))}]:[];
@@ -696,7 +696,7 @@ function render(data=flow.snapshot()) {
  if(active?.isConnected&&active!==document.activeElement&&$('board').contains(active))active.focus({preventScroll:true});
  restoreTyping(typing);rendering=false;
  showDependencies(data);drawChainLinks();
- renderClosed(data);
+ renderClosed(data);renderCanceled(data);
  // Only changes waiting for the person appear here: a retire from the conversation, or one an older
  // version left unapplied. Direct actions never wait.
  const shown=proposals.filter(p=>p.phase!=='evaluating');
@@ -717,7 +717,7 @@ function render(data=flow.snapshot()) {
  if(lastSeenEvent===undefined)lastSeenEvent=last?.id??null;else if(last&&last.id!==lastSeenEvent){lastSeenEvent=last.id;announce(last,data)}
  if(active&&!active.isConnected){requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const current=document.activeElement;if(current&&current!==document.body&&current!==active&&current.isConnected)return;let target;if(focusProposal)target=$('reviews').querySelector('[data-proposal="'+focusProposal+'"][data-review-action="'+reviewAction+'"]');if(!target&&focusTask)target=$('board').querySelector('[data-id="'+focusTask+'"][data-action="'+focusAction+'"]')||$('board').querySelector('[data-id="'+focusTask+'"][data-action="title"]');if(!target)target=shown.length?$('review-title'):$('list-view');target.focus({preventScroll:true})})}
  if(newlyRelevant)announceStatus(tr("a_pending_change_needs_review"));
- if(menu){const t=data.tasks.find(t=>t.id===menu.id);if(!t||['done','retired'].includes(t.state))closeMenu(false);else anchorOf(menu.id,menu.action)?.setAttribute('aria-expanded','true')}
+ if(menu){const t=data.tasks.find(t=>t.id===menu.id);if(!t||['done','retired','canceled'].includes(t.state))closeMenu(false);else anchorOf(menu.id,menu.action)?.setAttribute('aria-expanded','true')}
 }
 // Pagination affects presentation only; every closed responsibility stays in the profile.
 let closedLimit=10;
@@ -733,6 +733,13 @@ function renderClosed(data=flow.snapshot()){
  html+=rows.length?'<div class="closed-more">'+(left?'<button type="button" class="btn" data-closed-more>'+esc(tr('closed_more'))+'</button><span data-anon-safe="text">'+esc(formatted('closed_remaining',{n:left}))+'</span>':'')+'</div><p class="closed-note">'+esc(tr('closed_preserved'))+'</p>':'<p class="empty">'+esc(tr('closed_empty'))+'</p>';
  if($('closed')._html!==html){$('closed').innerHTML=html;$('closed')._html=html}
 }
+function renderCanceled(data=flow.snapshot()){
+ const rows=data.tasks.filter(t=>t.state==='canceled'&&matchesSearch(t)).sort((a,b)=>String(b.closedAt||'').localeCompare(String(a.closedAt||'')));
+ $('canceled-count').textContent=rows.length;
+ const html=rows.length?rows.map(t=>'<div class="closed-row canceled-row"><div><span aria-hidden="true">⊘</span> <strong data-anon-private="text">'+esc(t.title)+'</strong><div class="small">'+esc(tr('canceled_task'))+' · '+esc(t.closedAt?zoned({day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'},t.closedAt):tr('closed_date_unknown'))+'</div>'+(t.cancelReason?'<div data-anon-private="text">'+esc(tr('cancel_reason'))+': '+esc(t.cancelReason)+'</div>':'')+'</div><button type="button" class="link-button" data-reactivate-id="'+esc(t.id)+'"'+(data.readOnly?' disabled':'')+' aria-label="'+esc(tr('reactivate')+': '+t.title)+'">'+esc(tr('reactivate'))+'</button></div>').join(''):'<p class="empty">'+esc(tr('canceled_empty'))+'</p>';
+ if($('canceled-list')._html!==html){$('canceled-list').innerHTML=html;$('canceled-list')._html=html}
+}
+$('canceled-list').onclick=e=>{const b=e.target.closest('[data-reactivate-id]');if(b)request('task_reopen',{uuid:b.dataset.reactivateId})};
 // Confirms the latest saved change, how long it took to show, and Undo when it can be undone.
 function announce(last,data){const timing=timings.get(last.proposalId);timings.delete(last.proposalId);if(timing?.before&&last.undoable)undoViews.set(String(last.id),{...timing.before,taskId:last.taskId});announceStatus(tr(last.undoOf?'change_undone':'change_saved'));renderUndo(data);if(last.raised?.length&&!last.undoOf)showRaised(last,data);else if(String(last.id)!==$('raised-row').dataset.fact)hideRaised()}
 // A more urgent task also raised the open tasks that block it: say which, with the same single Undo.
@@ -824,14 +831,14 @@ function formatInput(input){
 function titleCell(t,data){
  if(titleEdit?.id===t.id)return '<span class="title-editor"><input class="title-edit" data-id="'+t.id+'" data-field="title" data-anon-private="value text" maxlength="2000" autocomplete="off" value="'+esc(draftValue(t,'title'))+'" aria-label="'+esc(tr('edit_title')+': '+t.title)+'"'+(data.readOnly?' disabled':'')+'><span class="edit-hint">'+esc(tr('title_edit_hint'))+'</span>'+fieldNote(t,'title')+'</span>';
  return '<span class="title-wrap">'+suggestionMark(t,data)+'<span class="task-title" tabindex="0" data-title-view data-anon-private="text" data-id="'+t.id+'" data-action="title" aria-label="'+esc(tr('edit_title')+': '+t.title)+'" title="'+esc(tr('edit_title_hint'))+'">'+richText(t.title)+'</span></span>'}
-function startTitleEdit(id){const t=task(id),data=flow.snapshot();if(!t||t.pending||data.readOnly||['done','retired'].includes(t.state))return;closeMenu(false);titleEdit={id};render();const input=$('board').querySelector('.title-edit[data-id="'+id+'"]');if(input){formatInput(input);input.focus({preventScroll:true});input.select()}}
+function startTitleEdit(id){const t=task(id),data=flow.snapshot();if(!t||t.pending||data.readOnly||['done','retired','canceled'].includes(t.state))return;closeMenu(false);titleEdit={id};render();const input=$('board').querySelector('.title-edit[data-id="'+id+'"]');if(input){formatInput(input);input.focus({preventScroll:true});input.select()}}
 function commitTitle(id){const d=drafts.get(draftKey(id,'title'));if(d?.conflict||d?.saving)return;titleEdit=null;
  // An emptied title keeps the saved one, as Esc does. A new one leaves before the row is redrawn.
  if(d&&!String(d.value).trim())drafts.delete(draftKey(id,'title'));if(drafts.has(draftKey(id,'title')))saveDraft(id,'title');render();restoreTitleFocus(id)}
 function cancelTitle(id){drafts.delete(draftKey(id,'title'));titleEdit=null;render();restoreTitleFocus(id)}
 const restoreTitleFocus=id=>$('board').querySelector('[data-id="'+id+'"][data-action="title"]')?.focus({preventScroll:true});
 // Expanded details: continuity, links and source, saved field by field.
-const relationTitle=(o,data)=>esc(o.title)+(['done','retired'].includes(o.state)?' · '+esc(tr(o.state==='done'?'completed':'retired')):'');
+const relationTitle=(o,data)=>esc(o.title)+(['done','retired','canceled'].includes(o.state)?' · '+esc(tr(o.state==='done'?'completed':o.state==='canceled'?'canceled_task':'retired')):'');
 function relationRows(ids,kind,t,data){const rows=ids.map(id=>data.tasks.find(x=>x.id===id)).filter(Boolean);
  return rows.length?rows.map(o=>'<div class="rel-item"><button type="button" class="rel-go" data-goto="'+o.id+'" title="'+esc(tr('go_to_task'))+'">'+relationTitle(o,data)+'</button>'+(data.readOnly||t.pending?'':'<button type="button" class="rel-remove" data-unlink="'+kind+':'+o.id+'" data-unlink-task="'+t.id+'" aria-label="'+esc(tr('remove_link')+': '+o.title)+'" title="'+esc(tr('remove_link'))+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>')+'</div>').join(''):'<p class="rel-none">'+esc(tr('none'))+'</p>'}
 const pickerInput=(t,kind,data)=>data.readOnly||t.pending?'':'<div class="picker"><input type="text" class="picker-input" data-search="'+kind+'" data-picker-task="'+t.id+'" autocomplete="off" placeholder="'+esc(tr(kind==='dep'?'add_prerequisite':'add_related'))+'" aria-label="'+esc(tr(kind==='dep'?'add_prerequisite':'add_related'))+'" aria-expanded="false" aria-controls="picker-'+kind+'-'+t.id+'"><div class="picker-list" id="picker-'+kind+'-'+t.id+'" role="listbox" hidden></div></div>';
@@ -911,7 +918,7 @@ function checklistField(t,off){const l=checklistOf(t),{done,n}=checklistCount(t)
   +(n?'<div class="cl-bar" role="progressbar" aria-labelledby="'+lid+'" aria-valuemin="0" aria-valuemax="'+n+'" aria-valuenow="'+done+'"><span style="width:'+Math.round(100*done/n)+'%"></span></div>':'')
   +(n?'<ul class="cl-list" aria-labelledby="'+lid+'">'+l.map(item).join('')+'</ul>':'')
   +(off||l.length>=50?'':'<input type="text" class="cl-add" data-cl-add="'+t.id+'" maxlength="300" autocomplete="off" placeholder="'+esc(tr(n?'checklist_add_more':'checklist_add'))+'" aria-label="'+esc(tr('checklist_add'))+'">')
-  +(n&&done===n&&!['done','retired'].includes(t.state)&&!off?'<div class="cl-alldone" role="status"><span>'+esc(tr('checklist_all_done'))+'</span><button type="button" class="btn" data-cl-finish="'+t.id+'">'+esc(tr('complete'))+'</button></div>':'')
+  +(n&&done===n&&!['done','retired','canceled'].includes(t.state)&&!off?'<div class="cl-alldone" role="status"><span>'+esc(tr('checklist_all_done'))+'</span><button type="button" class="btn" data-cl-finish="'+t.id+'">'+esc(tr('complete'))+'</button></div>':'')
   +'</div>'}
 function saveChecklist(id,list,focus){clFocus=focus||null;request('continuity_update',{uuid:id,checklist:list}).then(()=>restoreClFocus())}
 function restoreClFocus(){if(!clFocus)return;const f=clFocus;requestAnimationFrame(()=>{const box=$('board').querySelector('[data-checklist="'+f.task+'"]');const el=box?.querySelector(f.sel);if(el){el.focus({preventScroll:true});if(f.sel.includes('cl-edit'))el.select?.()}})}
@@ -937,7 +944,7 @@ $('board').addEventListener('click',e=>{
   if(e.target.closest('.cl-text'))e.preventDefault();// a single click on the text is not a toggle; double click edits
   e.stopPropagation();return}
  // Finishing a task that still has open checklist items asks first, with the app's own popover.
- const b=e.target.closest('[data-action="done"]');if(!b)return;const t=task(b.dataset.id);if(!t||['done','retired'].includes(t.state))return;
+ const b=e.target.closest('[data-action="done"]');if(!b)return;const t=task(b.dataset.id);if(!t||['done','retired','canceled'].includes(t.state))return;
  const {done,n}=checklistCount(t);if(!t.blockReason&&n&&done<n){e.stopPropagation();e.preventDefault();const r=b.getBoundingClientRect();openMenu(t.id,'cldone',{x:r.left,y:r.bottom+4})}},true);
 $('board').addEventListener('dblclick',e=>{const x=e.target.closest('[data-cl-text]');if(!x)return;const box=x.closest('[data-checklist]');e.stopPropagation();e.preventDefault();startClEdit(box.dataset.checklist,x.dataset.clText)},true);
 $('board').addEventListener('keydown',e=>{const box=e.target.closest?.('[data-checklist]');if(!box)return;const id=box.dataset.checklist,t=task(id);if(!t)return;
@@ -959,7 +966,7 @@ $('board').addEventListener('dragend',e=>{if(!clDrag&&!e.target.closest?.('[data
 function waitsOn(from,to,data){const seen=new Set(),walk=id=>{if(id===to)return true;if(seen.has(id))return false;seen.add(id);return (data.tasks.find(x=>x.id===id)?.dependsOn||[]).some(walk)};return walk(from)}
 function showPicker(input){const data=flow.snapshot(),id=input.dataset.pickerTask,kind=input.dataset.search,t=data.tasks.find(x=>x.id===id),list=input.nextElementSibling;if(!t||!list)return;picker={id,kind,value:input.value};
  const q=input.value.trim().toLocaleLowerCase(),taken=new Set([t.id,...(kind==='dep'?t.dependsOn:t.relatedTo)]);
- const found=data.tasks.filter(o=>!['done','retired'].includes(o.state)&&!o.pending&&!taken.has(o.id)&&!(kind==='dep'&&waitsOn(o.id,t.id,data))&&(!q||o.title.toLocaleLowerCase().includes(q))).slice(0,8);
+ const found=data.tasks.filter(o=>!['done','retired','canceled'].includes(o.state)&&!o.pending&&!taken.has(o.id)&&!(kind==='dep'&&waitsOn(o.id,t.id,data))&&(!q||o.title.toLocaleLowerCase().includes(q))).slice(0,8);
  list.innerHTML=found.map(o=>'<button type="button" class="menu-item" role="option" data-pick="'+kind+':'+o.id+'" data-pick-task="'+t.id+'"><span class="priority-pill" data-priority="'+esc(o.priority)+'">'+esc(tr('priority_'+o.priority))+'</span><span class="menu-label">'+esc(o.title)+'</span></button>').join('')||'<p class="rel-none">'+esc(tr('no_matches'))+'</p>';
  list.hidden=false;input.setAttribute('aria-expanded','true')}
 function hidePickers(except){for(const list of $('board').querySelectorAll('.picker-list:not([hidden])'))if(list!==except){list.hidden=true;list.previousElementSibling?.setAttribute('aria-expanded','false')}}
@@ -1030,7 +1037,7 @@ function moreMenu(t,data){const off=data.readOnly||t.pending,card=cardOf(t.id),i
   +menuItem('links',esc(tr('see_links')),{icon:linkIcon})+menuItem('connect',esc(tr('connect_to')),{icon:linkIcon,disabled:off})
   +menuItem('duplicate',esc(tr('duplicate')),{icon:copyIcon,disabled:off})
   +menuItem('block',esc(tr(t.blockReason?'block_edit':'block_mark')),{icon:lockIcon,disabled:off})+(t.blockReason?menuItem('block-clear',esc(tr('block_clear')),{icon:lockIcon,disabled:off}):'')
-  +'<div class="menu-sep" role="separator"></div>'+menuItem('retire',esc(tr('retire_7ad0e0')),{kind:'danger',disabled:off})}
+  +'<div class="menu-sep" role="separator"></div>'+menuItem('cancel-task',esc(tr('cancel_task_action')),{kind:'danger',disabled:off})+menuItem('retire',esc(tr('retire_7ad0e0')),{kind:'danger',disabled:off})}
 // Groups already in use, none, or a new one typed in place.
 function groupMenu(t,data,selected){const off=data.readOnly||t.pending,groups=rankedGroups(data).map(g=>g.label),current=selected||taskGroups(t)[0];
  return '<p class="menu-title">'+esc(tr('groups_open'))+'</p>'+(current?menuItem('group-rename',esc(tr('rename_group'))+' · '+esc(current),{value:current,disabled:off}):'')
@@ -1118,7 +1125,7 @@ document.addEventListener('dblclick',e=>{const el=e.target.closest?.('[data-rena
 document.addEventListener('keydown',e=>{if(e.key!=='F2'||e.altKey||e.ctrlKey||e.metaKey)return;const el=document.activeElement?.closest?.('[data-rename-label]');if(!el)return;e.preventDefault();startInlineRename(el.dataset.renameLabel,el)});
 addEventListener('resize',()=>endInlineRename(false));
 function showGroups(origin,filter=false){const d=groupDialog(tr('groups_open'),'<label class="field"><span>'+esc(tr('search_groups'))+'</span><input type="search" data-group-query></label><div class="group-list"></div>',origin),input=d.querySelector('input'),list=d.querySelector('.group-list');
- const draw=()=>{list.replaceChildren();if(!input.value&&flow.snapshot().tasks.some(t=>!taskGroups(t).length&&!['done','retired'].includes(t.state))){const b=document.createElement('button');b.type='button';b.className='btn ghost';b.textContent=tr('no_group');b.onclick=()=>{setGroupFilter('group:');d.close()};list.append(b)}for(const g of rankedGroups().filter(g=>groupKey(g.label).includes(groupKey(input.value)))){const row=document.createElement('div');row.className='group-list-row';const select=document.createElement('button');select.type='button';select.className='btn ghost';select.setAttribute('data-anon-private','text');select.innerHTML=groupDot(g.label)+esc(g.label);select.onclick=()=>{setGroupFilter('group:'+groupKey(g.label));d.close()};const rename=document.createElement('button');rename.type='button';rename.className='btn ghost';rename.textContent=tr('rename_group');rename.disabled=flow.snapshot().readOnly;rename.onclick=()=>{d.close();renameGroup(g.label,origin)};row.append(select,rename);list.append(row)}};input.oninput=draw;draw();input.focus();
+ const draw=()=>{list.replaceChildren();if(!input.value&&flow.snapshot().tasks.some(t=>!taskGroups(t).length&&!['done','retired','canceled'].includes(t.state))){const b=document.createElement('button');b.type='button';b.className='btn ghost';b.textContent=tr('no_group');b.onclick=()=>{setGroupFilter('group:');d.close()};list.append(b)}for(const g of rankedGroups().filter(g=>groupKey(g.label).includes(groupKey(input.value)))){const row=document.createElement('div');row.className='group-list-row';const select=document.createElement('button');select.type='button';select.className='btn ghost';select.setAttribute('data-anon-private','text');select.innerHTML=groupDot(g.label)+esc(g.label);select.onclick=()=>{setGroupFilter('group:'+groupKey(g.label));d.close()};const rename=document.createElement('button');rename.type='button';rename.className='btn ghost';rename.textContent=tr('rename_group');rename.disabled=flow.snapshot().readOnly;rename.onclick=()=>{d.close();renameGroup(g.label,origin)};row.append(select,rename);list.append(row)}};input.oninput=draw;draw();input.focus();
 }
 $('groups-open').onclick=e=>showGroups(e.currentTarget);
 // Deadlines at 18:00 in the profile's zone, or an exact local date and time.
@@ -1158,6 +1165,8 @@ function menuAct(b){const {id}=menu,t=task(id),act=b.dataset.menuAct,value=b.dat
  if(act==='group-rename'){renameGroup(value,anchorOf(id,'group'));return}
  if(act==='group-toggle'){const node=menu.node;const groups=taskGroups(t),has=groups.some(g=>groupKey(g)===groupKey(value));b.disabled=true;safely(async()=>{try{await flow.request('task_update',{uuid:id,groups:has?groups.filter(g=>groupKey(g)!==groupKey(value)):[...groups,value]});if(menu?.node===node)b.setAttribute('aria-checked',String(!has))}finally{b.disabled=false}});return}
  if(act==='retire'){retireConfirm();return}
+ if(act==='cancel-task'){menu.node.innerHTML='<label class="menu-form">'+esc(tr('cancel_reason_optional'))+'<input class="menu-input" data-menu-input="cancel-reason" maxlength="500"></label><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn danger" data-menu-act="cancel-task-yes">'+esc(tr('cancel_task_action'))+'</button></div>';menu.node.querySelector('input').focus();return}
+ if(act==='cancel-task-yes'){const reason=menu.node.querySelector('[data-menu-input=cancel-reason]').value.trim();closeMenu(false);request('task_cancel',{uuid:id,reason});return}
  if(act==='keep'){closeMenu();return}
  if(act==='cl-done-anyway'){closeMenu(false);request('task_done',{uuid:id});return}
  if(act==='cl-convert'||act==='cl-convert-dep'){const item=clMenuItem;closeMenu(false);convertItem(id,item,act==='cl-convert-dep');return}
@@ -1194,7 +1203,7 @@ document.addEventListener('input',e=>{if(e.target.dataset.menuInput!=='group'||!
 document.addEventListener('keydown',e=>{if(!menu||!menu.node.contains(document.activeElement)&&e.key!=='Escape')return;
  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeMenu();return}
  const typing=document.activeElement?.matches?.('.menu-input');
- if(typing&&e.key==='Enter'&&!e.isComposing){e.preventDefault();const input=document.activeElement;if(input.dataset.menuInput==='due')menu.node.querySelector('[data-menu-act=due-custom]')?.click();else if(input.dataset.menuInput==='block')menu.node.querySelector('[data-menu-act=block-save]')?.click();else{const value=input.value.trim();if(!value)return;const t=task(menu.id);if(t&&!taskGroups(t).some(g=>groupKey(g)===groupKey(value))){const node=menu.node;safely(async()=>{await flow.request('task_update',{uuid:t.id,groups:[...taskGroups(t),value]});if(menu?.node===node){const id=t.id;closeMenu(false);openMenu(id,'group')}})}}return}
+ if(typing&&e.key==='Enter'&&!e.isComposing){e.preventDefault();const input=document.activeElement;if(input.dataset.menuInput==='due')menu.node.querySelector('[data-menu-act=due-custom]')?.click();else if(input.dataset.menuInput==='block')menu.node.querySelector('[data-menu-act=block-save]')?.click();else if(input.dataset.menuInput==='cancel-reason')menu.node.querySelector('[data-menu-act=cancel-task-yes]')?.click();else{const value=input.value.trim();if(!value)return;const t=task(menu.id);if(t&&!taskGroups(t).some(g=>groupKey(g)===groupKey(value))){const node=menu.node;safely(async()=>{await flow.request('task_update',{uuid:t.id,groups:[...taskGroups(t),value]});if(menu?.node===node){const id=t.id;closeMenu(false);openMenu(id,'group')}})}}return}
  // A menu with a field keeps Tab inside it; a plain list closes on Tab.
  if(e.key==='Tab'){e.preventDefault();const items=[...menu.node.querySelectorAll('button:not([disabled]),input:not([disabled])')].filter(el=>el.getClientRects().length);if(!menu.node.querySelector('.menu-input')||!items.length){closeMenu();return}const i=items.indexOf(document.activeElement);items[(i+(e.shiftKey?-1:1)+items.length)%items.length].focus();return}
  if(!['ArrowDown','ArrowUp','Home','End'].includes(e.key)||typing&&['Home','End'].includes(e.key))return;e.preventDefault();
@@ -1360,7 +1369,7 @@ function placeChat(){const modal=$('chat-dialog'),panel=$('assistant'),dock=$('c
 $('chat-dialog').addEventListener('close',()=>{if($('chat-dialog').returnValue==='reflow')return;chatOpen=false;placeChat()});$('chat-toggle').onclick=()=>{chatOpen=!chatOpen;placeChat()};$('chat-close').onclick=()=>{chatOpen=false;placeChat();$('chat-toggle').focus({preventScroll:true})};compact.addEventListener('change',placeChat);placeChat();
 
 
-const aliases={front_activate:'activate',front_todo:'todo',task_snooze:'snooze',task_done:'done',front_retire:'retire',task_restore:'restore',task_add:'add',task_update:'update',task_reopen:'reopen',context_update:'declaration',continuity_update:'declaration',order_update:'order',group_color_update:'group_color',dependency_update:'dependency',related_update:'related',schedule_update:'schedule'};
+const aliases={front_activate:'activate',front_todo:'todo',task_snooze:'snooze',task_done:'done',front_retire:'retire',task_restore:'restore',task_add:'add',task_update:'update',task_reopen:'reopen',task_cancel:'cancel_task_action',context_update:'declaration',continuity_update:'declaration',order_update:'order',group_color_update:'group_color',dependency_update:'dependency',related_update:'related',schedule_update:'schedule'};
 const domain={activate:'front_activate',todo:'front_todo',snooze:'task_snooze',done:'task_done',retire:'front_retire'};
 // Reads bypass the HTTP cache: otherwise the browser holds a read behind an identical one in flight.
 async function api(path,body){if(body!==undefined&&globalThis.dayAnonymize?.active&&!['/api/session','/api/zone-rules','/api/recovery/inspect'].includes(path))throw Object.assign(Error(tr('the_request_could_not_be_completed')),{status:409});const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},credentials:'same-origin',cache:'no-store',body:body===undefined?undefined:JSON.stringify(body)});const result=await response.json();if(!response.ok){const error=Error(errorText(result.error?.code,result.error?.message||tr("the_request_could_not_be_completed")));error.code=result.error?.code;error.status=response.status;throw error;}return result.data;}
@@ -1396,19 +1405,19 @@ class RemoteFlow{
  observe(result){const revision=result?.result?.revision??result?.revision;if(Number.isInteger(revision)&&revision>this.seen){this.seen=revision;this.data.revision=Math.max(this.data.revision||0,revision)}return result}
  // Shows a direct change on screen at once; the service's answer and the next read reconcile it.
  preview(body){const p=body.payload,data=this.data;let tasks=data.tasks,context=data.context,colors=data.groupColors;
-  const moves={front_activate:{state:'active',until:null},front_todo:{state:'todo',until:null},task_done:{state:'done',until:null,closedAt:new Date().toISOString()},front_retire:{state:'retired',until:null,closedAt:new Date().toISOString()},task_reopen:{state:'todo',until:null,closedAt:null}};
+  const moves={front_activate:{state:'active',until:null},front_todo:{state:'todo',until:null},task_done:{state:'done',until:null,closedAt:new Date().toISOString()},front_retire:{state:'retired',until:null,closedAt:new Date().toISOString()},task_reopen:{state:'todo',until:null,closedAt:null,cancelReason:''},task_cancel:{state:'canceled',until:null,closedAt:new Date().toISOString(),cancelReason:p.reason||''}};
   if(body.action==='task_done'&&data.schedules?.[p.uuid]?.repeat)return false;
   if(moves[body.action]||body.action==='task_snooze'||body.action==='task_update'){
    const fields=moves[body.action]||(body.action==='task_snooze'?{state:'snoozed',until:p.until}:Object.fromEntries(['title','priority','due','group','groups'].filter(k=>k in p).map(k=>[k,k==='group'?p.group||null:p[k]])));
    if('groups' in p){fields.groups=p.groups;fields.group=p.groups[0]||null}else if('group' in p){fields.groups=p.group?[p.group]:[];fields.group=p.group||null}
    if(body.action==='front_activate')fields.startedAt=tasks.find(t=>t.id===p.uuid)?.startedAt||new Date().toISOString();
-   if(['front_todo','task_snooze','task_done','front_retire'].includes(body.action)){fields.lastActiveAt=tasks.find(t=>t.id===p.uuid)?.startedAt||tasks.find(t=>t.id===p.uuid)?.lastActiveAt;fields.startedAt=null}
+   if(['front_todo','task_snooze','task_done','front_retire','task_cancel'].includes(body.action)){fields.lastActiveAt=tasks.find(t=>t.id===p.uuid)?.startedAt||tasks.find(t=>t.id===p.uuid)?.lastActiveAt;fields.startedAt=null}
    if(!tasks.some(t=>t.id===p.uuid))return false;tasks=tasks.map(t=>t.id===p.uuid?{...t,...fields}:t)}
   else if(body.action==='task_add')tasks=[...tasks,{id:'draft:'+(++this.drafts),title:p.title,state:'todo',priority:p.priority||'medium',group:p.groups?.[0]||p.group||null,groups:p.groups||(p.group?[p.group]:[]),due:p.due||null,until:null,blocked:false,dependsOn:[],blockedBy:[],relatedTo:[],attachmentIds:[],context:'',next:'',awaiting:false,remainingMinutes:null,createdAt:null,pending:true}];
   else if(body.action==='event_add'||body.action==='event_update'){const events=data.calendar_events||[],shown={title:p.title,...(p.start?{start_at:p.start}:{}),...(p.end?{end_at:p.end}:{})};if(body.action==='event_update'&&!events.some(e=>e.uuid===p.uuid))return false;
    this.data={...data,calendar_events:(body.action==='event_add'?[...events,{uuid:'draft:'+(++this.drafts),...shown,pending:true}]:events.map(e=>e.uuid===p.uuid?{...e,...shown}:e)).sort((a,b)=>Date.parse(a.start_at)-Date.parse(b.start_at))};globalThis.dayDaily?.update(this.data);return {tasks:data.tasks,context:data.context,calendar_events:events}}
   else if(body.action==='continuity_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const fields=Object.fromEntries(['context','next','notes','awaiting','remainingMinutes','checklist','blockReason'].filter(k=>k in p).map(k=>[k,p[k]]));if('blockReason' in p)fields.blockedSince=p.blockReason?(tasks.find(t=>t.id===p.uuid)?.blockedSince||new Date().toISOString()):null;tasks=tasks.map(t=>t.id===p.uuid?{...t,...fields}:t)}
-  else if(body.action==='dependency_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const done=new Set(tasks.filter(t=>t.state==='done').map(t=>t.id)),blockedBy=p.dependsOn.filter(id=>!done.has(id));tasks=tasks.map(t=>t.id===p.uuid?{...t,dependsOn:[...p.dependsOn],blockedBy,blocked:blockedBy.length>0}:t)}
+  else if(body.action==='dependency_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const done=new Set(tasks.filter(t=>['done','canceled'].includes(t.state)).map(t=>t.id)),blockedBy=p.dependsOn.filter(id=>!done.has(id));tasks=tasks.map(t=>t.id===p.uuid?{...t,dependsOn:[...p.dependsOn],blockedBy,blocked:blockedBy.length>0}:t)}
   else if(body.action==='related_update'){if(!tasks.some(t=>t.id===p.uuid))return false;const wanted=new Set(p.relatedTo);tasks=tasks.map(t=>t.id===p.uuid?{...t,relatedTo:[...p.relatedTo]}:wanted.has(t.id)&&!t.relatedTo.includes(p.uuid)?{...t,relatedTo:[...t.relatedTo,p.uuid]}:!wanted.has(t.id)&&t.relatedTo.includes(p.uuid)?{...t,relatedTo:t.relatedTo.filter(x=>x!==p.uuid)}:t)}
   else if(body.action==='context_update')context={...context,...p};
   else if(body.action==='event_cancel'){const events=data.calendar_events||[];if(!events.some(e=>e.uuid===p.uuid))return false;this.data={...data,calendar_events:events.filter(e=>e.uuid!==p.uuid)};globalThis.dayDaily?.update(this.data);return {tasks:data.tasks,context:data.context,calendar_events:events}}

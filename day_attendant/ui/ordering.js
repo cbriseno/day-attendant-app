@@ -43,7 +43,7 @@ function adopt(own,before,after){const rank=p=>RANK[p]??RANK.medium;if(before&&r
 // Focus is a bounded local selection. Resolve prerequisites from current states so completing
 // one task promotes its dependent during the optimistic render, before the next read.
 function focus(tasks,now=Date.now()){
- const byId=new Map(tasks.map(t=>[t.id,t])),blocked=t=>(t.dependsOn||t.blockedBy||[]).some(id=>byId.get(id)?.state!=='done');
+ const byId=new Map(tasks.map(t=>[t.id,t])),blocked=t=>(t.dependsOn||t.blockedBy||[]).some(id=>!['done','canceled'].includes(byId.get(id)?.state));
  const open=tasks.filter(t=>['active','todo','snoozed'].includes(t.state));
  const counts=new Map();for(const t of open)for(const id of t.dependsOn||t.blockedBy||[])counts.set(id,(counts.get(id)||0)+1);
  const unlocks=t=>counts.get(t.id)||0;
