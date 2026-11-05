@@ -176,7 +176,15 @@ globalThis.dayTranslations = {
     "priority_urgent": "Urgent",
     "priority_high": "High",
     "priority_medium": "Medium",
-    "priority_low": "Low"
+    "priority_low": "Low",
+    "priority_soon": "Soon",
+    "priority_someday": "Someday",
+    "priority_hint_urgent": "Today, no excuses",
+    "priority_hint_high": "In the next couple of days",
+    "priority_hint_soon": "This week",
+    "priority_hint_medium": "In the coming weeks",
+    "priority_hint_low": "When there is time",
+    "priority_hint_someday": "No rush, just don't forget it"
   },
   "es": {
     "error_group_color_conflict": "Dos nombres equivalentes tienen colores guardados distintos. No se cambió nada; conserva el perfil para reconciliarlo.",
@@ -354,7 +362,15 @@ globalThis.dayTranslations = {
     "priority_urgent": "Urgente",
     "priority_high": "Alta",
     "priority_medium": "Media",
-    "priority_low": "Baja"
+    "priority_low": "Baja",
+    "priority_soon": "Pronto",
+    "priority_someday": "Algún día",
+    "priority_hint_urgent": "Hoy mismo, sin falta",
+    "priority_hint_high": "En los próximos días",
+    "priority_hint_soon": "Esta semana",
+    "priority_hint_medium": "En las próximas semanas",
+    "priority_hint_low": "Cuando haya tiempo",
+    "priority_hint_someday": "Sin prisa, para no olvidarla"
   }
 };
 
@@ -813,3 +829,4 @@ Object.assign(globalThis.dayTranslations.en,{product_name:"Day Attendant",locale
 Object.assign(globalThis.dayTranslations.es,{product_name:"Day Attendant",locale_en:"EN",locale_es:"ES",harness_codex:"Codex",harness_claude:"Claude Code",dismiss_symbol:"×",confirm_symbol:"✓",group_symbol:"#"});
 Object.assign(globalThis.dayTranslations.en,{"weekday_mon": "Mon", "weekday_tue": "Tue", "weekday_wed": "Wed", "weekday_thu": "Thu", "weekday_fri": "Fri", "weekday_sat": "Sat", "weekday_sun": "Sun", "source_general": "General", "source_chat": "Chat", "source_email": "Email", "source_ticket": "Ticket", "source_pr": "PR"});
 Object.assign(globalThis.dayTranslations.es,{"weekday_mon": "Lun", "weekday_tue": "Mar", "weekday_wed": "Mié", "weekday_thu": "Jue", "weekday_fri": "Vie", "weekday_sat": "Sáb", "weekday_sun": "Dom", "source_general": "General", "source_chat": "Chat", "source_email": "Correo", "source_ticket": "Ticket", "source_pr": "PR"});
+

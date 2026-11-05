@@ -31,7 +31,7 @@ assert.deepEqual(plain(byPriority.map(s=>[s.key,s.draggable])),[['high',true],['
 assert.deepEqual(ids(arrange([a],'priority')),['a']);
 // Urgent leads, in its own section; an unknown value is treated as medium.
 const u=task('u','urgent',{createdAt:'2026-10-06T00:00:00Z'}),odd=task('odd','critical',{createdAt:'2026-10-07T00:00:00Z'});
-assert.deepEqual(plain(PRIORITIES),['urgent','high','medium','low']);
+assert.deepEqual(plain(PRIORITIES),['urgent','high','soon','medium','low','someday']);
 assert.deepEqual(plain(manualIds([...all,u,odd])),['u','b','c','e','d','odd','a']);
 const withUrgent=arrange([...all,u,odd],'priority',{order:['e','a','c','b','d','odd','u']});
 assert.deepEqual(plain(withUrgent.map(s=>[s.key,s.tasks.map(t=>t.id)])),[['urgent',['u']],['high',['e','c','b']],['medium',['d','odd']],['low',['a']]]);

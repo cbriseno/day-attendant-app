@@ -3,7 +3,7 @@
 'use strict';
 const VIEWS=['priority','manual','newest','group','suggested'];
 // Most pressing first; an unknown value sorts and groups as medium.
-const PRIORITIES=['urgent','high','medium','low'],RANK=Object.fromEntries(PRIORITIES.map((p,i)=>[p,i]));
+const PRIORITIES=['urgent','high','soon','medium','low','someday'],RANK=Object.fromEntries(PRIORITIES.map((p,i)=>[p,i]));
 const cmp=(a,b)=>a<b?-1:a>b?1:0;
 // Tasks not placed by hand follow placed ones by priority, deadline, creation and UUID.
 const fallback=(a,b)=>(RANK[a.priority]??RANK.medium)-(RANK[b.priority]??RANK.medium)||cmp(a.due||'~',b.due||'~')||cmp(a.createdAt||'',b.createdAt||'')||cmp(a.id,b.id);

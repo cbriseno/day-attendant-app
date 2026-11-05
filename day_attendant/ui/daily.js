@@ -3,7 +3,6 @@
 'use strict';
 const ui=globalThis.dayUI;
 const $=id=>document.getElementById(id),{tr,esc,api,deliver,flow,safely,notice,taskGroups,groupKey,rankedGroups}=ui;
-
 const button=(id,key,extra='')=>`<button type="button" class="btn ${extra}" id="${id}">${esc(tr(key))}</button>`;
 function field(id,key,type='text',extra=''){return `<label class="field"><span>${esc(tr(key))}</span><input id="${id}" type="${type}" ${extra}></label>`}
 function dialog(id,title,body,footer){
@@ -49,7 +48,7 @@ $('capture-open').onclick=e=>{const q=parseQuick($('qa-input').value);openCaptur
 
 // One line above the list: «pagar luz mañana !2 #Casa» and Enter. Every token it reads is shown in the
 // preview before saving; a word it cannot place stays in the title, and a doubtful line is not saved.
-const PRIORITY_WORDS={1:'urgent',2:'high',3:'medium',4:'low',urgente:'urgent',urgent:'urgent',alta:'high',high:'high',media:'medium',medium:'medium',baja:'low',low:'low'};
+const PRIORITY_WORDS={1:'urgent',2:'high',3:'medium',4:'low',urgente:'urgent',urgent:'urgent',alta:'high',high:'high',media:'medium',medium:'medium',baja:'low',low:'low',pronto:'soon',soon:'soon',algundia:'someday','algundía':'someday','algúndía':'someday',someday:'someday',luego:'someday'};
 const DAY_WORDS={hoy:0,today:0,'mañana':1,manana:1,tomorrow:1};
 const WEEKDAYS={domingo:0,sunday:0,lunes:1,monday:1,martes:2,tuesday:2,'miércoles':3,miercoles:3,wednesday:3,jueves:4,thursday:4,viernes:5,friday:5,'sábado':6,sabado:6,saturday:6};
 // «la mañana», «esta mañana»: the morning, not tomorrow.

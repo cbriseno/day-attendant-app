@@ -17,7 +17,8 @@ from .timeutil import parse, stamp, wire, utcnow
 
 # Public priority names, most pressing first, and their stored codes. Schema 2 adds
 # urgent; high, medium and low keep the codes every earlier profile already uses.
-PRIORITIES = {'urgent': 'U', 'high': 'H', 'medium': 'M', 'low': 'L'}
+# Display/sort order. 'soon' and 'someday' widen the scale without touching stored U/H/M/L values.
+PRIORITIES = {'urgent': 'U', 'high': 'H', 'soon': 'S', 'medium': 'M', 'low': 'L', 'someday': 'D'}
 
 
 def canonical(row):

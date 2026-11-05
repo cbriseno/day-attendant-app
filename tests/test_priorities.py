@@ -28,15 +28,30 @@ def raw_rows(app):
         return con.execute('SELECT uuid,data FROM tasks ORDER BY rowid').fetchall()
 
 
+class SixLevelTests(DailyBase):
+    """#39: «Pronto» and «Algún día» widen the scale; the four original letters keep their meaning."""
+    def test_new_levels_sort_between_the_existing_ones_and_round_trip(self):
+        from day_attendant.service import PRIORITY_RANK
+        self.assertLess(PRIORITY_RANK['high'], PRIORITY_RANK['soon'])
+        self.assertLess(PRIORITY_RANK['soon'], PRIORITY_RANK['medium'])
+        self.assertLess(PRIORITY_RANK['low'], PRIORITY_RANK['someday'])
+        uid = self.apply('task_add', {'title': 'Algún día', 'priority': 'someday'})['result']['uuid']
+        self.assertEqual(self.app.tasks.get(uid)['priority'], 'D')
+        self.apply('task_update', {'uuid': uid, 'priority': 'soon'})
+        self.assertEqual(self.app.tasks.get(uid)['priority'], 'S')
+        public = {t['id']: t['priority'] for t in self.board.snapshot()['tasks']}
+        self.assertEqual(public[uid], 'soon')
+
+
 class FourPriorityTests(DailyBase):
     def priorities(self):
         return {t['id']: t['priority'] for t in self.board.snapshot()['tasks']}
 
     def test_each_level_is_created_changed_and_stored_without_a_model_turn(self):
-        self.assertEqual(list(PRIORITIES), ['urgent', 'high', 'medium', 'low'])
+        self.assertEqual(list(PRIORITIES), ['urgent', 'high', 'soon', 'medium', 'low', 'someday'])
         ids = {p: self.apply('task_add', {'title': 'Level ' + p, 'priority': p})['result']['uuid'] for p in PRIORITIES}
         self.assertEqual(self.priorities(), {ids[p]: p for p in PRIORITIES})
-        self.assertEqual({self.app.tasks.get(ids[p])['priority'] for p in PRIORITIES}, {'U', 'H', 'M', 'L'})
+        self.assertEqual({self.app.tasks.get(ids[p])['priority'] for p in PRIORITIES}, {'U', 'H', 'S', 'M', 'L', 'D'})
         self.apply('task_update', {'uuid': ids['low'], 'priority': 'urgent'})
         self.apply('task_update', {'uuid': ids['urgent'], 'priority': 'low'})
         self.assertEqual(self.priorities()[ids['low']], 'urgent')
@@ -65,8 +80,8 @@ class FourPriorityTests(DailyBase):
         from day_attendant.connected import followup_schema
         from day_attendant.conversation import FIELDS
         enum = followup_schema([low])['properties']['suggestions']['items']['properties']['action']['anyOf'][1]['properties']['priority']['enum']
-        self.assertEqual(enum, ['urgent', 'high', 'medium', 'low', None])
-        self.assertEqual(FIELDS['priority']['enum'], ['urgent', 'high', 'medium', 'low', None])
+        self.assertEqual(enum, ['urgent', 'high', 'soon', 'medium', 'low', 'someday', None])
+        self.assertEqual(FIELDS['priority']['enum'], ['urgent', 'high', 'soon', 'medium', 'low', 'someday', None])
 
     def test_applied_change_reports_public_names(self):
         uid = self.apply('task_add', {'title': 'Name', 'priority': 'high'})['result']['uuid']

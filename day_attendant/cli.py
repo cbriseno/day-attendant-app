@@ -225,7 +225,7 @@ def execute(app, args):
     raise AssistantError("invalid_arguments", "Unsupported command.")
 
 
-SPANISH_PRIORITY = {"urgent": "urgente", "high": "alta", "medium": "media", "low": "baja"}
+SPANISH_PRIORITY = {"urgent": "urgente", "high": "alta", "soon": "pronto", "medium": "media", "low": "baja", "someday": "algún día"}
 
 
 def human(data, language, group):
