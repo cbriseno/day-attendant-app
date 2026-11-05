@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory(prefix='day-v5-ui-') as state:
      const over=(a,b)=>a.slice(0,3).map((v,i)=>v*a[3]+b[i]*(1-a[3]));
      const lum=a=>a.slice(0,3).map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
      const contrast=(a,b)=>(Math.max(lum(a),lum(b))+.05)/(Math.min(lum(a),lum(b))+.05);
-     const result=[];for(const palette of ['grafito','papel','oceano'])for(const mode of ['light','dark']){dayTheme.set(mode,palette);document.querySelector('#theme-choice').value=mode;document.querySelector('#palette-choice').value=palette;
+     const result=[];for(const palette of ['grafito','papel','oceano','catppuccin','rosepine','gruvbox','solarized','nord','dracula','github','everforest','kanagawa'])for(const mode of ['light','dark']){dayTheme.set(mode,palette);document.querySelector('#theme-choice').value=mode;document.querySelector('#palette-choice').value=palette;
      const root=getComputedStyle(document.documentElement),surface=rgb(root.getPropertyValue('--surface')),ink=rgb(root.getPropertyValue('--ink')),muted=rgb(root.getPropertyValue('--muted'));
      const priorities=[...document.querySelectorAll('#board .priority-pill')].filter(n=>['high','medium','urgent'].includes(n.dataset.priority)).map(n=>{const s=getComputedStyle(n),bg=over(rgb(s.backgroundColor),surface);return {priority:n.dataset.priority,contrast:contrast(rgb(s.color),bg)}});
      result.push({palette,mode,ink:contrast(ink,surface),muted:contrast(muted,surface),priorities,colorScheme:root.colorScheme})}return result})))
@@ -76,11 +76,11 @@ with tempfile.TemporaryDirectory(prefix='day-v5-ui-') as state:
         if args.capture_palettes:
             axi('resize','1280','900')
             axi('run',script="await page.eval(()=>{document.querySelector('#locale-choice').value='es';document.querySelector('#locale-choice').dispatchEvent(new Event('change'));document.querySelector('[data-filter=\"*\"]').click()});console.log('ready')")
-            for palette in ('grafito','papel','oceano'):
+            for palette in ('grafito','papel','oceano','catppuccin','rosepine','gruvbox','solarized','nord','dracula','github','everforest','kanagawa'):
                 for mode in ('light','dark'):
                     script="await page.eval(()=>{document.querySelector('#theme-choice').value="+json.dumps(mode)+";document.querySelector('#palette-choice').value="+json.dumps(palette)+";document.querySelector('#palette-choice').dispatchEvent(new Event('change'))});console.log('ready')"
                     axi('run',script=script);axi('screenshot',str(out/(palette+'-'+mode+'.png')))
-            report['paletteScreens']=6
+            report['paletteScreens']=24
         report['passed']=True
     except BaseException as error:
         report['passed']=False;report['error']=str(error);raise

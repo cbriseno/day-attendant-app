@@ -220,3 +220,5 @@ claims perfect planning, risk detection or psychological outcomes.
 No screenshots, historical run traces, personal tasks or attachments ship in this
 export. All authored demo/test data is synthetic. The original [LICENSE](LICENSE)
 and any attribution in it are preserved unchanged.
+
+Theme colors are adapted from MIT-licensed palettes; see [THEMES-LICENSES.md](THEMES-LICENSES.md).

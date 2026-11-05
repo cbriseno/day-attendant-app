@@ -140,6 +140,8 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,(ASSETS/'index.html').read_bytes(),'text/html; charset=utf-8');return
         if self.path=='/favicon.ico':
             self.reply(204,b'', 'image/x-icon');return
+        if self.path=='/themes.css':
+            self.reply(200,(ASSETS/'themes.css').read_bytes(),'text/css; charset=utf-8');return
         if self.path in ('/interface.js','/locales.js','/daily.js','/ordering.js','/theme.js','/anonymize.js','/anonymize-boot.js'):
             self.reply(200,(ASSETS/self.path[1:]).read_bytes(),'text/javascript; charset=utf-8');return
         if not self.authenticated():
