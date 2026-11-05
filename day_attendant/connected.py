@@ -42,7 +42,7 @@ ALLOWED = {
     "front_activate": {"uuid", "order"}, "front_todo": {"uuid", "order"}, "front_retire": {"uuid"},
     "task_snooze": {"uuid", "until", "zone", "fold", "order"}, "task_done": {"uuid"}, "task_reopen":{"uuid"},
     "context_update": {"availableMinutes", "availableUntil", "rest"},
-    "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "checklist"},
+    "continuity_update": {"uuid", "remainingMinutes", "awaiting", "context", "next", "checklist", "blockReason"},
     "dependency_update": {"uuid","dependsOn"},
     "related_update": {"uuid","relatedTo"},
     "order_update": {"order"},
@@ -66,7 +66,7 @@ PRESENTATION = ("order_update", "group_color_update", "group_rename", "group_res
 FOLLOWUP_DELAY = 2.6  # seconds without new changes before the assistant looks at them
 FOLLOWUP_ACTIONS = ("front_activate", "front_todo", "task_snooze", "task_update")
 BASIS = ("state", "until", "due", "priority", "groups", "dependsOn", "blockedBy", "remainingMinutes", "awaiting")
-CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "checklist": []}
+CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "checklist": [], "blockReason": "", "blockedSince": None}
 # Effects whose previous value a fact keeps, so Undo can restore them.
 RESTORABLE = {"order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link"}
 # Inverse-only actions: Undo reaches them, never a request of their own.
@@ -351,6 +351,7 @@ class Connected:
                 "observedAt":row['metadata'].get('observed_at'),"capturedAt":row['metadata'].get('captured_at'),
                 "context": extra.get("context", ""), "next": extra.get("next", ""),
                 "remainingMinutes": extra.get("remainingMinutes"), "awaiting": extra.get("awaiting", False), "checklist": extra.get("checklist", []),
+                "blockReason": extra.get("blockReason", ""), "blockedSince": extra.get("blockedSince"),
                 "progressRecordedAt": row["metadata"].get("human_progress_at")})
         return tasks
 
@@ -405,7 +406,7 @@ class Connected:
             for row in con.execute('SELECT id,plan,action FROM facts ORDER BY id DESC'):
                 plan=json.loads(row['plan'])
                 if row['id'] not in undone and not plan.get('undo_of') and self._undoable(plan):
-                    undo_stack.append({'id':row['id'],'action':row['action'],'target':plan.get('target_uuid')})
+                    undo_stack.append({'id':row['id'],'action':row['action'],'target':plan.get('target_uuid'),**({'kind':'block'} if 'blockReason' in ((plan.get('effect') or {}).get('continuity_set') or [None,{}])[1] else {})})
                 if len(undo_stack)>=100:break
             suggestions=self._suggestion_view(con,tasks,context)
             review=self._review_view(con)
@@ -534,7 +535,7 @@ class Connected:
     def request(self, action, payload, key, origin="ui", request_text="", expected_revision=None, inverse=False, message_guard=None, connection=None, validate_only=False, _lock_held=False):
         if not isinstance(key, str) or not 1 <= len(key) <= 200 or not isinstance(payload, dict):
             raise AssistantError("invalid_request", "The request requires content and a stable key.")
-        restoring={"undo_of","declaredAt"} if inverse and action=="context_update" else {"undo_of"} if inverse else set()
+        restoring={"undo_of","declaredAt"} if inverse and action=="context_update" else {"undo_of","blockedSince"} if inverse and action=="continuity_update" else {"undo_of"} if inverse else set()
         if not isinstance(action,str) or action not in RESTORE and (action not in ALLOWED or set(payload)-ALLOWED[action]-restoring):
             raise AssistantError("unsupported_action", "Unsupported action or fields.")
         for name in ('uuid','title','priority','due','until','start','end','observed_at','zone','source','person','reference','context','next','group','to'):

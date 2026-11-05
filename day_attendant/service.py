@@ -45,8 +45,15 @@ def checklist_items(items):
 
 
 def continuity_values(payload):
-    value={k:payload[k] for k in ('remainingMinutes','awaiting','context','next','checklist') if k in payload}
+    value={k:payload[k] for k in ('remainingMinutes','awaiting','context','next','checklist','blockReason','blockedSince') if k in payload}
     if 'checklist' in value:value['checklist']=checklist_items(value['checklist'])
+    # A manual block names an outside reason (a person, a provider, a decision); dependencies stay separate.
+    if 'blockReason' in value:
+        if not isinstance(value['blockReason'],str) or len(value['blockReason'])>200 or any(ord(c)<32 for c in value['blockReason']):
+            raise AssistantError('invalid_block','A block reason is short single-line text; empty removes the block.')
+        value['blockReason']=value['blockReason'].strip()
+    if 'blockedSince' in value and value['blockedSince'] is not None and not isinstance(value['blockedSince'],str):
+        raise AssistantError('invalid_block','Invalid block start.')
     remaining=value.get('remainingMinutes')
     if remaining is not None and (isinstance(remaining,bool) or not isinstance(remaining,(int,float)) or not math.isfinite(remaining) or not 0<=remaining<=100000):
         raise AssistantError('invalid_estimate','Use nonnegative minutes or leave the estimate empty.')
@@ -474,13 +481,17 @@ class Assistant:
                     plan["effect"]["context_set"] = value
             else:
                 uid = self.required(p["uuid"])["uuid"]
-                allowed = {"remainingMinutes", "awaiting", "context", "next", "checklist"}
-                if set(p) - allowed - {"uuid"}:
+                allowed = {"remainingMinutes", "awaiting", "context", "next", "checklist", "blockReason"}
+                if set(p) - allowed - {"uuid", "blockedSince"}:
                     raise AssistantError("invalid_continuity", "Invalid declaration.")
                 value = continuity_values(p)
                 with self.store.connect() as con:
                     existing=con.execute('SELECT data FROM continuity WHERE uuid=?',(uid,)).fetchone()
                 previous=json.loads(existing[0]) if existing else {}
+                if 'blockReason' in value and 'blockedSince' not in p:
+                    # The start of a block is kept while only its reason is edited; Undo restores it exactly.
+                    value['blockedSince']=(previous.get('blockedSince') or now) if value['blockReason'] else None
+                    if not value['blockReason'] and not previous.get('blockReason'):value.pop('blockedSince')
                 if any(previous.get(k)!=v for k,v in value.items()):
                     plan["effect"]["continuity_set"] = [uid, value, now]
             plan["result"] = {"declared": True}
