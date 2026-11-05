@@ -429,6 +429,81 @@ class Assistant:
                 current=sorted(r['b'] if r['a']==uid else r['a'] for r in con.execute('SELECT * FROM related WHERE a=? OR b=?',(uid,uid)))
             if current!=wanted:plan['effect']['related_set']=[uid,wanted]
             plan['result']={'uuid':uid}
+        elif action=='organize_capture':
+            row=self.required(p['uuid']); original=p['original']; items=p['tasks']
+            if row.get('description')!=p['expectedTitle'] or row['status']!='pending' or row.get('start'):
+                raise AssistantError('capture_changed','The capture changed while the assistant was working.')
+            if not isinstance(items,list) or not 1<=len(items)<=20:raise AssistantError('invalid_organize','Invalid task list.')
+            ids=[row['uuid']]+[str(uuid.uuid4()) for _ in items[1:]]
+            for index,item in enumerate(items):
+                if not isinstance(item,dict) or set(item)!={'title','notes','groups','after'}:raise AssistantError('invalid_organize','Invalid organized task.')
+                if not isinstance(item['title'],str) or not item['title'].strip() or len(item['title'])>500 or not isinstance(item['notes'],str) or len(item['notes'])>2000:raise AssistantError('invalid_organize','Invalid title or notes.')
+                if not isinstance(item['groups'],list) or not isinstance(item['after'],list) or any(type(n) is not int or n<0 or n>=len(items) or n==index for n in item['after']):raise AssistantError('invalid_organize','Invalid categories or prerequisites.')
+                group_list(item['groups'])
+            def visit(index,path,done):
+                if index in path:raise AssistantError('invalid_organize','The proposed prerequisites form a cycle.')
+                if index in done:return
+                for other in items[index]['after']:visit(other,path|{index},done)
+                done.add(index)
+            done=set()
+            for index in range(len(items)):visit(index,set(),done)
+            with self.store.connect() as con:
+                old=con.execute('SELECT data FROM continuity WHERE uuid=?',(row['uuid'],)).fetchone()
+                before=json.loads(old[0]) if old else {}
+                attachments=sorted(r[0] for r in con.execute('SELECT attachment_id FROM item_attachments WHERE entity_uuid=?',(row['uuid'],)))
+                old_meta=con.execute('SELECT * FROM task_meta WHERE uuid=?',(row['uuid'],)).fetchone()
+                old_meta=dict(old_meta) if old_meta else {}
+                old_related=sorted(r['b'] if r['a']==row['uuid'] else r['a'] for r in con.execute('SELECT * FROM related WHERE a=? OR b=?',(row['uuid'],row['uuid'])))
+            continuities={};metadata=[];expected_meta={row['uuid']:old_meta}
+            for index,item in enumerate(items):
+                uid=ids[index];groups=group_list(item['groups'])
+                after=sorted({ids[n] for n in item['after']})
+                if index==0:
+                    current_groups=row_groups(row)
+                    groups=group_list(current_groups+[g for g in groups if group_key(g) not in {group_key(x) for x in current_groups}])
+                    changes={'description':item['title'].strip()}
+                    if groups!=current_groups:changes.update(project=groups or None,groupChanged=wire(now))
+                    if after:changes['depends']=sorted(set(row.get('depends') or [])|set(after))
+                    patch(row,changes)
+                    if not plan['steps']:plan['steps'].append({'uuid':uid,'before':canonical(row),'after':canonical(row),'patch':{}})
+                    continuities[uid]=dict(before,assistantNotes=item['notes'],original=original,declaredAt=now)
+                else:
+                    new={'uuid':uid,'description':item['title'].strip(),'status':'pending','entry':wire(now),'priority':row.get('priority',PRIORITIES['medium'])}
+                    if groups:new.update(project=groups,groupChanged=wire(now))
+                    if after:new['depends']=after
+                    plan['steps'].append({'uuid':uid,'before':None,'after':canonical(new),'create':new})
+                    metadata.append([uid,'general',None,None,None,now,None,None,None])
+                    expected_meta[uid]={'uuid':uid,'source':'general','person':None,'reference':None,'observed_at':None,'captured_at':now,'human_progress_at':None,'origin_zone':None,'estimate_minutes':None}
+                    continuities[uid]={'assistantNotes':item['notes'],'declaredAt':now}
+            plan['effect']['organize_continuity']=continuities
+            plan['effect']['organize_meta']=metadata
+            plan['result']={'uuid':row['uuid'],'tasks':ids,'original':original,'beforeContinuity':before,'afterContinuity':continuities,'attachments':attachments,'metadata':expected_meta,'related':old_related,'dependencies':sum(len(set(x['after'])) for x in items),'groups':sorted({g for item in items for g in group_list(item['groups'])})}
+        elif action=='organize_restore':
+            kept=[];restored=[];retired=set();restore={};members={item['uuid'] for item in p['items']}
+            for item in p['items']:
+                row=self.required(item['uuid'])
+                with self.store.connect() as con:
+                    continuity=con.execute('SELECT data FROM continuity WHERE uuid=?',(item['uuid'],)).fetchone()
+                    current=json.loads(continuity[0]) if continuity else {}
+                    attachments=sorted(r[0] for r in con.execute('SELECT attachment_id FROM item_attachments WHERE entity_uuid=?',(item['uuid'],)))
+                    metadata=con.execute('SELECT * FROM task_meta WHERE uuid=?',(item['uuid'],)).fetchone()
+                    metadata=dict(metadata) if metadata else {}
+                    related=sorted(r['b'] if r['a']==item['uuid'] else r['a'] for r in con.execute('SELECT * FROM related WHERE a=? OR b=?',(item['uuid'],item['uuid'])))
+                external=item['created'] and any(item['uuid'] in (r.get('depends') or []) for r in self.tasks.rows() if r['uuid'] not in members and r['status'] not in ('deleted','completed'))
+                touched=canonical(row)!=item['after'] or current!=item['continuity'] or attachments!=item['attachments'] or metadata!=item['metadata'] or related!=item['related'] or external
+                if touched:
+                    if not p.get('partial'):raise AssistantError('undo_conflict','An organized task changed; nothing was overwritten.',{'touched':[item['uuid']]})
+                    kept.append(item['uuid']);continue
+                changes=item['patch']
+                if set(changes)-{'description','project','groupChanged','status','end','start','wait','depends'}:raise AssistantError('invalid_restore','Invalid organization inverse.')
+                if changes.get('status')=='deleted':changes=dict(changes,end=wire(now));retired.add(item['uuid'])
+                patch(row,changes);restored.append(item['uuid']);restore[item['uuid']]=item['beforeContinuity']
+            if not restored:raise AssistantError('undo_conflict','Every organized task changed; nothing was overwritten.')
+            for uid in kept:
+                row=self.required(uid);deps=set(row.get('depends') or [])
+                if deps&retired:patch(row,{'depends':sorted(deps-retired) or None})
+            plan['effect']['organize_continuity']=restore
+            plan['result']={'restored':restored,'kept':kept}
         elif action=='attachments_update':
             uid=self.required(p['uuid'])['uuid']; wanted=self.attachment_ids(p['attachmentIds'])
             with self.store.connect() as con:
@@ -686,6 +761,11 @@ class Assistant:
             result = dict(plan["result"], revision=plan["revision"] + 1)
             effect = plan["effect"]
             with self.store.connect() as con:
+                for metadata in effect.get('organize_meta',[]):
+                    con.execute('INSERT INTO task_meta VALUES(?,?,?,?,?,?,?,?,?)',metadata)
+                for uid,value in effect.get('organize_continuity',{}).items():
+                    if value:con.execute('INSERT OR REPLACE INTO continuity VALUES(?,?)',(uid,encoded(value)))
+                    else:con.execute('DELETE FROM continuity WHERE uuid=?',(uid,))
                 if "meta_add" in effect:
                     con.execute("INSERT INTO task_meta VALUES(?,?,?,?,?,?,?,?,?)", effect["meta_add"])
                 if 'attachments_set' in effect:

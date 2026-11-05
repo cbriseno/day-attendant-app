@@ -136,7 +136,7 @@ def invalidate_pending(con,at,reason):
 def configure(app,values,key,expected_revision=None):
     """Authenticated typed settings; no model decides whether a preference is true."""
     from .service import encoded,fingerprint
-    allowed={'name','timezone','locale','harness','model','effort','notification_policy','backup_directory'}
+    allowed={'name','timezone','locale','harness','model','effort','notification_policy','backup_directory','autoOrganize'}
     if not isinstance(values,dict) or set(values)-allowed or not isinstance(key,str) or not 1<=len(key)<=200:
         raise AssistantError('invalid_settings','Unknown settings or invalid request key.')
     digest=fingerprint(values)
@@ -151,7 +151,7 @@ def configure(app,values,key,expected_revision=None):
         current=app.store.state_value('profile')
         if not current:raise AssistantError('profile_required','Initialize a managed profile first.')
         profile=dict(current)
-        for field in ('name','timezone','locale','harness','model','effort'):
+        for field in ('name','timezone','locale','harness','model','effort','autoOrganize'):
             if field in values:profile[field]=values[field]
         if not isinstance(profile['name'],str) or not 1<=len(profile['name'])<=100:raise AssistantError('invalid_settings','Use a short profile name.')
         try:ZoneInfo(profile['timezone'])
@@ -171,8 +171,9 @@ def configure(app,values,key,expected_revision=None):
             from .archives import directory
             if not isinstance(values['backup_directory'],str) or not values['backup_directory']:raise AssistantError('invalid_settings','Use an explicit local backup directory.')
             backup_directory=str(directory(app,values['backup_directory']))
+        if type(profile.get('autoOrganize',True)) is not bool:raise AssistantError('invalid_settings','The organizer setting must be on or off.')
         engine_changed=any(profile.get(k)!=current.get(k) for k in ('harness','model','effort'))
-        semantic_changed=engine_changed or profile['timezone']!=current['timezone']
+        semantic_changed=engine_changed or profile['timezone']!=current['timezone'] or profile.get('autoOrganize',True)!=current.get('autoOrganize',True)
         changed=profile!=current or policy!=app.store.state_value('notification_policy',default_policy()) or backup_directory!=app.store.state_value('backup_directory')
         revision=app.store.revision()
         if changed:

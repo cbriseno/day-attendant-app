@@ -1056,7 +1056,7 @@ function openSectionCapture(origin){
  const group=origin.dataset.sectionAdd||'';
  const dialog=groupDialog(tr('section_add_in').replace('{group}',group||tr('no_group')),
   '<label class="field"><span>'+esc(tr('section_title'))+'</span><textarea name="title" maxlength="2000" rows="3" required></textarea></label><p class="hint">'+esc(tr('section_keys'))+'</p>'
-  +'<label class="field"><span>'+esc(tr('priority'))+'</span><select name="priority">'+['urgent','high','medium','low'].map(p=>'<option value="'+p+'"'+(p==='medium'?' selected':'')+'>'+esc(tr('priority_'+p))+'</option>').join('')+'</select></label>'
+  +'<label class="field"><span>'+esc(tr('priority'))+'</span><select name="priority">'+globalThis.dayOrdering.PRIORITIES.map(p=>'<option value="'+p+'"'+(p==='medium'?' selected':'')+'>'+esc(tr('priority_'+p))+'</option>').join('')+'</select></label>'
   +'<details><summary>'+esc(tr('groups_open'))+'</summary><div class="section-groups">'+rankedGroups().map(g=>'<label><input type="checkbox" name="groups" value="'+esc(g.label)+'"'+(groupKey(g.label)===groupKey(group)?' checked':'')+'>'+esc(g.label)+'</label>').join('')+'</div><label class="field"><span>'+esc(tr('add_group'))+'</span><input name="newgroup" maxlength="120"></label></details>'
   +'<button type="submit" class="btn primary">'+esc(tr('section_submit'))+'</button>',origin);
  dialog.classList.add('section-capture');

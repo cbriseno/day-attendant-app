@@ -216,9 +216,9 @@ class Handler(BaseHTTPRequestHandler):
                 if set(body)-{'action','payload','key','expected_revision'}:raise ValueError('fields')
                 result=board.announced(board.request(body['action'],body['payload'],body['key'],origin='cli' if self.headers.get('Authorization','').startswith('Bearer ') else 'ui',expected_revision=body.get('expected_revision')))
                 review=True
-                if body['action']=='task_add' and result.get('phase')=='applied' and len(body['payload'].get('title',''))>120:
+                if body['action']=='task_add' and result.get('phase')=='applied' and body['payload'].get('organize',True) and board.store.state_value('profile',{}).get('autoOrganize',True) and (len(body['payload'].get('title',''))>120 or '\n' in body['payload'].get('title','')):
                     uid=result.get('result',{}).get('uuid');revision=result.get('result',{}).get('revision')
-                    if uid and revision is not None:self.server.pool.submit(board.normalize_capture,uid,body['payload']['title'].strip(),revision)
+                    if uid and revision is not None:self.server.pool.submit(board.normalize_capture,uid,body['payload'].get('captureText',body['payload']['title']).strip(),revision,body['payload']['title'].strip())
             elif match:=re.fullmatch(r'/api/proposals/([a-f0-9-]+)/(?P<action>confirm|cancel|retry)',self.path):
                 identity=match[1];action=match['action']
                 if action=='confirm':result=board.confirm(identity,body['generation'],without_review=body.get('without_review',False) is True);review=True
@@ -234,6 +234,9 @@ class Handler(BaseHTTPRequestHandler):
                     result=[board.announced(p) for p in board.undo_proposals(body['proposal_ids'],body['key'],body.get('expected_revision'))]
                 else:result=board.announced(board.undo(int(body['fact_id']),body['key'],body.get('expected_revision')))
                 review=True
+            elif self.path=='/api/organization/undo':
+                if set(body)-{'fact_id','key','partial'} or type(body.get('partial',False)) is not bool:raise ValueError('fields')
+                result=board.announced(board.undo_organization(int(body['fact_id']),body['key'],body.get('partial',False)));review=True
             elif match:=re.fullmatch(r'/api/suggestions/([a-f0-9-]+)/(?P<action>accept|dismiss)',self.path):
                 if set(body)-{'key'}:raise ValueError('fields')
                 if match['action']=='accept':result=board.announced(board.accept_suggestion(match[1]));review=True
