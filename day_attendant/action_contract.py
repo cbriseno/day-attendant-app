@@ -18,6 +18,7 @@ ALLOWED = {
     "order_update": {"order"},
     "group_rename": {"group", "to"},
     "group_color_update": {"group", "color"},
+    "group_priority_update": {"group", "groupPriority"},
     "provenance_update": {"uuid","source","person","reference","observed_at","zone"},
     "event_add": {"title","start","end","zone","fold","source","person","reference","observed_at"},
     "event_update": {"uuid","title","start","end","zone","fold"},
@@ -52,6 +53,7 @@ SCHEMAS.update({
     **{key:{'type':['boolean','null']} for key in ('nextUp','organize')},
     **{key:{'type':['array','null'],'items':{'type':'string'}} for key in ('attachmentIds','order')},
     'fold':{'type':['integer','null'],'enum':[0,1,None]},
+    'groupPriority':{'type':['string','null'],'enum':['high','medium','low','none',None]},
     'color':{'type':['string','null'],'enum':[*GROUP_COLORS,None]},
     'checklist':{'type':['array','null'],'maxItems':CHECKLIST_LIMIT,'items':{'type':'object','properties':{
         'id':{'type':'string'},'text':{'type':'string'},'done':{'type':'boolean'}},'required':['id','text','done'],'additionalProperties':False}},
@@ -75,6 +77,7 @@ DESCRIPTIONS={
     'organize_capture':'Organize an unchanged saved capture into tasks with notes, categories and zero-based prerequisite indices.',
     'order_update':'Set manual display order, preserving other tasks; does not change priority.',
     'group_rename':'Rename or merge all matching memberships, including closed tasks. Groups exist only as assigned labels.',
+    'group_priority_update':'Set category priority (high, medium, low, none), independently of task priorities.',
     'group_color_update':'Set a group palette color; clearFields=[color] restores automatic color.',
     'provenance_update':'Edit the human-supported source, person, reference and observed time.',
     'event_add':'Create a calendar commitment.', 'event_update':'Edit a calendar commitment.', 'event_cancel':'Cancel a calendar commitment.'}

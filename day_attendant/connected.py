@@ -48,13 +48,13 @@ CONFIRM_FROM_CHAT = {"front_retire"}
 CONFIRMATION = [{"code":"confirmation","message":"Retiring needs your confirmation. It does not complete the responsibility.",
                  "message_key":"confirm_retire_chat","message_params":{},"refs":[]}]
 # The person's own arrangement and colors: applied at once only on an explicit request.
-PRESENTATION = ("order_update", "group_color_update", "group_rename", "group_restore")
+PRESENTATION = ("group_priority_update", "order_update", "group_color_update", "group_rename", "group_restore")
 FOLLOWUP_DELAY = 2.6  # seconds without new changes before the assistant looks at them
 FOLLOWUP_ACTIONS = ("front_activate", "front_todo", "task_snooze", "task_update")
 BASIS = ("state", "until", "due", "priority", "groups", "dependsOn", "blockedBy", "remainingMinutes", "awaiting")
 CONTINUITY_DEFAULTS = {"remainingMinutes": None, "awaiting": False, "context": "", "next": "", "notes": "", "original": "", "assistantNotes": "", "checklist": [], "blockReason": "", "blockedSince": None}
 # Effects whose previous value a fact keeps, so Undo can restore them.
-RESTORABLE = {"schedule_set", "order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link", "attachments_set"}
+RESTORABLE = {"group_priorities_set", "schedule_set", "order_set", "group_color_set", "context_set", "continuity_set", "related_set", "event_add", "event_meta", "event_patch", "event_cancel", "event_restore", "attachments_link", "attachments_set"}
 # Inverse-only actions: Undo reaches them, never a request of their own.
 RESTORE = ("task_restore", "event_restore", "group_restore", "organize_restore")
 
@@ -420,7 +420,7 @@ class Connected:
         if suggestion:
             suggestion={'request':suggestion['request'],'result':suggestion.get('result')}
             if suggestion['result']:suggestion['stale']=suggestion['result']['fingerprint']!=self._suggestion_input({'tasks':tasks,'context':context})['fingerprint']
-        return {"organizations":organizations, "tasks": tasks, "taskOrder": [uid for uid in self.store.state_value('task_order',[]) if uid in known], "groupColors": normalized_colors(self.store.state_value('group_colors',{})), "schedules": {uid:v for uid,v in self.store.schedules().items() if uid in known}, "orderSuggestion": suggestion, "context": context,
+        return {"organizations":organizations, "tasks": tasks, "taskOrder": [uid for uid in self.store.state_value('task_order',[]) if uid in known], "groupPriorities": self.store.state_value("group_priorities",{}), "groupColors": normalized_colors(self.store.state_value('group_colors',{})), "schedules": {uid:v for uid,v in self.store.schedules().items() if uid in known}, "orderSuggestion": suggestion, "context": context,
                 "timezone": self.store.state_value('timezone','America/Edmonton'),
                 "calendar_events":self.store.events(),"notification_policy":self.store.state_value('notification_policy'),
                 "proposals": proposals, "events": facts, "lastFact": self._fact_summary(last) if last else None, "messages": messages,
@@ -478,6 +478,7 @@ class Connected:
         effect,inverse=plan["effect"],{}
         if "order_set" in effect:inverse["order"]=self.store.state_value("task_order",[])
         if "schedule_set" in effect:inverse["schedule"]=[effect["schedule_set"][0],self.store.schedules().get(effect["schedule_set"][0])]
+        if "group_priorities_set" in effect:inverse["group_priorities"]=self.store.state_value("group_priorities",{})
         if "group_colors_set" in effect:inverse["group_colors"]=self.store.state_value("group_colors",{})
         if "group_color_set" in effect:inverse["group_color"]=normalized_colors(self.store.state_value("group_colors",{})).get(effect["group_color_set"][0])
         if "context_set" in effect:
@@ -778,6 +779,7 @@ class Connected:
         if plan.get('action') in ('group_rename','group_restore'):
             payload={'items':[{'uuid':step['uuid'],'expected_after':step['after'],
                 'patch':{k:step['before'].get(k) for k in step['patch']}} for step in steps], 'undo_of':fact_id}
+            if 'group_priorities_set' in effect:payload.update(priorities=inverse['group_priorities'],expected_priorities=effect['group_priorities_set'])
             if 'group_colors_set' in effect:payload.update(colors=inverse['group_colors'],expected_colors=effect['group_colors_set'])
             return 'group_restore',payload
         if steps:
@@ -801,6 +803,9 @@ class Connected:
             if self.store.schedules().get(uid)!=value:raise conflict
             previous=inverse["schedule"][1] or {}
             return "schedule_update",{"uuid":uid,"repeat":previous.get("repeat"),"reminders":previous.get("reminders") or [],"undo_of":fact_id}
+        if "group_priorities_set" in effect:
+            if self.store.state_value("group_priorities",{})!=effect["group_priorities_set"]:raise conflict
+            return "group_restore",{"items":[],"priorities":inverse["group_priorities"],"expected_priorities":effect["group_priorities_set"],"undo_of":fact_id}
         if "group_color_set" in effect:
             name,color=effect["group_color_set"]
             if normalized_colors(self.store.state_value("group_colors",{})).get(name)!=color:raise conflict

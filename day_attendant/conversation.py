@@ -121,7 +121,7 @@ class Conversation:
                 context['capabilities']=capabilities(snapshot,self.api is not None)
                 context['appHelp']=app_help()
                 context['continuity']=continuity
-                context['presentation']={k:snapshot[k] for k in ('taskOrder','groupColors','undoStack','proposals','suggestions','profile')}
+                context['presentation']={k:snapshot[k] for k in ('taskOrder','groupColors','groupPriorities','undoStack','proposals','suggestions','profile')}
                 from .proactive import view as checkins_view
                 context['checkins']=checkins_view(self.board)
                 context['selectedImages']=[{'id':x['id'],'name':x['name']} for x in images]

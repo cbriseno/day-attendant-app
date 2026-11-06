@@ -540,6 +540,12 @@ class Assistant:
                     if group_key(raw)==source_key:merged.pop(raw)
                 if source_key in colors and target_key not in colors:merged[target_key]=colors[source_key]
             if merged!=stored_colors:plan['effect']['group_colors_set']=merged
+            priorities=self.store.state_value('group_priorities',{})
+            merged_priorities=dict(priorities)
+            if source_key!=target_key and source_key in merged_priorities:
+                value=merged_priorities.pop(source_key)
+                merged_priorities.setdefault(target_key,value)
+            if merged_priorities!=priorities:plan['effect']['group_priorities_set']=merged_priorities
             plan['result']={'group':source,'to':destination}
         elif action=='group_restore':
             for item in p['items']:
@@ -550,10 +556,25 @@ class Assistant:
                 if set(changes)-{'project','groupChanged'}:
                     raise AssistantError('invalid_restore','The group inverse exceeds its decision.')
                 patch(row,changes)
+            if 'priorities' in p:
+                if self.store.state_value('group_priorities',{})!=p['expected_priorities']:
+                    raise AssistantError('undo_conflict','Group priorities changed after this decision.')
+                plan['effect']['group_priorities_set']=p['priorities']
             if 'colors' in p:
                 if self.store.state_value('group_colors',{})!=p['expected_colors']:
                     raise AssistantError('undo_conflict','Group colors changed after this decision.')
                 plan['effect']['group_colors_set']=p['colors']
+        elif action=='group_priority_update':
+            label=group_label(p.get('group'))
+            priority=p.get('groupPriority')
+            if not label:raise AssistantError('invalid_group','Name the group.')
+            if priority not in ('high','medium','low','none'):raise AssistantError('invalid_group_priority','Choose high, medium, low or none.')
+            priorities=self.store.state_value('group_priorities',{})
+            wanted=dict(priorities)
+            if priority=='none':wanted.pop(group_key(label),None)
+            else:wanted[group_key(label)]=priority
+            if wanted!=priorities:plan['effect']['group_priorities_set']=wanted
+            plan['result']={'group':label}
         elif action=='group_color_update':
             # Presentation only, like the order: it changes no task and is never reviewed.
             if set(p)-{'group','color'} or 'group' not in p:raise AssistantError('invalid_group_color','Name a group and a color.')
@@ -813,6 +834,8 @@ class Assistant:
                     uid,value=effect['schedule_set']
                     if value is None:con.execute('DELETE FROM task_schedules WHERE uuid=?',(uid,))
                     else:con.execute('INSERT OR REPLACE INTO task_schedules VALUES(?,?)',(uid,encoded(value)))
+                if 'group_priorities_set' in effect:
+                    con.execute("INSERT OR REPLACE INTO state VALUES('group_priorities',?)",(encoded(effect['group_priorities_set']),))
                 if 'group_colors_set' in effect:
                     con.execute("INSERT OR REPLACE INTO state VALUES('group_colors',?)",(encoded(effect['group_colors_set']),))
                 if 'group_color_set' in effect:

@@ -66,6 +66,7 @@ groups lists. Ambiguous classification remains a question.
 | `organize_capture` | `expectedTitle`, `original`, `tasks`, `taskId` | Organize an unchanged saved capture into tasks with notes, categories and zero-based prerequisite indices. |
 | `order_update` | `order` | Set manual display order, preserving other tasks; does not change priority. |
 | `group_rename` | `group`, `to` | Rename or merge all matching memberships, including closed tasks. Groups exist only as assigned labels. |
+| `group_priority_update` | `group`, `groupPriority` | Set category priority: high, medium, low or none, independent of task priorities. |
 | `group_color_update` | `color`, `group` | Set a group palette color; clearFields=[color] restores automatic color. |
 | `provenance_update` | `observed_at`, `person`, `reference`, `source`, `taskId`, `zone` | Edit the human-supported source, person, reference and observed time. |
 | `event_add` | `end`, `fold`, `observed_at`, `person`, `reference`, `source`, `start`, `title`, `zone` | Create a calendar commitment. |
