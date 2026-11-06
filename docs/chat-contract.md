@@ -146,3 +146,31 @@ is no external milestone stop condition or autonomous external status check.
 Delivery policy and scheduler status do not establish delivery or that a person
 read a notification. Turning assistant use off prevents further interpretation;
 resume through its existing UI control.
+
+## Continuity and action outcomes
+
+`continuity.requestResults` associates each earlier human message since `/clear`
+with its current proposal IDs, generations, intents, phases, results and errors,
+stored app-operation results, unprocessed work and interpretation errors. These
+are views of the existing messages and receipts, not another action log. A
+completed reply does not mean all changes saved: an applied change and a failed
+change remain separate. Review awaits confirmation; pending and failed work
+remain visible. Saved state and Undo facts override historical success.
+
+A requested retry uses `proposal_retry` with the existing failed proposal ID;
+`chat_retry` keeps the original incomplete-message key and durable proposals.
+Already saved changes are not proposed again. Existing receipt controls and
+Undo remain available. Historical unprocessed work must be checked against later
+turns and current state before describing it as still pending.
+
+`uncertainties` is the complete set of questions still open after each completed
+interpretation: retain unrelated unanswered questions, remove answered or
+withdrawn ones, and return an empty list when none remain. The next turn receives
+that latest set, rather than every question ever asked. Incomplete or stale
+interpretations do not replace it. Resolving a question is model interpretation,
+not independent authorization for a change.
+
+`/clear` removes the earlier conversation, its result associations and its
+questions from portable continuity. Earlier messages remain stored locally;
+durable tasks, proposals, schedules and Undo are unchanged and current app state
+remains available. It neither cancels pending proposals nor undoes saved work.

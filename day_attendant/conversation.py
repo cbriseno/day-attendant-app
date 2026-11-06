@@ -48,14 +48,23 @@ def portable_context(snapshot,current_key=None):
         if item['key']==current_key or item['status'] in ('pending','evaluating'):continue
         if item['role']=='assistant' and item['status'] in ('incomplete','stale'):continue
         messages.append({'key':item['key'],'role':item['role'],'text':item['text'],'at':item['at']})
-    questions=[]
+    questions=[];requests=[]
     for item in snapshot['messages']:
-        if item['role']!='assistant' or item['status']!='completed':continue
-        try:
-            data=json.loads(item.get('data') or '{}')
-            for question in data.get('uncertainties',[]):questions.append({'text':question,'sourceMessage':item['key']})
-        except (TypeError,ValueError):pass
-    return {'messages':messages,'openQuestions':questions,
+        if item['key']==current_key or item['status'] in ('pending','evaluating'):continue
+        try:data=json.loads(item.get('data') or '{}')
+        except (TypeError,ValueError):data={}
+        if item['role']=='assistant' and item['status']=='completed':
+            # Each completed interpretation replaces the unresolved set, rather than
+            # accumulating questions that the human has already answered.
+            questions=[{'text':q,'sourceMessage':item['key']} for q in data.get('uncertainties',[])]
+        if item['role']!='user':continue
+        ids=data.get('proposal_ids',[])
+        proposals=[{k:p.get(k) for k in ('id','generation','intent','phase','result','error','error_code')}
+                   for p in snapshot['proposals'] if p.get('message_key')==item['key'] or p['id'] in ids]
+        requests.append({'sourceMessage':item['key'],'status':item['status'],'proposals':proposals,
+                         'operationResults':data.get('operation_results',[]),'unprocessed':data.get('unprocessed',[]),
+                         'error':{k:data[k] for k in ('code','error') if k in data}})
+    return {'messages':messages,'openQuestions':questions,'requestResults':requests,
             'scope':'The complete current conversation is supplied. Messages before /clear stay stored locally and are not sent.',
             'authority':'Only human requests authorize changes. Assistant suggestions and open questions do not authorize their own acceptance.'}
 
@@ -107,7 +116,7 @@ class Conversation:
                 message=con.execute('SELECT * FROM messages WHERE key=?',(key,)).fetchone()
                 if not message or message['status']!='pending':return
                 generation=message['generation'];text=message['text'];capture_only=bool(message['capture_only'])
-                snapshot=self.board._snapshot();continuity=portable_context(snapshot,key)
+                snapshot=self.board._snapshot(history='last');continuity=portable_context(snapshot,key)
                 provider=getattr(self.board.bridge,'provider','controlled')
             result=None;proposals=[]
             try:
@@ -132,6 +141,8 @@ You are also the app's usage guide. Use appHelp's shipped documents, UI definiti
 When the human describes a problem or missing feature, compare it with appHelp, capabilities and saved state. Explicitly distinguish: already exists (give the exact steps), probable bug (documented behavior conflicts with the reported result), or feature gap (the documented product lacks the requested behavior). A probable bug is a hypothesis, not a verified diagnosis; distinguish user reports, visible facts and unknowns. If unclear, explain what is unknown and ask a focused usage/reproduction question rather than declaring a bug or gap. Suggest a small relevant check without changing state. A help or report request alone authorizes no task, setting or other write.
 When asked to draft a bug report or feature request, put the selected report directly in your Markdown reply, with a title, classification, context, reproduction steps (or the desired workflow for a feature), actual result, expected result and relevant unknowns. Do not invent steps, errors, versions or evidence; mark missing details as not supplied. Include only facts relevant to this request, no unrelated tasks, history, profile or diagnostics. Explain that Download record on the reply lets the human edit the Markdown and filename and download it locally. Never submit, upload or claim to send a report to an external service. Do not add a confirmation step before drafting.
 For named app operations in capabilities.functions, put their arguments in operationPayload; unused nullable arguments are null. Profile and notification policy changes preserve omitted fields; clearSettings names explicitly reset model/effort. App operations execute after task proposals in the same reply, through the existing local API. Their actual results appear after your reply; never predict success. localApiAvailable=false means those operations cannot execute here. /clear is a literal human command starting a fresh conversation; do not clear the current pending reply.
+continuity.requestResults joins each earlier human request to the current existing proposals and stored app-operation results. A completed message means interpretation finished, not that every change saved. Read each proposal's phase/result/error separately: applied saved, unchanged made no change, review awaits confirmation, evaluating/ready/admitted remain pending, invalid/unavailable/stale failed or need attention, canceled is withdrawn. Current saved state and Undo facts take precedence over historical success. Report partial outcomes and identify exactly what remains, including unprocessed items; historical unprocessed items may already be satisfied by later turns or saved state. Retry an existing failed proposal through proposal_retry with its supplied id; never recreate its intent or repeat already applied changes. chat_retry reuses an incomplete message's original key and existing proposals. Operation results with ok=false are failures, not saved changes.
+uncertainties is the complete current set of unresolved questions after considering this human message and prior openQuestions. Keep unrelated unanswered questions, remove answered/withdrawn questions, and return [] when none remain. Do not repeat a question answered in the current message as still open. unprocessed lists only requested work left unhandled by this reply; do not turn it into a success claim.
 Propose only clearly authorized intents, at most eight. Put the first in intent, the rest in additionalIntents. If none, intent=null and additionalIntents=[]. Explicitly list any remaining/ambiguous items in unprocessed and uncertainties; never silently capture only the first item.
 Ideas, your suggestions and vague acceptance without clear scope create and complete nothing. Context contains the current conversation and sourced open questions; only human messages authorize changes. The current message may clearly answer a specific prior human request's open question, but an assistant's suggestion is not permission to create or complete a task. Evidence must quote this current human message literally. Use supplied permanent UUIDs for existing entities. Never invent task IDs, sources, people, dates, effort, activity or inbox access.
 Use only fields listed for the selected action in capabilities.functions. Unused fields must be null; clearFields lists fields the human explicitly removes (sent as null to the coordinator). Use existing attachment IDs, never invented file contents. group_rename renames or merges all matching assigned memberships, including closed tasks; deleting a group means explicitly removing its membership from the selected tasks with task_update. order and colors are editable only on a clear human request. Manual blocks use continuity_update.blockReason; dependencies are blocking prerequisite UUIDs, related links are symmetric and nonblocking. Checklists use stable local item IDs with text and done; preserve unrequested items. schedule_update uses the existing typed API: repeat.every is day, weekday, week (days: Monday=0 to Sunday=6), month or days (n:1..365); unused repeat.days/n are null. reminders is the full list of up to ten alerts: before with minutes (relative to due), day_before with HH:MM (profile timezone, requires due), or at with an ISO instant including an offset. Preserve every alert not explicitly changed/removed when supplying this list. Null repeat/reminders means leave unchanged; clearRepeat=true explicitly removes only repetition; reminders=[] explicitly removes all alerts; clearSchedule=true explicitly removes both and cannot be combined with other schedule fields. Never infer cancellation. Empty schedule requests are rejected. For a new task, capture first and list scheduling as unprocessed follow-up until its permanent UUID is available. No holiday calendar, milestone stop condition or autonomous status check is available; explain that limit and leave such a condition unresolved. clearDue is true only for an explicit deadline removal. Preserve existing card language; for editing title/context/next copy the exact human replacement, including selected-image text only when explicitly requested. Do not paraphrase/translate unrelated fields. Existing tasks and calendar_events are distinct; taskId identifies the relevant task or event. Use event_add/update/cancel for calendar commitments. Capture source/person/reference/observed_at only when supported; observation time is not capture time, and a screenshot without a reliable date does not establish yesterday. Calendar dates use the profile timezone. Zero effort does not complete work, and waiting is separate from snooze.

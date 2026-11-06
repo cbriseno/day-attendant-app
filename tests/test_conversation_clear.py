@@ -73,7 +73,7 @@ class ConversationClearTests(unittest.TestCase):
         self.assertEqual([m['key'] for m in self.board.snapshot()['messages']],['after','after:assistant'])
         self.assertEqual(len(self.board.snapshot()['tasks']),before)
         self.assertEqual(self.stored(),4)
-        self.assertEqual(set(continuity),{'messages','openQuestions','scope','authority'})
+        self.assertEqual(set(continuity),{'messages','openQuestions','requestResults','scope','authority'})
 
     def restart(self):
         board=Connected(Assistant(self.temp.name,clock=lambda:NOW),self.fixture);board.initialize(kind='personal');board.startup()
