@@ -105,7 +105,7 @@ const undoViews=new Map();
 const announceStatus=text=>{$('status').textContent=text};
 const notice=text=>{$('save-error-text').textContent=text;$('save-error').hidden=false};
 $('error-close').onclick=()=>{$('save-error').hidden=true};
-function renderUndo(data){const top=data.undoStack?.[0];$('undo').disabled=!top||data.readOnly||flow?.sending>0;$('undo').dataset.event=top?.id??'';$('undo').title=top?tr('undo')+' · '+(actionLabel[top.kind||aliases[top.action]||top.action]||tr('change_saved'))+(top.target?' · '+(data.tasks.find(t=>t.id===top.target)?.title||''):''):tr('undo_empty')}
+function renderUndo(data){const top=data.undoStack?.[0];$('undo').disabled=!top||data.readOnly||flow?.sending>0;$('undo').dataset.event=top?.id??'';$('undo').textContent=top?tr('undo')+': '+(actionLabel[top.kind||aliases[top.action]||top.action]||tr('change_saved'))+(top.target?' · '+(data.tasks.find(t=>t.id===top.target)?.title||''):''):tr('undo');$('undo').title=top?tr('undo')+' · '+(actionLabel[top.kind||aliases[top.action]||top.action]||tr('change_saved'))+(top.target?' · '+(data.tasks.find(t=>t.id===top.target)?.title||''):''):tr('undo_empty')}
 const task=id=>flow.snapshot().tasks.find(t=>t.id===id);
 const safely=async fn=>{try{return await fn()}catch(error){notice(error.message);return null}};
 let actionLabel,phaseLabel;function refreshLabels(){actionLabel={activate:tr("start"),snooze:tr("snooze"),todo:tr("back_to_to_do"),done:tr("complete"),retire:tr("retire"),cancel_task_action:tr("cancel_task_action"),restore:tr("undo"),declaration:tr("declaration_updated"),block:tr('block_changed'),add:tr("create"),update:tr("update"),reopen:tr("reopen"),dependency:tr("dependency_update"),related:tr("related_update"),schedule:tr("schedule_saved"),group_color:tr("group_color_saved"),group_rename:tr('rename_group'),order:tr('order_saved'),event_add:tr('create'),event_update:tr('update'),event_cancel:tr('event_canceled')};
@@ -119,7 +119,7 @@ let orderThen='manual';try{orderThen=localStorage.getItem('day-attendant-order-t
 // The second key only applies where the primary view has sections; elsewhere it stays stored but hidden.
 const activeThen=()=>globalThis.dayOrdering.thenOptions(orderView).includes(orderThen)?orderThen:'manual';
 function syncThen(){const options=globalThis.dayOrdering.thenOptions(orderView),select=$('order-then');$('order-then-wrap').hidden=!options.length;for(const o of select.options)o.hidden=!options.includes(o.value);select.value=activeThen();select.classList.toggle('is-set',activeThen()!=='manual')}
-let taskView='list';
+let taskView=['group','chains'].includes(orderView)?orderView:'list',lastSort=['group','chains'].includes(orderView)?'priority':orderView;
 let localOrder=null,orderBase=null,orderSaving=false,drag=null;
 // Motion: a card that changes place glides there from where it was (FLIP), a new one fades in and
 // a finished or retired one fades out over its old place. Reduced motion shows every change at once.
@@ -230,7 +230,7 @@ function rankedGroups(data=flow.snapshot()){const all=groupInventory(data),used=
 function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)),groups=groupInventory({...data,tasks:open.map(t=>({...t,groups:[...new Set(taskGroups(t).map(groupParent))]}))}).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label));
  if(groupFilter==='group:'&&open.some(t=>!taskGroups(t).length))groups.push({label:'',n:open.filter(t=>!taskGroups(t).length).length});
  if(!groups.length)return '';
- const selected=groups.find(g=>'group:'+groupKey(g.label)===groupFilter),limit=innerWidth<=600?2:3,visible=groups.slice(0,limit);
+ const selected=groups.find(g=>'group:'+groupKey(g.label)===groupFilter),limit=groups.length,visible=groups.slice(0,limit);
  if(selected&&!visible.includes(selected))visible[visible.length-1]=selected;
  const chip=(value,label,extra='',name='')=>'<button type="button" class="filter-chip '+extra+'" data-filter="'+esc(value)+'" aria-pressed="'+(groupFilter===value)+'"'+(name?' data-rename-label="'+esc(name)+'" aria-keyshortcuts="F2" title="'+esc(tr('group_label_hint'))+'"':'')+'>'+label+'</button>';
  return chip('*',esc(tr('filter_all'))+' <span class="filter-count" data-anon-safe="text title aria-label">'+open.length+'</span>')+visible.map(g=>chip('group:'+groupKey(g.label),(g.label?groupDot(g.label)+esc(g.label):esc(tr('no_group'))),selected===g?'active-group':'',g.label)).join('')
@@ -394,26 +394,24 @@ function buildRow(t,s,data,proposal){
   +'<span class="row-grip">'+handle+'</span>'
   +'<button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+label(tr('complete'))+'" title="'+esc(tr('complete'))+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button>'
   +'<div class="row-text">'+suggestionReason(t,data)+titleCell(t,data)+'<span class="row-meta">'+rowMeta(t,data,proposal,s)+'</span></div>'
-  +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+starIcon+'</button>':'')+priorityButton(t,off)+''
+  +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib'+(t.nextUp?' on':'')+'" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+starIcon+'</button>':'')+priorityButton(t,off)+''
   +state+'<button type="button" class="ib" data-id="'+t.id+'" data-action="snooze" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('snooze'))+'" title="'+esc(tr('snooze'))+'"'+(off?' disabled':'')+'>'+clockIcon+'</button>'
   +'<button type="button" class="ib more" data-id="'+t.id+'" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('more_actions'))+'" title="'+esc(tr('more_actions_hint'))+'">'+moreIcon+'</button></div>'
   +'<span class="port-slot">'+(off?'':'<button type="button" class="port" data-id="'+t.id+'" aria-label="'+esc(tr('port_hint'))+'" title="'+esc(tr('port_hint'))+'"></button>')+'</span></div>'+suggestionBubble(t,data)+(open?expandView(t,data):'')+'</article>'}
 // Focus keeps only the immediate actions and the reason this task is here.
 function focusRow(t,data,big){
  const off=data.readOnly||t.pending,reason=[],blocked=(t.dependsOn||t.blockedBy||[]).some(id=>data.tasks.find(r=>r.id===id)?.state!=='done');
- if(t.state==='active')reason.push(tr('focus_in_progress'));
- if(t.priority==='urgent')reason.push(tr('priority_urgent'));
  if(t.due)reason.push(tr(new Date(t.due)<NOW?'meta_overdue':'meta_due').replace('{time}',short(t.due)));
  const n=data.tasks.filter(r=>!['done','retired','canceled'].includes(r.state)&&(r.dependsOn||r.blockedBy||[]).includes(t.id)).length;
  if(n)reason.push(formatted(n===1?'focus_unlocks_one':'focus_unlocks',{n}));
  if(t.awaiting)reason.push(tr('meta_waiting'));
  if(t.state==='snoozed'&&t.until)reason.push(tr('meta_resumes').replace('{time}',short(t.until)));
- if(!reason.length)reason.push(tr('priority_'+t.priority));
+
  const button=(action,label,icon)=>'<button type="button" class="btn" data-id="'+t.id+'" data-action="'+action+'"'+(['snooze','retire'].includes(action)?' aria-haspopup="menu" aria-expanded="false"':'')+' aria-label="'+esc(label+': '+t.title)+'"'+(off||action==='activate'&&blocked?' disabled':'')+'>'+icon+esc(label)+'</button>';
- return '<article class="task focus-item'+(big?' big':'')+'" data-task-id="'+t.id+'"><div class="row-main"><button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+esc(tr('complete')+': '+t.title)+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button><div class="row-text">'+titleCell(t,data)+'<p class="focus-reason" data-anon-safe="text title aria-label">'+esc(reason.join(' · '))+' · '+numberButton(t)+creationTime(t)+activityTime(t)+'</p>'+(t.next?'<p class="focus-next"><b>'+esc(tr('next_step'))+':</b> '+esc(t.next)+'</p>':'')+'</div><div class="focus-actions">'+priorityButton(t,off)+(t.state==='active'?button('todo',tr('pause'),pauseIcon):button('activate',tr(t.state==='snoozed'?'resume_now':'start'),playIcon))+button('snooze',tr('snooze'),clockIcon)+button('retire',tr('retire_7ad0e0'),'')+'</div></div>'+(expanded===t.id?expandView(t,data):'')+'</article>';
+ return '<article class="task focus-item'+(big?' big':'')+'" data-task-id="'+t.id+'"><div class="row-main"><button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+esc(tr('complete')+': '+t.title)+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button><div class="row-text">'+titleCell(t,data)+'<p class="focus-reason" data-anon-safe="text title aria-label">'+esc(reason.join(' · '))+(reason.length?' · ':'')+numberButton(t)+creationTime(t)+activityTime(t)+'</p>'+(t.next?'<p class="focus-next"><b>'+esc(tr('next_step'))+':</b> '+esc(t.next)+'</p>':'')+'</div><div class="focus-actions">'+priorityButton(t,off)+(t.state==='active'?button('todo',tr('pause'),pauseIcon):button('activate',tr(t.state==='snoozed'?'resume_now':'start'),playIcon))+button('snooze',tr('snooze'),clockIcon)+'</div></div>'+(expanded===t.id?expandView(t,data):'')+'</article>';
 }
 function focusLanes(data){const selected=globalThis.dayOrdering.focus(data.tasks,NOW.getTime()),sections=[['active',selected.active],['next',selected.next],['soon',selected.soon]],shown=sections.reduce((n,[,rows])=>n+rows.length,0),hidden=data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)).length-shown;let first=true;
- const lanes=[{id:'focus:intro',head:'',items:[{key:'intro',html:'<p class="focus-intro" data-anon-safe="text title aria-label">'+esc(shown?formatted('focus_intro',{n:hidden}):tr('focus_empty'))+' <button type="button" class="link-button" data-exit-focus>'+esc(tr('focus_all'))+'</button></p>'}]}];
+ const lanes=[{id:'focus:intro',head:'',items:[{key:'intro',html:'<p class="focus-intro" data-anon-safe="text title aria-label">'+esc(shown?formatted('focus_intro',{n:hidden}):tr('focus_empty'))+(selected.activeTotal>selected.active.length?' '+formatted('focus_active_count',{shown:selected.active.length,total:selected.activeTotal}):'')+' <button type="button" class="link-button" data-exit-focus>'+esc(tr('focus_all'))+'</button></p>'}]}];
  for(const [key,rows] of sections)if(rows.length)lanes.push({id:'focus:'+key,cls:' focus-section',head:'<h2>'+esc(tr('focus_'+key))+'</h2>'+(key==='next'?sectionAdd('',data):''),items:rows.map(t=>{const big=first;first=false;return {id:t.id,html:focusRow(t,data,big)}})});
  if(shown)lanes.push({id:'focus:rest',head:'',items:[{key:'rest',html:'<p class="focus-rest">'+esc(tr('focus_rest'))+'</p>'}]});return lanes;
 }
@@ -478,7 +476,7 @@ function dependencyChips(t,data){const blocks=blocksOf.get(t.id)||[],chip=(kind,
 const dependencyEdges=data=>dependencyFocus?data.tasks.flatMap(r=>r.blockedBy.filter(p=>p===dependencyFocus||r.id===dependencyFocus).map(p=>[p,r.id])):[];
 const dependencyLines=document.createElementNS('http://www.w3.org/2000/svg','svg');dependencyLines.classList.add('dependency-lines');dependencyLines.setAttribute('aria-hidden','true');$('board').after(dependencyLines);
 const dependencyResize=new ResizeObserver(()=>drawDependencies());dependencyResize.observe($('board'));
-function showDependencies(data=flow.snapshot()){
+function showDependencies(data=flow.snapshot()){dependencyBanner.hidden=!dependencyFocus;
  const edges=dependencyEdges(data),board=$('board');if(!edges.length)dependencyFocus=null;
  board.classList.toggle('dependency-focus',!!dependencyFocus);
  for(const card of board.querySelectorAll('[data-task-id]')){
@@ -560,7 +558,11 @@ function drawDependencies(data=flow.snapshot()){
   if(selected){out+='<circle class="link-knob" cx="'+e.b.x+'" cy="'+e.b.y+'" r="7"/>';bar={x:box.left-area.left+(e.a.x+e.b.x)/2,y:box.top-area.top+(e.a.y+e.b.y)/2,link:l}}}
  if(connectDrag?.path)out+='<path class="link-draft" d="'+connectDrag.path+'"/>';
  svg.classList.toggle('has-hot',anyHot);svg.innerHTML=out;placeLineBar(bar)}
-function toggleDependencies(id){dependencyFocus=dependencyFocus===id?null:id;showDependencies()}
+const dependencyBanner=document.createElement('div');dependencyBanner.className='dependency-banner';dependencyBanner.hidden=true;$('board').before(dependencyBanner);
+function toggleDependencies(id){dependencyFocus=dependencyFocus===id?null:id;showDependencies();dependencyBanner.hidden=!dependencyFocus;if(!dependencyFocus)return;
+ const source=task(dependencyFocus);dependencyBanner.innerHTML='<span>'+esc(formatted('dependency_highlight',{title:source?.title||''}))+'</span><button type="button" class="btn">'+esc(tr('dependency_exit'))+'</button>';dependencyBanner.querySelector('button').onclick=()=>toggleDependencies(dependencyFocus);
+ $('board').querySelector('[data-dependency-role=dependent],[data-dependency-role=prerequisite]')?.scrollIntoView({block:'center',behavior:'smooth'})}
+
 // A selected line offers its two changes beside it; its tip can be dragged to another task.
 const lineBar=document.createElement('div');lineBar.className='line-bar';lineBar.hidden=true;$('board').after(lineBar);
 function placeLineBar(at){if(!at){if(!lineBar.hidden)lineBar.hidden=true;return}
@@ -679,7 +681,7 @@ function render(data=flow.snapshot()) {
   if(!rows.length)items.push({key:'empty',html:'<p class="lane-empty">'+esc(tr(state==='blocked'?'lane_blocked_empty':'lane_empty'))+'</p>'});
   const filtered=groupFilter.startsWith('group:')?rankedGroups(data).find(g=>'group:'+groupKey(g.label)===groupFilter)?.label||'':'';
   return {state,head:'<span class="state-dot" aria-hidden="true"></span><h2>'+label+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+rows.length+'</span>'+(state==='todo'&&orderView!=='group'?sectionAdd(filtered,data):''),items};
- }))],data);
+ }))].reduce((all,l,i,arr)=>{if(l.id==='next-up'&&arr.some(x=>x.state==='active'))return all;all.push(l);if(l.state==='active'&&arr[0]?.id==='next-up')all.push(arr[0]);return all},[]),data);
  // A focused control whose card moved keeps its focus.
  if(active?.isConnected&&active!==document.activeElement&&$('board').contains(active))active.focus({preventScroll:true});
  restoreTyping(typing);rendering=false;
@@ -710,7 +712,7 @@ function render(data=flow.snapshot()) {
 // Pagination affects presentation only; every closed responsibility stays in the profile.
 let closedLimit=10;
 function renderClosed(data=flow.snapshot()){
- const rows=data.tasks.filter(t=>['done','retired'].includes(t.state)&&matchesSearch(t)).sort((a,b)=>String(b.closedAt||'').localeCompare(String(a.closedAt||''))||a.id.localeCompare(b.id));
+ const rows=data.tasks.filter(t=>t.state==='done'&&matchesSearch(t)).sort((a,b)=>String(b.closedAt||'').localeCompare(String(a.closedAt||''))||a.id.localeCompare(b.id));
  $('closed-count').textContent=rows.length;let day=null,html='';
  for(const t of rows.slice(0,closedLimit)){
   const valid=t.closedAt&&Number.isFinite(Date.parse(t.closedAt)),key=valid?localValue(new Date(t.closedAt)).slice(0,10):'';
@@ -722,9 +724,9 @@ function renderClosed(data=flow.snapshot()){
  if($('closed')._html!==html){$('closed').innerHTML=html;$('closed')._html=html}
 }
 function renderCanceled(data=flow.snapshot()){
- const rows=data.tasks.filter(t=>t.state==='canceled'&&matchesSearch(t)).sort((a,b)=>String(b.closedAt||'').localeCompare(String(a.closedAt||'')));
+ const rows=data.tasks.filter(t=>['canceled','retired'].includes(t.state)&&matchesSearch(t)).sort((a,b)=>String(b.closedAt||'').localeCompare(String(a.closedAt||'')));
  $('canceled-count').textContent=rows.length;
- const html=rows.length?rows.map(t=>'<div class="closed-row canceled-row"><div><span aria-hidden="true">⊘</span> <strong data-anon-private="text">'+esc(t.title)+'</strong><div class="small">'+esc(tr('canceled_task'))+' · '+esc(t.closedAt?zoned({day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'},t.closedAt):tr('closed_date_unknown'))+'</div>'+(t.cancelReason?'<div data-anon-private="text">'+esc(tr('cancel_reason'))+': '+esc(t.cancelReason)+'</div>':'')+'</div><button type="button" class="link-button" data-reactivate-id="'+esc(t.id)+'"'+(data.readOnly?' disabled':'')+' aria-label="'+esc(tr('reactivate')+': '+t.title)+'">'+esc(tr('reactivate'))+'</button></div>').join(''):'<p class="empty">'+esc(tr('canceled_empty'))+'</p>';
+ const html=rows.length?rows.map(t=>'<div class="closed-row canceled-row"><div><span aria-hidden="true">⊘</span> <strong data-anon-private="text">'+esc(t.title)+'</strong><div class="small">'+esc(tr('canceled_task'))+' · '+esc(t.closedAt?zoned({day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false},t.closedAt):tr('closed_date_unknown'))+'</div>'+(t.cancelReason?'<div data-anon-private="text">'+esc(tr('cancel_reason'))+': '+esc(t.cancelReason)+'</div>':'')+'</div><button type="button" class="link-button" data-reactivate-id="'+esc(t.id)+'"'+(data.readOnly?' disabled':'')+' aria-label="'+esc(tr('reactivate')+': '+t.title)+'">'+esc(tr('reactivate'))+'</button></div>').join(''):'<p class="empty">'+esc(tr('canceled_empty'))+'</p>';
  if($('canceled-list')._html!==html){$('canceled-list').innerHTML=html;$('canceled-list')._html=html}
 }
 $('canceled-list').onclick=e=>{const b=e.target.closest('[data-reactivate-id]');if(b)request('task_reopen',{uuid:b.dataset.reactivateId})};
@@ -738,7 +740,7 @@ function hideRaised(){const row=$('raised-row');row.classList.remove('show');set
 // must cover them all.
 function confirmSaved(fact,draftTitle){if(!fact||flow.sending||fact.id<=lastSeenEvent)return;lastSeenEvent=fact.id;announce({...fact,title:draftTitle},flow.snapshot())}
 async function request(action,payload,key,expectedRevision,gesture){return safely(async()=>{const p=await flow.request(action,payload,key,expectedRevision,gesture);lastRequestedProposal=p?.id||null;if(p?.phase==='unchanged')announceStatus(p.superseded?.length?tr("the_pending_change_was_discarded_the_respons"):tr("there_are_no_new_changes_to_apply"));else if(p&&p.phase!=='applied')announceStatus(tr('a_pending_change_needs_review'));return p;});}
-function openDialog(dialog,origin,id,action){localizedDates(dialog);origins.set(dialog,{origin,id,action});dialog.returnValue='cancel';dialog.showModal();}
+function openDialog(dialog,origin,id,action){localizedDates(dialog);origins.set(dialog,{origin,id,action});dialog.returnValue='cancel';dialog.showModal();(dialog.querySelector('input:not([type=hidden]),textarea,select')||dialog.querySelector('button'))?.focus({preventScroll:true})}
 function restoreDialog(dialog){const saved=origins.get(dialog);origins.delete(dialog);requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;let target=saved?.origin;if(!target?.isConnected||!target.getClientRects().length)target=saved?.id?document.querySelector('[data-id="'+saved.id+'"][data-action="'+saved.action+'"]'):null;if(!target?.getClientRects().length)target=saved?.id?$('list-view'):$('chat-toggle');target.focus({preventScroll:true});})}
 // Preserve v3 outside-dismiss and keyboard behavior for all dialogs.
 function registerDialog(dialog){
@@ -851,7 +853,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
  const source=[[tr('source_label'),t.source&&t.source!=='general'?t.source:null],[tr('person_label'),t.person],[tr('reference_label'),t.reference],[tr('observed_label'),t.observedAt?full(t.observedAt):null,true],[tr('captured_label'),t.capturedAt?full(t.capturedAt):null,true],[tr('created_label'),t.createdAt?full(t.createdAt):null,true]].filter(([,v])=>v);
  const note=savedNote?.id===t.id?tr('saved_field').replace('{field}',tr('field_'+savedNote.field)):'';
  const foot=retireAsk===t.id?'<div class="inline-confirm" role="alert"><span>'+esc(tr('retire_this_responsibility_it_will_be_kept_s'))+'</span><button type="button" class="btn danger" data-x="retire-yes">'+esc(tr('yes_retire'))+'</button><button type="button" class="btn" data-x="retire-no">'+esc(tr('cancel'))+'</button></div>'
-  :'<button type="button" class="btn ghost danger" data-x="retire"'+off+'>'+esc(tr('retire_7ad0e0'))+'</button><button type="button" class="btn ghost" data-x="duplicate"'+off+'>'+esc(tr('duplicate'))+'</button><button type="button" class="btn ghost" data-x="close">'+esc(tr('close_details'))+'</button><span class="saved-note" aria-live="polite">'+(note?checkIcon+esc(note):'')+'</span>';
+  :'<button type="button" class="btn ghost" data-x="duplicate"'+off+'>'+esc(tr('duplicate'))+'</button><button type="button" class="btn ghost" data-x="close">'+esc(tr('close_details'))+'</button><span class="saved-note" aria-live="polite">'+(note?checkIcon+esc(note):'')+'</span>';
  return '<div class="expand" data-expand="'+t.id+'"><div class="xgrid">'
   +(t.assistantNotes||t.original?'<div class="xfield xnotes"><span class="xlabel">'+esc(tr('org_notes'))+'</span>'+(t.assistantNotes?'<p data-anon-private="text">'+esc(t.assistantNotes)+'</p>':'')+(t.original?'<details><summary>'+esc(tr('org_original'))+'</summary><p data-anon-private="text">'+esc(t.original)+'</p></details>':'')+'<span class="att-hint">'+esc(tr('org_from'))+' · <button type="button" class="link-button" data-org-history>'+esc(tr('org_open_history'))+'</button></span></div>':'')+(t.captureError?'<p class="error" role="status">'+esc(tr('capture_failed'))+': '+esc(t.captureError)+'</p>':'')
   +field('notes','general_notes','<textarea id="'+id('notes')+'" data-id="'+t.id+'" data-field="notes" data-anon-private="value text" rows="3" maxlength="2000"'+off+'>'+esc(draftValue(t,'notes'))+'</textarea>'+(t.notes?'<div class="note-preview" data-anon-private="text">'+richText(t.notes)+'</div>':''))
@@ -988,7 +990,7 @@ let menu=null,swallowClick=false;const DOUBLE_CLICK_MS=240;
 const sheetMedia=matchMedia('(max-width:600px)');
 const anchorOf=(id,action)=>cardOf(id)?.querySelector('[data-id="'+id+'"][data-action="'+action+'"]');
 const menuItem=(act,label,{value='',icon='',kind='',checked=null,disabled=false,hint='',title=''}={})=>'<button type="button" class="menu-item'+(kind?' '+kind:'')+'" role="'+(checked===null?'menuitem':'menuitemradio')+'"'+(checked===null?'':' aria-checked="'+checked+'"')+' data-menu-act="'+act+'" data-value="'+esc(value)+'"'+(title?' title="'+esc(title)+'"':'')+(disabled?' disabled':'')+'>'+icon+'<span class="menu-label">'+label+'</span>'+(hint?'<span class="menu-hint" data-anon-safe="text title aria-label">'+esc(hint)+'</span>':'')+(checked?'<span class="tick">'+checkIcon+'</span>':'')+'</button>';
-function priorityMenu(t,data){return '<p class="menu-title">'+esc(tr('priority'))+'</p>'+PRIORITIES.map(p=>menuItem('priority','<span class="priority-pill" data-priority="'+p+'">'+esc(tr('priority_'+p))+'</span><span class="priority-hint">'+esc(tr('priority_hint_'+p))+'</span>',{value:p,checked:t.priority===p,disabled:data.readOnly||t.pending})).join('')}
+function priorityMenu(t,data){return '<p class="menu-title">'+esc(tr('priority'))+'</p>'+PRIORITIES.map(p=>menuItem('priority','<span class="priority-pill" data-priority="'+p+'">'+esc(tr('priority_'+p))+'</span>',{value:p,checked:t.priority===p,disabled:data.readOnly||t.pending})).join('')}
 // Snooze presets (P7). Each one shows the exact time it saves, in the profile's zone, and that same
 // value is sent. A day whose 9:00 does not exist or repeats there is left out rather than guessed.
 const SNOOZE_PRESETS=[['snooze_in_1_hour',{hours:1}],['snooze_in_3_hours',{hours:3}],['snooze_tomorrow',{days:1}],['snooze_in_2_days',{days:2}],['snooze_in_1_week',{days:7}]];
@@ -999,7 +1001,7 @@ function snoozeMenu(t,data){const off=data.readOnly||t.pending,today=localValue(
  const clock=(d,withDay)=>zoned({...(withDay?{weekday:'short',day:'numeric',month:'short'}:{}),hour:'2-digit',minute:'2-digit',hour12:false},d);
  const items=SNOOZE_PRESETS.map(([key,span])=>{const d=snoozeTime(span);if(!d)return '';const late=t.due&&d>new Date(t.due);
   return menuItem('snooze',esc(tr(key))+(late?'<span class="menu-warn">'+esc(tr('snooze_after_deadline'))+'</span>':''),{value:d.toISOString(),hint:clock(d,key!=='snooze_tomorrow'&&localValue(d).slice(0,10)!==today),title:full(d),disabled:off})}).join('');
- return '<p class="menu-title">'+esc(tr('snooze_until'))+'</p>'+items+(browserZone!==zone?'<p class="menu-note">'+esc(tr('snooze_zone_note').replace('{zone}',zone))+'</p>':'')
+ return '<p class="menu-title">'+esc(tr('snooze_until'))+'</p>'+items+(browserZone!==zone?'<p class="menu-note">'+esc(tr('snooze_zone_note').replace('{zone}',zone==='America/Mexico_City'?tr('zone_mexico_central'):intl('DateTimeFormat',formatLocale(),{timeZone:zone,timeZoneName:'longGeneric'}).formatToParts(NOW).find(p=>p.type==='timeZoneName')?.value||zone))+'</p>':'')
   +(t.state==='snoozed'?'<div class="menu-sep" role="separator"></div>'+menuItem('todo',esc(tr('resume_now')),{disabled:off}):'')}
 function moreMenu(t,data){const off=data.readOnly||t.pending,card=cardOf(t.id),ids=card?.querySelector('.drag-handle')?sectionIds(card.dataset.section):[],i=ids.indexOf(t.id),link=titleMenuLink===null?null:titleLinks(t.title)[titleMenuLink];titleMenuLink=null;
  return (link?'<p class="menu-title">'+esc(tr('title_link'))+' · <span data-anon-private="text">'+esc(link.text)+'</span></p>'+menuItem('title-link-open',esc(tr('title_link_open')),{icon:arrowIcon,value:link.url,hint:hostOf(link.url)})+menuItem('title-link-edit',esc(tr('title_link_edit')),{icon:editIcon,value:String(link.start),disabled:off})+menuItem('title-link-remove',esc(tr('title_link_remove')),{icon:linkIcon,value:String(link.start),disabled:off})+'<div class="menu-sep" role="separator"></div>':'')+'<p class="menu-title task-name">'+esc(t.title)+'</p>'+(t.state!=='todo'?menuItem('todo',esc(tr('back_to_to_do')),{disabled:off}):'')
@@ -1009,7 +1011,7 @@ function moreMenu(t,data){const off=data.readOnly||t.pending,card=cardOf(t.id),i
   +menuItem('links',esc(tr('see_links')),{icon:linkIcon})+menuItem('connect',esc(tr('connect_to')),{icon:linkIcon,disabled:off})
   +menuItem('duplicate',esc(tr('duplicate')),{icon:copyIcon,disabled:off})
   +menuItem('block',esc(tr(t.blockReason?'block_edit':'block_mark')),{icon:lockIcon,disabled:off})+(t.blockReason?menuItem('block-clear',esc(tr('block_clear')),{icon:lockIcon,disabled:off}):'')
-  +'<div class="menu-sep" role="separator"></div>'+menuItem('cancel-task',esc(tr('cancel_task_action')),{kind:'danger',disabled:off})+menuItem('retire',esc(tr('retire_7ad0e0')),{kind:'danger',disabled:off})}
+  +'<div class="menu-sep" role="separator"></div>'+menuItem('cancel-task',esc(tr('cancel_task_action')),{kind:'danger',disabled:off})}
 // Groups already in use, none, or a new one typed in place.
 function groupMenu(t,data,selected){const off=data.readOnly||t.pending,groups=rankedGroups(data).map(g=>g.label),current=selected||taskGroups(t)[0];
  return '<p class="menu-title">'+esc(tr('groups_open'))+'</p>'+(current?menuItem('group-rename',esc(tr('rename_group'))+' · '+esc(current),{value:current,disabled:off}):'')
@@ -1081,7 +1083,7 @@ document.addEventListener('dblclick',e=>{const el=e.target.closest?.('[data-rena
 document.addEventListener('keydown',e=>{if(e.key!=='F2'||e.altKey||e.ctrlKey||e.metaKey)return;const el=document.activeElement?.closest?.('[data-rename-label]');if(!el)return;e.preventDefault();startInlineRename(el.dataset.renameLabel,el)});
 addEventListener('resize',()=>endInlineRename(false));
 function showGroups(origin,filter=false){const d=groupDialog(tr('groups_open'),'<label class="field"><span>'+esc(tr('search_groups'))+'</span><input type="search" data-group-query></label><div class="group-list"></div>',origin),input=d.querySelector('input'),list=d.querySelector('.group-list');
- const draw=()=>{list.replaceChildren();if(!input.value&&flow.snapshot().tasks.some(t=>!taskGroups(t).length&&!['done','retired','canceled'].includes(t.state))){const b=document.createElement('button');b.type='button';b.className='btn ghost';b.textContent=tr('no_group');b.onclick=()=>{setGroupFilter('group:');d.close()};list.append(b)}for(const g of rankedGroups().filter(g=>groupKey(g.label).includes(groupKey(input.value)))){const row=document.createElement('div');row.className='group-list-row';const select=document.createElement('button');select.type='button';select.className='btn ghost';select.setAttribute('data-anon-private','text');select.innerHTML=groupDot(g.label)+esc(g.label);select.onclick=()=>{setGroupFilter('group:'+groupKey(g.label));d.close()};const rename=document.createElement('button');rename.type='button';rename.className='btn ghost';rename.textContent=tr('rename_group');rename.disabled=flow.snapshot().readOnly;rename.onclick=()=>{d.close();renameGroup(g.label,origin)};row.append(select,rename);list.append(row)}};input.oninput=draw;draw();input.focus();
+ const draw=()=>{list.replaceChildren();if(!input.value&&flow.snapshot().tasks.some(t=>!taskGroups(t).length&&!['done','retired','canceled'].includes(t.state))){const b=document.createElement('button');b.type='button';b.className='btn ghost';b.textContent=tr('no_group');b.onclick=()=>{setGroupFilter('group:');d.close()};list.append(b)}for(const g of rankedGroups().filter(g=>groupKey(g.label).includes(groupKey(input.value)))){const row=document.createElement('div');row.className='group-list-row';const select=document.createElement('button');select.type='button';select.className='btn ghost';select.setAttribute('data-anon-private','text');select.innerHTML=groupDot(g.label)+esc(groupName(g.label));select.onclick=()=>{setGroupFilter('group:'+groupKey(g.label));d.close()};const rename=document.createElement('button');rename.type='button';rename.className='btn ghost';rename.textContent=tr('rename_group');rename.disabled=flow.snapshot().readOnly;rename.onclick=()=>{d.close();renameGroup(g.label,origin)};row.append(select,rename);list.append(row)}};input.oninput=draw;draw();input.focus();
 }
 $('groups-open').onclick=e=>showGroups(e.currentTarget);
 // Deadlines at 18:00 in the profile's zone, or an exact local date and time.
@@ -1203,14 +1205,16 @@ function openContext(origin){const revision=flow.snapshot().revision,c=flow.snap
  $('context-form').onsubmit=async e=>{e.preventDefault();const raw=$('context-minutes').value,until=$('context-until').value;try{await zoneReady($('context-form'));let availableUntil=c.availableUntil;if(raw.trim()){if(until!==openingUntil){const date=parseLocal(until);if(!Number.isFinite(date.getTime())||ambiguous(date)||localValue(date)!==until)throw Error(tr("provide_an_unambiguous_local_date_and_time_f"));availableUntil=date.toISOString()}if(!availableUntil)throw Error(tr("provide_an_unambiguous_local_date_and_time_f"))}await flow.setContext({availableMinutes:raw.trim()?Number(raw):null,availableUntil:raw.trim()?availableUntil:null,rest:$('context-rest').checked},revision);$('context-dialog').close('declared')}catch(error){$('context-error').hidden=false;$('context-error').textContent=error.message}};
  openDialog($('context-dialog'),origin,null,null)}
 $('context-open').onclick=e=>openContext(e.currentTarget);$('context-cancel').onclick=()=>$('context-dialog').close('cancel');
-function setTaskView(view){closeMenu();taskView=view;if(view==='focus')dependencyFocus=null;selectedLink=null;hoverTask=hoverKeep=null;expanded=null;
- document.body.classList.toggle('focus-mode',view==='focus');$('board').classList.toggle('is-list',view==='list');$('board').classList.toggle('is-focus',view==='focus');
- for(const key of ['list','board','focus'])$(key+'-view').setAttribute('aria-pressed',String(view===key));
+function setTaskView(view){closeMenu();if(['group','chains'].includes(view)){if(!['group','chains'].includes(orderView))lastSort=orderView;orderView=view}else if(['group','chains'].includes(orderView))orderView=lastSort;$('order-choice').value=lastSort;taskView=view;syncThen();syncViewControls();if(view==='focus')dependencyFocus=null;selectedLink=null;hoverTask=hoverKeep=null;expanded=null;
+ document.body.classList.toggle('focus-mode',view==='focus');$('board').classList.toggle('is-list',['list','group','chains'].includes(view));$('board').classList.toggle('is-focus',view==='focus');
+ for(const key of ['list','board','focus','chains','group'])$(key+'-view').setAttribute('aria-pressed',String(view===key));
  placeChat();render();}
+function syncViewControls(){document.querySelector('.order-choice').hidden=['group','chains','focus'].includes(taskView);for(const key of ['list','board','focus','chains','group'])$(key+'-view').setAttribute('aria-pressed',String(taskView===key))}
+$('chains-view').onclick=()=>setTaskView('chains');$('group-view').onclick=()=>setTaskView('group');syncViewControls();
 $('list-view').onclick=()=>setTaskView('list');$('board-view').onclick=()=>setTaskView('board');$('focus-view').onclick=()=>setTaskView('focus');
 $('board').addEventListener('click',e=>{if(e.target.closest('[data-exit-focus]'))setTaskView('list')});
 $('group-filters').onclick=e=>{const rename=e.target.closest('[data-rename-group]');if(rename){renameGroup(rename.dataset.renameGroup,rename);return}if(e.target.closest('[data-more-groups]')){showGroups(e.target,true);return}const b=e.target.closest('[data-filter]');if(b&&b.dataset.filter!==groupFilter)setGroupFilter(b.dataset.filter)};
-$('order-choice').value=orderView;$('order-choice').onchange=()=>{orderView=$('order-choice').value;try{localStorage.setItem('day-attendant-order',orderView)}catch{}syncThen();render()};
+$('order-choice').value=['group','chains'].includes(orderView)?lastSort:orderView;$('order-choice').onchange=()=>{orderView=lastSort=$('order-choice').value;try{localStorage.setItem('day-attendant-order',orderView)}catch{}syncThen();render()};
 syncThen();$('order-then').onchange=()=>{orderThen=$('order-then').value;try{localStorage.setItem('day-attendant-order-then',orderThen)}catch{}syncThen();render()};
 $('order-note').onclick=e=>{if(e.target.closest('#order-then-reset')){orderThen='manual';try{localStorage.setItem('day-attendant-order-then',orderThen)}catch{}syncThen();render();$('order-then').focus();return}if(e.target.closest('#suggest-order'))safely(async()=>{await deliver('/api/suggestion',{});announceStatus(tr('suggestion_pending'))})};
 $('board').addEventListener('keydown',e=>{const handle=e.target.closest?.('.drag-handle');if(!handle||!['ArrowUp','ArrowDown'].includes(e.key)||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey)return;e.preventDefault();const ids=sectionIds(handle.closest('.task').dataset.section),from=ids.indexOf(handle.dataset.id),to=from+(e.key==='ArrowUp'?-1:1);if(to>=0&&to<ids.length&&placeOrder(handle.dataset.id,ids,to))announceStatus(tr('moved_to').replace('{n}',to+1).replace('{total}',ids.length))});
@@ -1475,7 +1479,7 @@ $('conversation-input').addEventListener('keydown',e=>{if(e.key!=='Enter'||e.isC
 $('connection-retry').onclick=()=>safely(()=>flow.refresh());
 flow=new RemoteFlow();
 document.addEventListener('day-anonymize-change',()=>{render();globalThis.dayDaily?.update(flow.snapshot());});
-$('locale-choice').value=locale;translateChrome();$('locale-choice').onchange=()=>{locale=$('locale-choice').value;try{localStorage.setItem('day-attendant-locale',locale)}catch{}translateChrome();refreshLabels();render();renderMessages(flow.snapshot().messages);renderReview(flow.snapshot());renderContextStatus(flow.snapshot());$('save-error').hidden=true;if(!globalThis.dayAnonymize?.active)safely(()=>deliver('/api/settings',{values:{locale}}));};
+$('locale-choice').value=locale;translateChrome();$('locale-choice').onchange=()=>{locale=$('locale-choice').value;try{localStorage.setItem('day-attendant-locale',locale)}catch{}translateChrome();refreshLabels();render();renderMessages(flow.snapshot().messages);renderReview(flow.snapshot());renderContextStatus(flow.snapshot());$('save-error').hidden=true;if(!globalThis.dayAnonymize?.active)safely(async()=>{await deliver('/api/settings',{values:{locale}});globalThis.dayDaily?.localeChanged?.()});};
 async function boot(){const token=new URLSearchParams(location.hash.slice(1)).get('session');if(token){await api('/api/session',{token});history.replaceState(null,'',location.pathname)}await flow.refresh();}
 addEventListener('hashchange',()=>{if(new URLSearchParams(location.hash.slice(1)).has('session'))safely(boot)});
 safely(boot);

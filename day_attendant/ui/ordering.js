@@ -49,7 +49,7 @@ function focus(tasks,now=Date.now()){
  const unlocks=t=>counts.get(t.id)||0;
  const rank=(a,b)=>(RANK[a.priority]??RANK.medium)-(RANK[b.priority]??RANK.medium)||cmp(a.due||'~',b.due||'~')||unlocks(b)-unlocks(a)||fallback(a,b);
  const available=open.filter(t=>!blocked(t)).sort(rank),active=available.filter(t=>t.state==='active').slice(0,2);
- return {active,next:available.filter(t=>t.state==='todo').slice(0,5-active.length),soon:open.filter(t=>t.state==='snoozed'&&t.until&&Date.parse(t.until)<=now+72*3600000).sort((a,b)=>cmp(a.until,b.until)||rank(a,b)).slice(0,2)};
+ const todo=available.filter(t=>t.state==='todo'),star=todo.filter(t=>t.nextUp);return {activeTotal:available.filter(t=>t.state==='active').length,active,next:[...star,...todo.filter(t=>!t.nextUp)].slice(0,5-active.length),soon:open.filter(t=>t.state==='snoozed'&&t.until&&Date.parse(t.until)<=now+72*3600000).sort((a,b)=>cmp(a.until,b.until)||rank(a,b)).slice(0,2)};
 }
 globalThis.dayOrdering={groups,key,focus,VIEWS,THEN,thenOptions,PRIORITIES,manualIds,arrange,move,place,adopt,hue};
 })();

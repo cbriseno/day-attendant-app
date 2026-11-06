@@ -39,7 +39,7 @@ selected timezone data need separate verification. Tool versions may be unknown.
 
 ## Anonymize mode
 
-Use **Anonymize** in the header (**Anonimizar** in Spanish) before a screenshot.
+Use **Anonymize** in Settings → Groups and support (**Anonimizar** in Spanish) before a screenshot.
 It starts off, remembers its state only in this tab's `sessionStorage`, and
 restores current real text when turned off. The tab title stays unchanged; there
 is no extra banner or lock icon.

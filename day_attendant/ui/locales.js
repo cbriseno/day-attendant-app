@@ -5,7 +5,7 @@ globalThis.dayTranslations = {
     "last_active_now": "active just now",
     "in_progress_now": "in progress now",
     "copy_unavailable": "Copy is unavailable in this browser.",
-    "groups_open": "# Groups",
+    "groups_open": "Groups",
     "palette": "Theme",
     "palette_grafito": "Graphite",
     "palette_papel": "Paper",
@@ -59,7 +59,6 @@ globalThis.dayTranslations = {
     "focus_empty": "Nothing needs attention right now. A good moment to rest or choose calmly.",
     "focus_all": "See all",
     "focus_rest": "When you finish one, the next moves up.",
-
     "snooze_until": "Snooze until",
     "snooze_in_1_hour": "In 1 hour",
     "snooze_in_3_hours": "In 3 hours",
@@ -67,7 +66,7 @@ globalThis.dayTranslations = {
     "snooze_in_2_days": "In 2 days",
     "snooze_in_1_week": "In 1 week",
     "snooze_after_deadline": "after the deadline",
-    "snooze_zone_note": "Times in {zone}",
+    "snooze_zone_note": "{zone}",
     "resume_now": "Resume now",
     "snoozed_until": "Snoozed until {time}",
     "today": "today",
@@ -133,13 +132,13 @@ globalThis.dayTranslations = {
     "today_24345a": "Today",
     "board": "Board",
     "before_applying": "Needs your decision",
-    "closed": "Closed ",
+    "closed": "Completed ",
     "local_pilot_persistent_synthetic_data": "Local pilot · persistent synthetic data",
     "reconnect": "Reconnect",
     "connecting": "Connecting…",
     "message_your_assistant": "Message your assistant",
     "send": "Send",
-    "cancel": "Cancel",
+    "cancel": "Back",
     "details": "Details",
     "estimated_remaining_effort_minutes": "Estimated remaining effort (minutes)",
     "retire_this_responsibility_it_will_be_kept_s": "Retire this responsibility? It will be kept separate from completed ones.",
@@ -152,7 +151,7 @@ globalThis.dayTranslations = {
     "available_time_minutes_optional": "Available time (minutes, optional)",
     "until_which_date_and_time": "Until which date and time",
     "i_need_rest_today": " I need rest today",
-    "leave_time_empty_if_you_have_not_estimated_i": "Leave time empty if you have not estimated it. It is not inferred from your calendar or card count.",
+    "leave_time_empty_if_you_have_not_estimated_i": "If you don’t know how much time you have, leave it empty.",
     "save_context": "Save context",
     "appearance": "Appearance",
     "my_responsibilities": "My responsibilities",
@@ -198,7 +197,7 @@ globalThis.dayTranslations = {
     "last_active_now": "activa ahora",
     "in_progress_now": "en curso ahora",
     "copy_unavailable": "Este navegador no permite copiar.",
-    "groups_open": "# Grupos",
+    "groups_open": "Grupos",
     "palette": "Tema",
     "palette_grafito": "Grafito",
     "palette_papel": "Papel",
@@ -227,8 +226,8 @@ globalThis.dayTranslations = {
     "group_renamed": "«{from}» ahora se llama «{group}».",
     "group_search_create": "Buscar o crear (Grupo/Sub)… Enter",
     "search_groups": "Buscar grupos",
-    "group_merge_hint": "{n} tarjetas se unirán en «{group}». Deshacer las puede separar.",
-    "group_rename_hint": "{n} tarjetas usarán «{group}», incluidas las cerradas.",
+    "group_merge_hint": "{n} tareas se unirán en «{group}». Deshacer las puede separar.",
+    "group_rename_hint": "{n} tareas usarán «{group}», incluidas las cerradas.",
     "save": "Guardar",
     "close": "Cerrar",
     "change_saved": "Cambio guardado",
@@ -238,7 +237,7 @@ globalThis.dayTranslations = {
     "use_group": "Usar {group}",
     "backup_created": "Respaldo verificado creado",
     "error_invalid_group": "Usa nombres de grupo de 1 a 120 caracteres en una sola línea.",
-    "error_undo_conflict": "El elemento cambió después de esa acción. No se sobrescribió nada.",
+    "error_undo_conflict": "La tarea cambió después de esa acción. No se sobrescribió nada.",
     "creation_now": "ahora",
     "creation_unknown": "Fecha de creación desconocida",
     "focus_view": "Enfoque",
@@ -252,7 +251,6 @@ globalThis.dayTranslations = {
     "focus_empty": "Nada urgente por ahora. Buen momento para descansar o elegir algo con calma.",
     "focus_all": "Ver todo",
     "focus_rest": "Cuando termines una, sube la siguiente.",
-
     "snooze_until": "Posponer hasta",
     "snooze_in_1_hour": "En 1 hora",
     "snooze_in_3_hours": "En 3 horas",
@@ -260,7 +258,7 @@ globalThis.dayTranslations = {
     "snooze_in_2_days": "En 2 días",
     "snooze_in_1_week": "En 1 semana",
     "snooze_after_deadline": "después del vencimiento",
-    "snooze_zone_note": "Horas en {zone}",
+    "snooze_zone_note": "{zone}",
     "resume_now": "Retomar ahora",
     "snoozed_until": "Pospuesta hasta {time}",
     "today": "hoy",
@@ -280,7 +278,7 @@ globalThis.dayTranslations = {
     "my_context": "Mi contexto",
     "active": "En curso",
     "to_do": "Por atender",
-    "snoozed": "Pospuesto",
+    "snoozed": "Pospuestas",
     "completed": "Terminada",
     "retired": "Retirada",
     "1_pending_change": "1 cambio pendiente",
@@ -295,7 +293,7 @@ globalThis.dayTranslations = {
     "this_is_not_an_approval_retry_leave_it_pendi": "<p class=\"decision-alternative\">Esto no equivale a una aprobación. Puedes reintentar, dejarlo pendiente o continuar expresamente con la información disponible.</p>",
     "change_undone": "Cambio deshecho",
     "a_pending_change_needs_review": "Un cambio espera tu decisión.",
-    "the_pending_change_was_discarded_the_respons": "Se descartó el cambio pendiente. La responsabilidad conserva su estado.",
+    "the_pending_change_was_discarded_the_respons": "Se descartó el cambio pendiente. La tarea conserva su estado.",
     "there_are_no_new_changes_to_apply": "No hay cambios nuevos que aplicar.",
     "state": "Estado",
     "priority": "Prioridad",
@@ -304,7 +302,7 @@ globalThis.dayTranslations = {
     "resume_b3bd0b": "Retomar",
     "time_zone": "Zona",
     "the_review_changed_read_the_current_state": "La revisión cambió. Consulta el estado actual.",
-    "change_canceled_the_responsibility_keeps_its": "Cambio cancelado. La responsabilidad conserva su estado.",
+    "change_canceled_the_responsibility_keeps_its": "Cambio cancelado. La tarea conserva su estado.",
     "provide_an_unambiguous_local_date_and_time_f": "Indica una fecha y una hora local inequívocas para esa disponibilidad.",
     "choose_an_unambiguous_local_date_and_time": "Elige una fecha y hora local inequívoca.",
     "confirming_date": "Confirmando esta fecha…",
@@ -326,16 +324,16 @@ globalThis.dayTranslations = {
     "today_24345a": "Hoy",
     "board": "Tablero",
     "before_applying": "Necesita tu decisión",
-    "closed": "Cerradas ",
+    "closed": "Terminadas ",
     "local_pilot_persistent_synthetic_data": "Piloto local · datos ficticios persistentes",
     "reconnect": "Reconectar",
     "connecting": "Conectando…",
     "message_your_assistant": "Mensaje a tu asistente",
     "send": "Enviar",
-    "cancel": "Cancelar",
+    "cancel": "Volver",
     "details": "Detalle",
     "estimated_remaining_effort_minutes": "Tiempo restante estimado (minutos)",
-    "retire_this_responsibility_it_will_be_kept_s": "¿Retirar esta responsabilidad? Se conservará separada de las terminadas.",
+    "retire_this_responsibility_it_will_be_kept_s": "¿Retirar esta tarea? Se conservará separada de las terminadas.",
     "keep": "Conservar",
     "yes_retire": "Sí, retirar",
     "retire_7ad0e0": "Retirar…",
@@ -345,10 +343,10 @@ globalThis.dayTranslations = {
     "available_time_minutes_optional": "Tiempo disponible (minutos, opcional)",
     "until_which_date_and_time": "Hasta qué fecha y hora",
     "i_need_rest_today": " Hoy necesito descansar",
-    "leave_time_empty_if_you_have_not_estimated_i": "Deja el tiempo vacío si no lo has estimado. No se deduce de tu agenda ni del número de tarjetas.",
+    "leave_time_empty_if_you_have_not_estimated_i": "Si no sabes cuánto tiempo tienes, déjalo vacío.",
     "save_context": "Guardar contexto",
     "appearance": "Apariencia",
-    "my_responsibilities": "Mis responsabilidades",
+    "my_responsibilities": "Mis tareas",
     "task_view": "Vista de tareas",
     "collapse_chat": "Contraer chat",
     "conversation_with_your_assistant": "Conversación con tu asistente",
@@ -362,14 +360,14 @@ globalThis.dayTranslations = {
     "error_agent_unavailable": "El asistente no está disponible. Tus cambios se siguen guardando al instante.",
     "error_invalid_context": "Revisa los minutos disponibles, el final de la ventana y la declaración de descanso.",
     "error_invalid_estimate": "Usa minutos restantes no negativos o deja vacía la estimación.",
-    "error_not_actionable": "Esta responsabilidad está cerrada, pospuesta o depende de otra pendiente.",
+    "error_not_actionable": "Esta tarea está cerrada, pospuesta o depende de otra pendiente.",
     "error_past_snooze": "Elige una hora futura para retomar.",
     "error_undo_unavailable": "Deshacer no está disponible para este cambio.",
     "error_proposal_not_ready": "Esta propuesta no está lista. Consulta su estado actual.",
     "error_invalid_request": "Revisa la acción y sus campos.",
     "error_idempotency_conflict": "Esta clave de solicitud ya identifica otro contenido.",
     "error_task_upgrade_required": "Urgente aún no está disponible en este perfil. Reinicia el asistente para activarlo; no se cambió nada.",
-    "risk_after_due": "Retomarías después del vencimiento registrado. Posponer conserva ese compromiso.",
+    "risk_after_due": "Retomarías después del vencimiento registrado. Posponer conserva ese vencimiento.",
     "risk_capacity": "Los frentes de esta ventana suman {required} minutos estimados frente a un máximo de {possible} disponibles. Puede haber avances sin registrar.",
     "language": "Idioma",
     "retry_reply": "Reintentar respuesta",
@@ -389,13 +387,13 @@ globalThis.dayTranslations = {
 };
 
 Object.assign(globalThis.dayTranslations.en,{
- blocked_prefix:'Blocked · ',blocks_prefix:'Blocks · ',show_dependencies:'Highlight dependencies',dependency_prerequisite:'Prerequisite',dependency_dependent:'Depends on it',declared_context_for_this_profile:'Declared context for this profile',
+ blocked_prefix:"Waits for · ",blocks_prefix:"Unblocks · ",show_dependencies:'Highlight dependencies',dependency_prerequisite:"Goes before",dependency_dependent:"Goes after",declared_context_for_this_profile:'Declared context for this profile',
  dependency_update:'Prerequisites',related_update:'Related responsibilities',provenance_update:'Source',event_add:'New commitment',event_update:'Edit commitment',event_cancel:'Cancel commitment',event_canceled:'Commitment canceled',
  phase_ready:'Ready to save',phase_admitted:'Saving; check recovery',phase_applied:'Saved',phase_unchanged:'Unchanged',phase_review:'Needs review',phase_unavailable:'Review incomplete',phase_stale:'Context changed',phase_evaluating:'Saving',phase_canceled:'Canceled',phase_invalid:'Invalid',phase_superseded:'Replaced'
 });
 Object.assign(globalThis.dayTranslations.es,{
- blocked_prefix:'Bloqueada · ',blocks_prefix:'Bloquea · ',show_dependencies:'Resaltar dependencias',dependency_prerequisite:'Requisito',dependency_dependent:'Depende de esta',declared_context_for_this_profile:'Contexto declarado para este perfil',
- dependency_update:'Requisitos',related_update:'Responsabilidades relacionadas',provenance_update:'Origen',event_add:'Nuevo compromiso',event_update:'Editar compromiso',event_cancel:'Cancelar compromiso',event_canceled:'Compromiso cancelado',
+ blocked_prefix:"Espera a · ",blocks_prefix:"Destraba · ",show_dependencies:'Resaltar dependencias',dependency_prerequisite:"Va antes",dependency_dependent:"Va después",declared_context_for_this_profile:'Contexto declarado para este perfil',
+ dependency_update:'Requisitos',related_update:"Tareas relacionadas",provenance_update:'Origen',event_add:'Nueva cita',event_update:'Editar cita',event_cancel:'Cancelar cita',event_canceled:'Cita cancelada',
  phase_ready:'Lista para guardar',phase_admitted:'Guardando; revisa recuperación',phase_applied:'Guardado',phase_unchanged:'Sin cambios',phase_review:'Requiere revisión',phase_unavailable:'Revisión incompleta',phase_stale:'Cambió el contexto',phase_evaluating:'Guardando',phase_canceled:'Cancelado',phase_invalid:'Inválido',phase_superseded:'Reemplazado'
 });
 
@@ -404,7 +402,7 @@ globalThis.dayTranslations.en.reopen="Reopen";globalThis.dayTranslations.es.reop
 globalThis.dayTranslations.en.agent_temporarily_unavailable="The selected assistant is unavailable. Known-data reminders still work.";globalThis.dayTranslations.es.agent_temporarily_unavailable="El asistente seleccionado no está disponible. Los recordatorios de datos guardados siguen funcionando.";
 
 Object.assign(globalThis.dayTranslations.en,{new_conversation:"New conversation",new_conversation_hint:"Start a new conversation (/clear). Tasks, calendar and context stay; earlier messages stay saved locally and are no longer sent.",attach_images:"Attach images",error_chat_busy:"Wait for the current reply before starting a new conversation.",error_agent_effort_unavailable:"The selected model does not offer this reasoning level. Choose another level."});
-Object.assign(globalThis.dayTranslations.es,{new_conversation:"Nueva conversación",new_conversation_hint:"Empieza una conversación nueva (/clear). Tareas, agenda y contexto se quedan; los mensajes anteriores quedan guardados localmente y ya no se envían.",attach_images:"Adjuntar imágenes",error_chat_busy:"Espera la respuesta actual antes de empezar una conversación nueva.",error_agent_effort_unavailable:"El modelo elegido no ofrece este nivel de razonamiento. Elige otro nivel."});
+Object.assign(globalThis.dayTranslations.es,{new_conversation:"Nueva conversación",new_conversation_hint:"Empieza una conversación nueva (/clear). Tareas, agenda y contexto se quedan; los mensajes anteriores quedan guardados localmente y ya no se envían.",attach_images:"Adjuntar",error_chat_busy:"Espera la respuesta actual antes de empezar una conversación nueva.",error_agent_effort_unavailable:"El modelo elegido no ofrece este nivel de razonamiento. Elige otro nivel."});
 Object.assign(globalThis.dayTranslations.en,{enter_to_send:"Enter to send · Shift+Enter for a new line",context_no_data:"Context: no data",context_window_status:"Context {used} / {window} · {free} free",context_used_no_window:"Context {used} used · window not reported",context_status_hint:"Reported by the assistant's harness for its latest reply in this conversation. Your next message adds to it; /clear starts over."});
 Object.assign(globalThis.dayTranslations.es,{enter_to_send:"Enter para enviar · Mayús+Enter para nueva línea",context_no_data:"Contexto: sin datos",context_window_status:"Contexto {used} / {window} · {free} libre",context_used_no_window:"Contexto {used} usado · ventana no informada",context_status_hint:"Lo informa el harness del asistente en su respuesta más reciente de esta conversación. Tu siguiente mensaje lo aumenta; /clear empieza de nuevo."});
 
@@ -472,17 +470,17 @@ Object.assign(globalThis.dayTranslations.es,{
  receipt_wait_insufficient_change:'aún no se aplicó: el asistente necesitaba una aclaración. Revisa «Necesita tu decisión».',
  receipt_wait_review:'aún no se creó: espera tu confirmación en «Necesita tu decisión».',
  receipt_wait_review_change:'aún no se aplicó: retirar espera tu confirmación en «Necesita tu decisión».',
- receipt_wait_stale:'aún no se creó: la responsabilidad cambió. Decide de nuevo en «Necesita tu decisión».',
- receipt_wait_stale_change:'aún no se aplicó: la responsabilidad cambió. Decide de nuevo en «Necesita tu decisión».',
+ receipt_wait_stale:'aún no se creó: la tarea cambió. Decide de nuevo en «Necesita tu decisión».',
+ receipt_wait_stale_change:'aún no se aplicó: la tarea cambió. Decide de nuevo en «Necesita tu decisión».',
  receipt_wait_invalid:'no se creó: no se pudo aplicar como lo pediste. Revisa «Necesita tu decisión».',receipt_wait_invalid_change:'no se aplicó: no se pudo aplicar como lo pediste. Revisa «Necesita tu decisión».',
  chat_incomplete:'No se pudo completar la respuesta.',chat_failed_generic:'Un error técnico la detuvo.',error_agent_interrupted:'Se interrumpió el turno del asistente.',error_attachment_corrupt:'Falta una imagen seleccionada o está dañada.',chat_incomplete_saved_nothing:'No se guardó nada de ella. Reintenta la respuesta o escríbelo de nuevo.',
  chat_restart_interrupted:'Un reinicio interrumpió la respuesta. Reintenta; cualquier cambio que ya haya propuesto conserva su propio estado.',
  chat_response_interrupted:'Un mantenimiento, una restauración o un cambio de configuración interrumpió la respuesta. Reintenta; cualquier cambio que ya haya propuesto conserva su propio estado.',
  chat_state_changed:'Tus tareas cambiaron mientras respondía. Vuelve a preguntar para usar el estado actual.',
  chat_existing_proposals:'Esta solicitud ya tiene cambios propuestos. Revisa su estado actual; no se enviaron otra vez.',
- context_notice_pending:'Tu corrección se guardó. Los compromisos activos ahora superan la ventana declarada; el asistente está preparando una orientación.',
+ context_notice_pending:'Tu corrección se guardó. Las tareas activas ahora superan la ventana declarada; el asistente está preparando una orientación.',
  context_notice_incomplete:'Tu corrección se guardó. No se pudo completar la orientación del asistente.',
- context_notice_stale:'El contexto cambió mientras se preparaba esta orientación. Consulta los compromisos actuales.',
+ context_notice_stale:'El contexto cambió mientras se preparaba esta orientación. Consulta las tareas actuales.',
  error_decision_required:'Una consecuencia requiere tu decisión antes de aplicar este cambio.',
  error_already_admitted:'Este cambio ya se está aplicando. Revisa su resultado; usa Deshacer si hace falta.',
  error_recovery_required:'Un cambio interrumpido requiere recuperación. Abre la vista de recuperación antes de continuar.',
@@ -550,7 +548,7 @@ Object.assign(globalThis.dayTranslations.es,{
  toast_ms:'{ms} ms',toast_reviewed_later:'el asistente lo revisa en segundo plano',instant_footer:'Los cambios se guardan al instante; el asistente revisa después, sin detenerte.',
  agent_reviewing:'Revisando tus cambios…',agent_pending:'{n} cambios por revisar',agent_pending_one:'1 cambio por revisar',agent_up_to_date:'Al día',
  review_strip_offline:'Todo guardado. El asistente no está disponible, así que nada se está revisando.',review_strip_running:'Revisando en segundo plano; tus cambios ya están guardados.',
- review_strip_waiting:'Guardado. Reviso cuando dejes de moverte ({n}).',review_strip_incomplete:'Todo guardado. El asistente no pudo revisar los últimos cambios.',
+ review_strip_waiting:"Guardado. Lo reviso cuando hagas una pausa ({n} cambios).",review_strip_incomplete:'Todo guardado. El asistente no pudo revisar los últimos cambios.',
  review_strip_done:'Todo guardado · revisado {time}',review_strip_saved:'Todo guardado',
  suggestion_mark_label:'Sugerencia del asistente',suggestion_mark_title:'El asistente notó algo',suggestion_prefix:'Sugerencia:',suggestion_dismiss:'Ignorar',
  suggestion_log_prefix:'Marqué',suggestion_handled:'atendida',
@@ -560,22 +558,22 @@ Object.assign(globalThis.dayTranslations.es,{
  suggest_do_start:'Iniciar ahora',suggest_do_start_other:'Iniciar «{title}»',suggest_do_todo:'Regresar a Por atender',suggest_do_snooze:'Retomar {time}',
  suggest_do_unlink:'Quitar este requisito',suggest_do_priority:'Prioridad: {priority}',suggest_do_due:'Vence {time}',
  undo_message_change:'Deshacer este cambio',undo_message_changes:'Deshacer estos cambios',changes_undone:'Cambios deshechos',
- error_dependency_cycle:'Rechazado: ese vínculo haría un ciclo de requisitos.',error_invalid_uuid:'Rechazado: ese identificador de responsabilidad no es válido.',
- error_task_not_found:'Rechazado: esa responsabilidad no existe.',error_invalid_dependencies:'Rechazado: los requisitos deben ser responsabilidades existentes.',
- error_invalid_relations:'Rechazado: una responsabilidad no puede relacionarse consigo misma ni con una que no existe.',error_terminal_task:'Esta responsabilidad ya está cerrada.',
- error_invalid_title:'Usa un título de 1 a 500 caracteres.',error_empty_update:'No hay nada que cambiar.',error_not_closed:'Solo una responsabilidad terminada o retirada se puede reabrir.',
- error_invalid_event:'Un compromiso necesita título y un fin después de su inicio.',error_event_not_found:'Ese compromiso ya no existe.',
- error_external_conflict:'Algo fuera de Day Attendant cambió esta responsabilidad; no se sobrescribió nada.',
- error_suggestion_not_found:'Esa sugerencia ya no existe.',error_suggestion_closed:'Esa sugerencia ya se atendió.',error_suggestion_stale:'La responsabilidad cambió después de esta sugerencia.'});
+ error_dependency_cycle:'Rechazado: ese vínculo haría un ciclo de requisitos.',error_invalid_uuid:'Rechazado: ese identificador de tarea no es válido.',
+ error_task_not_found:'Rechazado: esa tarea no existe.',error_invalid_dependencies:'Rechazado: los requisitos deben ser tareas existentes.',
+ error_invalid_relations:'Rechazado: una tarea no puede relacionarse consigo misma ni con una que no existe.',error_terminal_task:'Esta tarea ya está cerrada.',
+ error_invalid_title:'Usa un título de 1 a 500 caracteres.',error_empty_update:'No hay nada que cambiar.',error_not_closed:'Solo una tarea terminada o retirada se puede reabrir.',
+ error_invalid_event:'Una cita necesita título y un fin después de su inicio.',error_event_not_found:'Esa cita ya no existe.',
+ error_external_conflict:'Algo fuera de Day Attendant cambió esta tarea; no se sobrescribió nada.',
+ error_suggestion_not_found:'Esa sugerencia ya no existe.',error_suggestion_closed:'Esa sugerencia ya se atendió.',error_suggestion_stale:'La tarea cambió después de esta sugerencia.'});
 // Compact rows and their one-level menus.
 Object.assign(globalThis.dayTranslations.en,{pause:'Pause',start_blocked:'It waits for its prerequisites',change_priority:'Change priority',
  more_actions:'More actions',more_actions_hint:'More actions (also right click or long press)',move_up:'Move up',move_down:'Move down',
  meta_due:'Due {time}',meta_overdue:'Was due {time}',meta_resumes:'Resumes {time}',meta_waiting:'Waiting for a reply',meta_remaining:'{n} min left',
- blocked_by_count:'Blocked by {n}',blocks_count:'Blocks {n}',pending_change_badge:'Pending change',lane_empty:'Nothing here.'});
+ blocked_by_count:"Waits for {n}",blocks_count:"Unblocks {n}",pending_change_badge:'Pending change',lane_empty:'Nothing here.'});
 Object.assign(globalThis.dayTranslations.es,{pause:'Pausar',start_blocked:'Espera a sus requisitos',change_priority:'Cambiar prioridad',
- more_actions:'Más acciones',more_actions_hint:'Más acciones (también clic derecho o presión larga)',move_up:'Subir',move_down:'Bajar',
+ more_actions:'Más acciones',more_actions_hint:'Más acciones (también clic derecho o presión larga)',move_up:"Mover arriba",move_down:"Mover abajo",
  meta_due:'Vence {time}',meta_overdue:'Venció {time}',meta_resumes:'Regresa {time}',meta_waiting:'En espera de respuesta',meta_remaining:'Faltan {n} min',
- blocked_by_count:'Bloqueada por {n}',blocks_count:'Bloquea {n}',pending_change_badge:'Cambio pendiente',lane_empty:'Nada aquí.'});
+ blocked_by_count:"Espera a {n}",blocks_count:"Destraba {n}",pending_change_badge:'Cambio pendiente',lane_empty:'Nada aquí.'});
 // Editing in the row and its expanded details.
 Object.assign(globalThis.dayTranslations.en,{edit_title:'Edit title',edit_title_hint:'Click to edit the title',title_edit_hint:'Enter saves · Esc cancels',
  change_group:'Change group',add_group:'Add a group',add_group_chip:'group',new_group:'New group',new_group_placeholder:'New group… Enter',
@@ -592,7 +590,7 @@ Object.assign(globalThis.dayTranslations.en,{edit_title:'Edit title',edit_title_
  value_yes:'yes',value_no:'no',value_empty:'(empty)',
  conflict_changed:'This changed somewhere else while you were typing. It now says: {value}. What you typed is still here.',conflict_keep_mine:'Save mine',conflict_use_current:'Use the current one'});
 Object.assign(globalThis.dayTranslations.es,{edit_title:'Editar título',edit_title_hint:'Clic para editar el título',title_edit_hint:'Enter guarda · Esc cancela',
- change_group:'Cambiar grupo',add_group:'Poner grupo',add_group_chip:'grupo',new_group:'Grupo nuevo',new_group_placeholder:'Grupo nuevo… Enter',
+ change_group:'Cambiar grupo',add_group:"Agregar este grupo",add_group_chip:'grupo',new_group:'Grupo nuevo',new_group_placeholder:'Grupo nuevo… Enter',
  change_deadline:'Cambiar vencimiento',set_deadline:'Poner vencimiento',due_today:'Hoy',due_tomorrow:'Mañana',due_friday:'Viernes',due_next_week:'En una semana',
  exact_deadline:'Vencimiento exacto, fecha y hora local',set:'Poner',remove_deadline:'Quitar vencimiento',
  more_details:'Más detalles',hide_details:'Ocultar detalles',close_details:'Cerrar detalles',duplicate:'Duplicar',
@@ -743,15 +741,15 @@ Object.assign(globalThis.dayTranslations.en,{
 });
 Object.assign(globalThis.dayTranslations.es,{
   "daily_c641536258": "Elige una fecha y hora local inequívoca.",
-  "daily_4a91d6da82": "Nuevo elemento",
+  "daily_4a91d6da82": "Nueva tarea",
   "daily_e00ac23f2a": "Tipo",
-  "daily_2550b1dcad": "Responsabilidad",
-  "daily_b95f485bf5": "Compromiso de agenda",
-  "daily_8f71959ca4": "Origen y hora de observación",
+  "daily_2550b1dcad": "Tarea",
+  "daily_b95f485bf5": "Cita en la agenda",
+  "daily_8f71959ca4": "¿De dónde salió? (opcional)",
   "daily_6da13addb0": "Origen",
   "daily_291a0a58df": "Llamada",
   "daily_be601df25e": "Investigación",
-  "daily_ff25fb790f": "La observación y la captura tienen horas separadas. Esto no abre ninguna bandeja.",
+  "daily_ff25fb790f": "Para recordar quién lo pidió y cuándo lo viste. No abre ningún correo ni chat.",
   "daily_9996af5999": "Escribe un título.",
   "daily_ad3c3e9e8e": "Elige el inicio y el fin.",
   "daily_28b99b54a4": "Esa fecha y hora no es inequívoca aquí. Elígela en Agregar con detalles.",
@@ -766,7 +764,7 @@ Object.assign(globalThis.dayTranslations.es,{
   "daily_1c34cc98bf": "Aplicación del asistente",
   "daily_68c2cc7f0c": "Modelo",
   "daily_6874c03787": "Nivel de razonamiento",
-  "daily_d13157cb0c": "Usa tu sesión de suscripción existente. Sin compras adicionales ni cambios automáticos de aplicación. Se guarda el modelo elegido. Las tarjetas conservan su idioma original.",
+  "daily_d13157cb0c": "Usa tu sesión de suscripción existente. Sin compras adicionales ni cambios automáticos de aplicación. Se guarda el modelo elegido. Las tareas conservan su idioma original.",
   "daily_88ad883d4c": "Recordatorios locales",
   "daily_73c69b1b29": "Entregar recordatorios locales",
   "daily_a3b96333fe": "Horario inicial: laborables 09:00–18:00. Es un valor de entrega, no una estimación de tu disponibilidad. Los recordatorios no llaman al asistente.",
@@ -795,7 +793,7 @@ Object.assign(globalThis.dayTranslations.es,{
   "daily_f6a34f2768": "Revisar recuperación: ",
   "daily_3f7cdad207": "Revisar operación interrumpida",
   "daily_93cdc37ee4": "Compara lo observado con el cambio previsto. Se crea un respaldo verificado antes de resolver. Conservar lo observado preserva cambios parciales o externos; no afirma que la acción original terminó.",
-  "daily_537c963567": "Adjuntar imágenes",
+  "daily_537c963567": "Adjuntar",
   "daily_e963907dac": "Quitar",
   "daily_f4314e5483": "Indica al asistente qué capturar de estas imágenes.",
   "daily_64fbd995d3": "Cambio",
@@ -810,8 +808,8 @@ Object.assign(globalThis.dayTranslations.es,{
   "daily_5a9ce773f4": "Un recordatorio local falló o tiene un resultado incierto. Revisa el diagnóstico de entrega.",
   "daily_e8d5e4fb5d": "La última revisión programada requiere atención.",
   "daily_ed54f97283": "Abrir diagnóstico",
-  "daily_4342720ce3": "Compromisos de agenda",
-  "daily_b910be6fd3": "No hay compromisos próximos guardados.",
+  "daily_4342720ce3": "Citas en la agenda",
+  "daily_b910be6fd3": "No hay citas próximas guardadas.",
   "daily_768e0c1c69": "Título",
   "daily_46588ea318": "Vencimiento (opcional)",
   "daily_fc612a2fcc": "Inicio",
@@ -821,11 +819,11 @@ Object.assign(globalThis.dayTranslations.es,{
   "daily_97844eb51c": "Observado el (opcional)",
   "daily_77574766df": "Nombre del perfil",
   "daily_d1f7dc891b": "Zona horaria",
-  "daily_3f66052a10": "Desde",
-  "daily_96bdb66ba4": "Hasta",
-  "daily_248ddd1447": "Silencio desde",
-  "daily_f0448c3b89": "Silencio hasta",
-  "daily_e8957f9619": "Revisar cada (minutos)",
+  "daily_3f66052a10": "Avisar desde",
+  "daily_96bdb66ba4": "Avisar hasta",
+  "daily_248ddd1447": "Sin avisos desde",
+  "daily_f0448c3b89": "Sin avisos hasta",
+  "daily_e8957f9619": "Revisar avisos cada (minutos)",
   "daily_7e738ef3d1": "Repetir sin cambios tras (minutos)",
   "daily_c1673affd4": "Máximo de intentos de aviso / día",
   "daily_15c063aef3": "Pausar hasta (opcional)",
@@ -850,8 +848,8 @@ Object.assign(globalThis.dayTranslations.es,{next_up:"Lo que sigue",next_up_mark
 Object.assign(globalThis.dayTranslations.en,{checklist_label:"Checklist",checklist_add:"Add a step… (Enter)",checklist_add_more:"Add another step… (Enter)",checklist_open:"Open the checklist",checklist_progress_aria:"Checklist: {done} of {n} done",checklist_drag:"Drag to reorder (or Alt+↑/↓)",checklist_edit_hint:"Double-click or F2 to edit",checklist_edit_aria:"Edit step",checklist_remove:"Remove step",checklist_removed:"Step removed. Undo brings it back.",checklist_convert:"Make it a task",checklist_convert_title:"«{title}» as its own task",checklist_convert_plain:"Separate task (same group and priority)",checklist_convert_dep:"Separate task this one waits for",checklist_converted:"«{title}» is now its own task.",checklist_converted_dep:"«{title}» is now its own task, and this one waits for it.",checklist_all_done:"Every step is checked. Finish the task?",checklist_done_confirm:"{left} of {n} steps are still open. Finish it anyway?",checklist_done_anyway:"Finish anyway"});
 Object.assign(globalThis.dayTranslations.es,{checklist_label:"Lista",checklist_add:"Agrega un paso… (Enter)",checklist_add_more:"Agrega otro paso… (Enter)",checklist_open:"Abrir la lista",checklist_progress_aria:"Lista: {done} de {n} hechos",checklist_drag:"Arrastra para reordenar (o Alt+↑/↓)",checklist_edit_hint:"Doble clic o F2 para editar",checklist_edit_aria:"Editar paso",checklist_remove:"Quitar paso",checklist_removed:"Paso quitado. Deshacer lo regresa.",checklist_convert:"Convertir en tarea",checklist_convert_title:"«{title}» como tarea aparte",checklist_convert_plain:"Tarea aparte (mismo grupo y prioridad)",checklist_convert_dep:"Tarea aparte que esta espera",checklist_converted:"«{title}» ya es una tarea aparte.",checklist_converted_dep:"«{title}» ya es una tarea aparte, y esta la espera.",checklist_all_done:"Ya marcaste todos los pasos. ¿Terminar la tarea?",checklist_done_confirm:"Quedan {left} de {n} pasos sin marcar. ¿Terminarla igual?",checklist_done_anyway:"Terminar igual"});
 // #43 Manual blocks: an outside reason, shown beside dependency blocks with the same «Blocked» language.
-Object.assign(globalThis.dayTranslations.en,{lane_blocked:'Blocked',block_changed:'Block',lane_blocked_empty:'Nothing blocked.',block_word:'Blocked',block_chip_label:'Blocked: {reason}',block_since:'for {time}',block_since_now:'just now',block_since_full:'Blocked {time}. Empty the field to unblock.',block_hint:'What is stopping it outside the app (a reply, a decision, a missing thing). Empty means not blocked.',block_mark:'Mark as blocked…',block_edit:'Edit block reason',block_clear:'Unblock',block_save:'Block',block_reason_label:'Blocked because',block_placeholder:'What is it waiting on?',block_idea_reply:'Waiting for a reply',block_idea_decision:'Waiting for a decision',block_idea_info:'Missing information or material',block_need_reason:'Write why it is blocked.',block_too_long:'Keep the reason under 200 characters.',block_done_confirm:'It is blocked: «{reason}». Finish it anyway?',block_done_anyway:'Finish anyway',block_announce:'«{title}» blocked: {reason}',block_announce_clear:'«{title}» is no longer blocked.'});
-Object.assign(globalThis.dayTranslations.es,{lane_blocked:'Bloqueadas',block_changed:'Bloqueo',lane_blocked_empty:'Nada bloqueado.',block_word:'Bloqueada',block_chip_label:'Bloqueada: {reason}',block_since:'hace {time}',block_since_now:'recién',block_since_full:'Bloqueada {time}. Vacía el campo para desbloquearla.',block_hint:'Lo que la detiene fuera de la app (una respuesta, una decisión, algo que falta). Vacío = no está bloqueada.',block_mark:'Marcar como bloqueada…',block_edit:'Editar motivo del bloqueo',block_clear:'Quitar bloqueo',block_save:'Bloquear',block_reason_label:'Bloqueada porque',block_placeholder:'¿Qué está esperando?',block_idea_reply:'Esperando respuesta',block_idea_decision:'Esperando una decisión',block_idea_info:'Falta información o material',block_need_reason:'Escribe por qué está bloqueada.',block_too_long:'Usa menos de 200 caracteres.',block_done_confirm:'Está bloqueada: «{reason}». ¿Terminarla igual?',block_done_anyway:'Terminar igual',block_announce:'«{title}» bloqueada: {reason}',block_announce_clear:'«{title}» ya no está bloqueada.'});
+Object.assign(globalThis.dayTranslations.en,{lane_blocked:"Blocked or waiting",block_changed:'Block',lane_blocked_empty:'Nothing blocked.',block_word:'Blocked',block_chip_label:'Blocked: {reason}',block_since:'for {time}',block_since_now:'just now',block_since_full:'Blocked {time}. Empty the field to unblock.',block_hint:'What is stopping it outside the app (a reply, a decision, a missing thing). Empty means not blocked.',block_mark:'Mark as blocked…',block_edit:'Edit block reason',block_clear:'Unblock',block_save:'Block',block_reason_label:'Blocked because',block_placeholder:'What is it waiting on?',block_idea_reply:'Waiting for a reply',block_idea_decision:'Waiting for a decision',block_idea_info:'Missing information or material',block_need_reason:'Write why it is blocked.',block_too_long:'Keep the reason under 200 characters.',block_done_confirm:'It is blocked: «{reason}». Finish it anyway?',block_done_anyway:'Finish anyway',block_announce:'«{title}» blocked: {reason}',block_announce_clear:'«{title}» is no longer blocked.'});
+Object.assign(globalThis.dayTranslations.es,{lane_blocked:"Bloqueadas o en espera",block_changed:'Bloqueo',lane_blocked_empty:'Nada bloqueado.',block_word:'Bloqueada',block_chip_label:'Bloqueada: {reason}',block_since:'hace {time}',block_since_now:'recién',block_since_full:'Bloqueada {time}. Vacía el campo para desbloquearla.',block_hint:'Lo que la detiene fuera de la app (una respuesta, una decisión, algo que falta). Vacío = no está bloqueada.',block_mark:'Marcar como bloqueada…',block_edit:'Editar motivo del bloqueo',block_clear:'Quitar bloqueo',block_save:'Bloquear',block_reason_label:'Bloqueada porque',block_placeholder:'¿Qué está esperando?',block_idea_reply:'Esperando respuesta',block_idea_decision:'Esperando una decisión',block_idea_info:'Falta información o material',block_need_reason:'Escribe por qué está bloqueada.',block_too_long:'Usa menos de 200 caracteres.',block_done_confirm:'Está bloqueada: «{reason}». ¿Terminarla igual?',block_done_anyway:'Terminar igual',block_announce:'«{title}» bloqueada: {reason}',block_announce_clear:'«{title}» ya no está bloqueada.'});
 
 
 // #41 repetition, reminders and notification kinds
@@ -861,7 +859,7 @@ Object.assign(globalThis.dayTranslations.en,{section_add_in:'Add a task in {grou
 Object.assign(globalThis.dayTranslations.es,{section_add_in:'Agregar tarea en {group}',section_title:'Tarea',section_keys:'Enter para agregar · Ctrl+Enter para nueva línea · Esc para cancelar',section_submit:'Agregar tarea'});
 
 Object.assign(globalThis.dayTranslations.en,{attach_files:'Attach images or files',remove_file:'Remove {name}',file_too_large:'Files may be at most 20 MB.',files_uploading:'Wait for files to finish uploading.'});
-Object.assign(globalThis.dayTranslations.es,{attach_files:'Adjuntar imágenes o archivos',remove_file:'Quitar {name}',file_too_large:'Los archivos pueden tener hasta 20 MB.',files_uploading:'Espera a que terminen de cargarse los archivos.'});
+Object.assign(globalThis.dayTranslations.es,{attach_files:"Adjuntar",remove_file:'Quitar {name}',file_too_large:'Los archivos pueden tener hasta 20 MB.',files_uploading:'Espera a que terminen de cargarse los archivos.'});
 
 Object.assign(globalThis.dayTranslations.en,{format_text:'Format text',format_bold:'Bold',format_italic:'Italic',format_link:'Link',link_text:'Text',link_address:'Address',invalid_link:'Enter an HTTP or HTTPS address.'});
 Object.assign(globalThis.dayTranslations.es,{format_text:'Dar formato',format_bold:'Negrita',format_italic:'Cursiva',format_link:'Enlace',link_text:'Texto',link_address:'Dirección',invalid_link:'Escribe una dirección HTTP o HTTPS.'});
@@ -877,16 +875,54 @@ Object.assign(globalThis.dayTranslations.es,{assistant_notes:'Notas del asistent
 
 Object.assign(globalThis.dayTranslations.en,{skip_organize:'Do not organize this capture',auto_organize:'Organize my captures automatically',organize_history:'Assistant history',organize_count:'Organized · {n}',organize_notice:'I organized your idea · {tasks} tasks',organize_view:'View',organize_undo:'Undo',organize_undone:'Undone',organize_empty:'No organized captures yet.',organize_summary:'{tasks} tasks · {dependencies} dependencies',organize_changed:'Some tasks were changed',organize_partial_explain:'Keep changed tasks and undo only the untouched ones?',organize_partial:'Undo untouched tasks'});
 Object.assign(globalThis.dayTranslations.es,{skip_organize:'No organizar esta captura',auto_organize:'Organizar mis capturas automáticamente',organize_history:'Historial del asistente',organize_count:'Organizadas · {n}',organize_notice:'Organicé tu idea · {tasks} tareas',organize_view:'Ver',organize_undo:'Deshacer',organize_undone:'Deshecha',organize_empty:'Todavía no hay capturas organizadas.',organize_summary:'{tasks} tareas · {dependencies} dependencias',organize_changed:'Algunas tareas cambiaron',organize_partial_explain:'¿Conservar las tareas modificadas y deshacer solo las que no se tocaron?',organize_partial:'Deshacer solo lo no tocado'});
-Object.assign(globalThis.dayTranslations.en,{canceled_section:'Canceled ',canceled_task:'Canceled',cancel_task_action:'Cancel task…',cancel_reason_optional:'Reason (optional)',cancel_reason:'Reason',reactivate:'Reactivate',canceled_empty:'No canceled tasks.'});
-Object.assign(globalThis.dayTranslations.es,{canceled_section:'Canceladas ',canceled_task:'Cancelada',cancel_task_action:'Cancelar tarea…',cancel_reason_optional:'Motivo (opcional)',cancel_reason:'Motivo',reactivate:'Reactivar',canceled_empty:'No hay tareas canceladas.'});
+Object.assign(globalThis.dayTranslations.en,{canceled_section:'Canceled ',canceled_task:'Canceled',cancel_task_action:'Cancel task…',cancel_reason_optional:'Reason (optional)',cancel_reason:'Reason',reactivate:"Reopen",canceled_empty:'No canceled tasks.'});
+Object.assign(globalThis.dayTranslations.es,{canceled_section:'Canceladas ',canceled_task:"Cancelada",cancel_task_action:'Cancelar tarea…',cancel_reason_optional:'Motivo (opcional)',cancel_reason:'Motivo',reactivate:"Reabrir",canceled_empty:'No hay tareas canceladas.'});
 
 Object.assign(globalThis.dayTranslations.en,{"section_add_in": "Add a task in {group}", "section_add_title": "New task", "section_add_button": "Add", "section_add_placeholder": "What do you need to do?", "section_add_keys": "Enter adds · Ctrl+Enter new line · Esc cancels", "capture_options": "New task options", "capture_priority_title": "Priority of the new task", "capture_priority_label": "Priority: {p}. Change", "capture_groups_title": "Categories of the new task", "capture_groups_label": "Categories: {g}. Change", "capture_groups_none_found": "No matches. Enter creates it.", "section_add_empty": "Write a title first, or press Esc.", "section_add_done": "Added in {group}. Write the next one or press Esc.", "attachments_update": "Attachments", "edit_title_hint": "Double-click or F2 to edit", "title_edit_hint": "Enter saves · Esc cancels · select text to format it", "title_format": "Title format", "title_bold": "Bold", "title_italic": "Italic", "title_link": "Link", "title_link_add": "Add link", "title_link_edit": "Edit link", "title_link_remove": "Remove link", "title_link_open": "Open link", "title_link_text": "Text", "title_link_url": "Address", "title_link_bad_url": "Write a web address (https://…) or an email.", "attach_files": "Attach images or files", "attachments_label": "Attachments", "attachments_none": "Nothing attached yet.", "attachments_hint": "You can also paste or drop images in the title.", "attachment_view": "View image: {name}", "attachment_download": "Download", "attachment_remove": "Remove attachment", "attachments_more": "{n} more attachments", "attachment_pasted": "pasted-image.png", "attachments_uploading": "Uploading…", "attachments_added": "{n} attached.", "attachments_pending_hint": "Attached when you add the task", "attachment_prev": "Previous image", "attachment_next": "Next image", "attachment_close": "Close"});
 
-Object.assign(globalThis.dayTranslations.es,{"section_add_in": "Agregar tarea en {group}", "section_add_title": "Nueva tarea", "section_add_button": "Agregar", "section_add_placeholder": "¿Qué tienes que hacer?", "section_add_keys": "Enter agrega · Ctrl+Enter nueva línea · Esc cancela", "capture_options": "Opciones de la tarea nueva", "capture_priority_title": "Prioridad de la tarea nueva", "capture_priority_label": "Prioridad: {p}. Cambiar", "capture_groups_title": "Categorías de la tarea nueva", "capture_groups_label": "Categorías: {g}. Cambiar", "capture_groups_none_found": "No hay coincidencias. Enter la crea.", "section_add_empty": "Escribe un título o pulsa Esc.", "section_add_done": "Agregada en {group}. Escribe otra o pulsa Esc.", "attachments_update": "Adjuntos", "edit_title_hint": "Doble clic o F2 para editar", "title_edit_hint": "Enter guarda · Esc cancela · selecciona texto para darle formato", "title_format": "Formato del título", "title_bold": "Negrita", "title_italic": "Cursiva", "title_link": "Enlace", "title_link_add": "Agregar enlace", "title_link_edit": "Editar enlace", "title_link_remove": "Quitar enlace", "title_link_open": "Abrir enlace", "title_link_text": "Texto", "title_link_url": "Dirección", "title_link_bad_url": "Escribe una dirección web (https://…) o un correo.", "attach_files": "Adjuntar imágenes o archivos", "attachments_label": "Adjuntos", "attachments_none": "Todavía no hay adjuntos.", "attachments_hint": "También puedes pegar o soltar imágenes en el título.", "attachment_view": "Ver imagen: {name}", "attachment_download": "Descargar", "attachment_remove": "Quitar adjunto", "attachments_more": "{n} adjuntos más", "attachment_pasted": "imagen-pegada.png", "attachments_uploading": "Subiendo…", "attachments_added": "{n} adjunto(s) listo(s).", "attachments_pending_hint": "Se adjuntan al agregar la tarea", "attachment_prev": "Imagen anterior", "attachment_next": "Imagen siguiente", "attachment_close": "Cerrar"});
+Object.assign(globalThis.dayTranslations.es,{"section_add_in": "Agregar tarea en {group}", "section_add_title": "Nueva tarea", "section_add_button": "Agregar", "section_add_placeholder": "¿Qué tienes que hacer?", "section_add_keys": "Enter agrega · Ctrl+Enter nueva línea · Esc cancela", "capture_options": "Opciones de la tarea nueva", "capture_priority_title": "Prioridad de la tarea nueva", "capture_priority_label": "Prioridad: {p}. Cambiar", "capture_groups_title": "Grupos de la tarea nueva", "capture_groups_label": "Grupos: {g}. Cambiar", "capture_groups_none_found": "No hay coincidencias. Enter la crea.", "section_add_empty": "Escribe un título o pulsa Esc.", "section_add_done": "Agregada en {group}. Escribe otra o pulsa Esc.", "attachments_update": "Adjuntos", "edit_title_hint": "Doble clic o F2 para editar", "title_edit_hint": "Enter guarda · Esc cancela · selecciona texto para darle formato", "title_format": "Formato del título", "title_bold": "Negrita", "title_italic": "Cursiva", "title_link": "Enlace", "title_link_add": "Agregar enlace", "title_link_edit": "Editar enlace", "title_link_remove": "Quitar enlace", "title_link_open": "Abrir enlace", "title_link_text": "Texto", "title_link_url": "Dirección", "title_link_bad_url": "Escribe una dirección web (https://…) o un correo.", "attach_files": "Adjuntar", "attachments_label": "Adjuntos", "attachments_none": "Todavía no hay adjuntos.", "attachments_hint": "También puedes pegar o soltar imágenes en el título.", "attachment_view": "Ver imagen: {name}", "attachment_download": "Descargar", "attachment_remove": "Quitar adjunto", "attachments_more": "{n} adjuntos más", "attachment_pasted": "imagen-pegada.png", "attachments_uploading": "Subiendo…", "attachments_added": "{n} adjunto(s) listo(s).", "attachments_pending_hint": "Se adjuntan al agregar la tarea", "attachment_prev": "Imagen anterior", "attachment_next": "Imagen siguiente", "attachment_close": "Cerrar"});
 
 Object.assign(globalThis.dayTranslations.en,{"org_label": "Organize capture", "org_waits": "waits for", "org_hint_on": "Long idea: the assistant will tidy it up — a short title, notes, separate tasks and their order if it makes sense. Your text is kept.", "org_hint_off": "Long idea: saved as written. Organizing is off.", "org_skip": "Don't organize this one", "org_skipped": "This one stays as written", "org_undo_skip": "Organize it", "org_working": "Organizing your idea…", "org_done": "Organized your idea: {tasks} · {deps} · {groups}", "org_tasks_one": "1 task", "org_tasks": "{n} tasks", "org_deps_none": "no dependencies", "org_deps_one": "1 dependency", "org_deps": "{n} dependencies", "org_group": "category {g}", "org_new": "new", "org_nothing": "Your idea reads as one task; I kept it as written.", "org_view": "View", "org_undo": "Undo", "org_dismiss": "Dismiss", "org_history": "Assistant history", "org_history_button": "Organized · {n}", "org_history_sub": "Every capture the assistant organized. Undo brings back your original task.", "org_history_empty": "Nothing organized yet. Add a long idea and it shows up here.", "org_original": "Your original text", "org_produced": "What it created", "org_untouched": "untouched", "org_touched": "you worked on it", "org_undo_all": "Undo all", "org_undo_part": "Undo only what you didn't touch", "org_keep": "Keep it like this", "org_touched_note": "You already worked on {list}, so I won't undo everything and lose your progress.", "org_undone": "Undone: your original task is back.", "org_undone_part": "Partly undone: kept what you worked on ({n}).", "org_setting": "Organize my captures automatically", "org_setting_hint": "Long ideas get a short title, notes, split tasks, dependencies and categories. You can undo each one from the assistant history.", "org_notes": "Assistant notes", "org_from": "Comes from an organized idea", "org_open_history": "See in history", "org_close": "Close", "org_at": "Organized {when}", "qa_long_hint": "Long idea: saved as written, dates in the text are not read as a deadline. The assistant will give it a short title and keep your text.", "qa_newline_hint": "Shift+Enter new line", "qa_count": "{n} of {max}"});
 
-Object.assign(globalThis.dayTranslations.es,{"org_label": "Organizar captura", "org_waits": "espera a", "org_hint_on": "Idea larga: el asistente la va a ordenar — título corto, notas, tareas separadas y su orden si tiene sentido. Tu texto se guarda.", "org_hint_off": "Idea larga: se guarda tal cual. Organizar está apagado.", "org_skip": "No organizar esta", "org_skipped": "Esta se queda tal cual", "org_undo_skip": "Sí organizarla", "org_working": "Organizando tu idea…", "org_done": "Organicé tu idea: {tasks} · {deps} · {groups}", "org_tasks_one": "1 tarea", "org_tasks": "{n} tareas", "org_deps_none": "sin dependencias", "org_deps_one": "1 dependencia", "org_deps": "{n} dependencias", "org_group": "categoría {g}", "org_new": "nueva", "org_nothing": "Tu idea se lee como una sola tarea; la dejé tal cual.", "org_view": "Ver", "org_undo": "Deshacer", "org_dismiss": "Cerrar aviso", "org_history": "Historial del asistente", "org_history_button": "Organizadas · {n}", "org_history_sub": "Cada captura que el asistente organizó. Deshacer te regresa tu tarea original.", "org_history_empty": "Todavía no hay nada organizado. Agrega una idea larga y aparece aquí.", "org_original": "Tu texto original", "org_produced": "Lo que creó", "org_untouched": "sin tocar", "org_touched": "ya la trabajaste", "org_undo_all": "Deshacer todo", "org_undo_part": "Deshacer solo lo que no tocaste", "org_keep": "Dejarlo así", "org_touched_note": "Ya trabajaste en {list}, así que no deshago todo para no perder tu avance.", "org_undone": "Deshecho: volvió tu tarea original.", "org_undone_part": "Deshecho en parte: dejé lo que ya trabajaste ({n}).", "org_setting": "Organizar mis capturas automáticamente", "org_setting_hint": "Las ideas largas reciben título corto, notas, tareas separadas, dependencias y categorías. Cada una se puede deshacer desde el historial del asistente.", "org_notes": "Notas del asistente", "org_from": "Viene de una idea organizada", "org_open_history": "Ver en el historial", "org_close": "Cerrar", "org_at": "Organizada {when}", "qa_long_hint": "Idea larga: se guarda tal cual, sin tomar fechas del texto como vencimiento. El asistente le pondrá un título corto y conservará tu texto.", "qa_newline_hint": "Mayús+Enter nueva línea", "qa_count": "{n} de {max}"});
+Object.assign(globalThis.dayTranslations.es,{"org_label": "Organizar captura", "org_waits": "espera a", "org_hint_on": "Idea larga: el asistente la va a ordenar — título corto, notas, tareas separadas y su orden si tiene sentido. Tu texto se guarda.", "org_hint_off": "Idea larga: se guarda tal cual. Organizar está apagado.", "org_skip": "No organizar esta", "org_skipped": "Esta se queda tal cual", "org_undo_skip": "Sí organizarla", "org_working": "Organizando tu idea…", "org_done": "Organicé tu idea: {tasks} · {deps} · {groups}", "org_tasks_one": "1 tarea", "org_tasks": "{n} tareas", "org_deps_none": "sin dependencias", "org_deps_one": "1 dependencia", "org_deps": "{n} dependencias", "org_group": "grupo {g}", "org_new": "nueva", "org_nothing": "Tu idea se lee como una sola tarea; la dejé tal cual.", "org_view": "Ver", "org_undo": "Deshacer", "org_dismiss": "Cerrar aviso", "org_history": "Historial del asistente", "org_history_button": "Organizadas · {n}", "org_history_sub": "Cada captura que el asistente organizó. Deshacer te regresa tu tarea original.", "org_history_empty": "Todavía no hay nada organizado. Agrega una idea larga y aparece aquí.", "org_original": "Tu texto original", "org_produced": "Lo que creó", "org_untouched": "sin tocar", "org_touched": "ya la trabajaste", "org_undo_all": "Deshacer todo", "org_undo_part": "Deshacer solo lo que no tocaste", "org_keep": "Dejarlo así", "org_touched_note": "Ya trabajaste en {list}, así que no deshago todo para no perder tu avance.", "org_undone": "Deshecho: volvió tu tarea original.", "org_undone_part": "Deshecho en parte: dejé lo que ya trabajaste ({n}).", "org_setting": "Organizar mis capturas automáticamente", "org_setting_hint": "Las ideas largas reciben título corto, notas, tareas separadas, dependencias y grupos. Cada una se puede deshacer desde el historial del asistente.", "org_notes": "Notas del asistente", "org_from": "Viene de una idea organizada", "org_open_history": "Ver en el historial", "org_close": "Cerrar", "org_at": "Organizada {when}", "qa_long_hint": "Idea larga: se guarda tal cual, sin tomar fechas del texto como vencimiento. El asistente le pondrá un título corto y conservará tu texto.", "qa_newline_hint": "Mayús+Enter nueva línea", "qa_count": "{n} de {max}"});
 
 Object.assign(globalThis.dayTranslations.en,{chain_done_waiting:'Still waiting for «{others}». Complete the prerequisites first.'});
 Object.assign(globalThis.dayTranslations.es,{chain_done_waiting:'Todavía espera a «{others}». Completa sus requisitos primero.'});
+
+Object.assign(globalThis.dayTranslations.es,{
+  "export_diagnostics": "Exportar diagnóstico",
+  "zone_mexico_central": "Hora del centro de México",
+  "view_group": "Por grupo",
+  "options": "Opciones",
+  "groups_support": "Grupos y soporte",
+  "capture_hint": "Escribe una tarea · # para grupo · Enter para guardar",
+  "focus_active_count": "En curso se muestran {shown} de {total}.",
+  "dependency_highlight": "Resaltando lo que va antes y después de «{title}».",
+  "dependency_exit": "Salir (Esc)",
+  "capture_added": "Agregada «{title}»",
+  "capture_in": "en {group}",
+  "capture_undo": "Ctrl+Z para deshacer",
+  "shortcuts": "Atajos",
+  "shortcut_new": "Nueva tarea",
+  "shortcut_search": "Buscar",
+  "shortcut_help": "Mostrar u ocultar esta ayuda"
+});
+
+Object.assign(globalThis.dayTranslations.en,{
+  "export_diagnostics": "Export diagnostics",
+  "view_group": "By group",
+  "options": "Options",
+  "groups_support": "Groups and support",
+  "capture_hint": "Write a task · # for group · Enter to save",
+  "focus_active_count": "In progress: showing {shown} of {total}.",
+  "dependency_highlight": "Highlighting what goes before and after “{title}”.",
+  "dependency_exit": "Exit (Esc)",
+  "capture_added": "Added “{title}”",
+  "capture_in": "in {group}",
+  "capture_undo": "Ctrl+Z to undo",
+  "shortcuts": "Shortcuts",
+  "shortcut_new": "New task",
+  "shortcut_search": "Search",
+  "shortcut_help": "Show or hide this help",
+  "zone_mexico_central": "Central Mexico time"
+});
