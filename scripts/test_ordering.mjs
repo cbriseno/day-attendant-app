@@ -56,7 +56,7 @@ assert.ok(byTitle.every(s=>!s.draggable));
 assert.deepEqual(plain(arrange(all,'group',{then:'due'}).map(s=>s.tasks.map(t=>t.id))),[['c','d'],['e','a'],['b']]);
 assert.deepEqual(ids(arrange(all,'priority',{order:['e','a','c','b','d'],then:'newest'})),['e','b','c','d','a']);
 // Priority cannot be its own second key; unknown or inapplicable keys keep the drag order.
-assert.deepEqual(plain(thenOptions('priority')),['manual','due','title','newest']);assert.deepEqual(plain(thenOptions('manual')),[]);
+assert.deepEqual(plain(thenOptions('priority')),['manual','due','title','newest','oldest','blocked']);assert.deepEqual(plain(thenOptions('manual')),[]);
 assert.ok(arrange(all,'priority',{then:'priority'}).every(s=>s.draggable));
 assert.deepEqual(ids(arrange(all,'manual',{order:['e','a','c','b','d'],then:'title'})),['e','a','c','b','d']);
 
@@ -117,3 +117,15 @@ assert.equal(context.dayOrdering.focus([held],now).active.length,0);
 assert.equal(held.state,'active');
 assert.equal(context.dayOrdering.focus([{...held,blockReason:''}],now).active[0].id,'held');
 console.log('Focus selection rules passed');
+// Blocked/newest/oldest order operates within each category, without changing task data.
+const categoryTasks=[task('a','low',{group:'Release',blocked:true,createdAt:'2026-01-01'}),task('b','urgent',{group:'Release',createdAt:'2026-02-01'})];
+assert.deepEqual(ids(arrange(categoryTasks,'group',{then:'blocked'})),['a','b']);
+assert.deepEqual(ids(arrange(categoryTasks,'group',{then:'oldest'})),['a','b']);
+assert.deepEqual(ids(arrange(categoryTasks,'group',{then:'newest'})),['b','a']);
+assert.deepEqual(ids(arrange(categoryTasks,'group',{then:'priority'})),['b','a']);
+const categories=['Experiments','Release','Release/API','Security team',null].map(label=>({label}));
+const categoryLabels=(mode,manual=[],priorities={})=>plain(context.dayOrdering.sortGroups(categories,mode,manual,priorities).map(s=>s.label));
+assert.deepEqual(categoryLabels('manual',['release','security team','experiments']),['Release','Release/API','Security team','Experiments',null]);
+assert.deepEqual(categoryLabels('priority',['security team','release'],{'release':'high','security team':'high','experiments':'low'}),['Security team','Release','Release/API','Experiments',null]);
+assert.deepEqual(categoryLabels('title',['release']),['Experiments','Release','Release/API','Security team',null]);
+console.log('Category ordering rules passed');

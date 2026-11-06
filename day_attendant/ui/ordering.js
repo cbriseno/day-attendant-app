@@ -3,7 +3,7 @@
 'use strict';
 const VIEWS=['priority','manual','newest','group','chains','suggested'];
 // A second key orders tasks inside each section of Priority or Group; 'manual' keeps the drag order.
-const THEN=['manual','priority','due','title','newest'],THEN_VIEWS=['priority','group'];
+const THEN=['manual','priority','due','title','newest','oldest','blocked'],THEN_VIEWS=['priority','group'];
 // Most pressing first; an unknown value sorts and groups as medium.
 const PRIORITIES=['urgent','high','soon','medium','low','someday'],RANK=Object.fromEntries(PRIORITIES.map((p,i)=>[p,i]));
 const cmp=(a,b)=>a<b?-1:a>b?1:0;
@@ -22,6 +22,7 @@ function arrange(tasks,view,{order=[],suggestion=null,then='manual'}={}){
  const by=thenOptions(view).includes(then)&&then!=='manual'?then:'manual';
  const second={manual,priority:(a,b)=>(RANK[a.priority]??RANK.medium)-(RANK[b.priority]??RANK.medium)||manual(a,b),
   due:(a,b)=>cmp(a.due||'~',b.due||'~')||manual(a,b),newest:(a,b)=>cmp(b.createdAt||'',a.createdAt||'')||manual(a,b),
+  oldest:(a,b)=>cmp(a.createdAt||'',b.createdAt||'')||manual(a,b),blocked:(a,b)=>Number(!!(b.blocked||b.blockReason))-Number(!!(a.blocked||a.blockReason))||manual(a,b),
   title:(a,b)=>(a.title||'').localeCompare(b.title||'',undefined,{sensitivity:'base',numeric:true})||manual(a,b)}[by],drag=by==='manual';
  if(view==='newest')return [{key:'all',draggable:false,tasks:[...tasks].sort((a,b)=>cmp(b.createdAt||'',a.createdAt||'')||cmp(a.id,b.id))}];
  if(view==='suggested'){const ranks=new Map((suggestion?.order||[]).map((item,i)=>[item.id,i]));return [{key:'all',draggable:false,tasks:[...tasks].sort((a,b)=>(ranks.get(a.id)??Infinity)-(ranks.get(b.id)??Infinity)||manual(a,b))}]}
@@ -51,5 +52,12 @@ function focus(tasks,now=Date.now()){
  const available=open.filter(t=>!blocked(t)).sort(rank),active=available.filter(t=>t.state==='active').slice(0,2);
  const todo=available.filter(t=>t.state==='todo'),star=todo.filter(t=>t.nextUp);return {activeTotal:available.filter(t=>t.state==='active').length,active,next:[...star,...todo.filter(t=>!t.nextUp)].slice(0,5-active.length),soon:open.filter(t=>t.state==='snoozed'&&t.until&&Date.parse(t.until)<=now+72*3600000).sort((a,b)=>cmp(a.until,b.until)||rank(a,b)).slice(0,2)};
 }
-globalThis.dayOrdering={groups,key,focus,VIEWS,THEN,thenOptions,PRIORITIES,manualIds,arrange,move,place,adopt,hue};
+function sortGroups(sections,mode,order=[],priorities={}){
+ const position=new Map(order.map((k,i)=>[key(k),i])),rank={high:0,medium:1,low:2};
+ const parent=s=>(s.label||'').split('/')[0],sub=s=>(s.label||'').includes('/');
+ const compare=(a,b)=>(mode==='priority'?(rank[priorities[key(a)]]??3)-(rank[priorities[key(b)]]??3):0)
+  ||(mode!=='title'?(position.get(key(a))??Infinity)-(position.get(key(b))??Infinity):0)||a.localeCompare(b);
+ return [...sections].sort((a,b)=>Number(!a.label)-Number(!b.label)||compare(parent(a),parent(b))||Number(sub(a))-Number(sub(b))||compare(a.label||'',b.label||''));
+}
+globalThis.dayOrdering={sortGroups,groups,key,focus,VIEWS,THEN,thenOptions,PRIORITIES,manualIds,arrange,move,place,adopt,hue};
 })();

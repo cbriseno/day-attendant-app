@@ -108,7 +108,7 @@ $('error-close').onclick=()=>{$('save-error').hidden=true};
 function renderUndo(data){const top=data.undoStack?.[0];$('undo').disabled=!top||data.readOnly||flow?.sending>0;$('undo').dataset.event=top?.id??'';$('undo').textContent=top?tr('undo')+': '+(actionLabel[top.kind||aliases[top.action]||top.action]||tr('change_saved'))+(top.target?' · '+(data.tasks.find(t=>t.id===top.target)?.title||''):''):tr('undo');$('undo').title=top?tr('undo')+' · '+(actionLabel[top.kind||aliases[top.action]||top.action]||tr('change_saved'))+(top.target?' · '+(data.tasks.find(t=>t.id===top.target)?.title||''):''):tr('undo_empty')}
 const task=id=>flow.snapshot().tasks.find(t=>t.id===id);
 const safely=async fn=>{try{return await fn()}catch(error){notice(error.message);return null}};
-let actionLabel,phaseLabel;function refreshLabels(){actionLabel={activate:tr("start"),snooze:tr("snooze"),todo:tr("back_to_to_do"),done:tr("complete"),retire:tr("retire"),cancel_task_action:tr("cancel_task_action"),restore:tr("undo"),declaration:tr("declaration_updated"),block:tr('block_changed'),add:tr("create"),update:tr("update"),reopen:tr("reopen"),dependency:tr("dependency_update"),related:tr("related_update"),schedule:tr("schedule_saved"),group_color:tr("group_color_saved"),group_rename:tr('rename_group'),order:tr('order_saved'),event_add:tr('create'),event_update:tr('update'),event_cancel:tr('event_canceled')};
+let actionLabel,phaseLabel;function refreshLabels(){actionLabel={activate:tr("start"),snooze:tr("snooze"),todo:tr("back_to_to_do"),done:tr("complete"),retire:tr("retire"),cancel_task_action:tr("cancel_task_action"),restore:tr("undo"),declaration:tr("declaration_updated"),block:tr('block_changed'),add:tr("create"),update:tr("update"),reopen:tr("reopen"),dependency:tr("dependency_update"),related:tr("related_update"),schedule:tr("schedule_saved"),group_priority:tr('category_priority_saved'),group_color:tr("group_color_saved"),group_rename:tr('rename_group'),order:tr('order_saved'),event_add:tr('create'),event_update:tr('update'),event_cancel:tr('event_canceled')};
 phaseLabel={evaluating:tr("the_assistant_is_reviewing"),review:tr("phase_waits_for_you"),unavailable:tr("phase_left_waiting"),stale:tr("context_changed"),invalid:tr("phase_not_applied")};
 }
 refreshLabels();
@@ -118,7 +118,7 @@ let orderView='priority';try{orderView=localStorage.getItem('day-attendant-order
 let orderThen='manual';try{orderThen=localStorage.getItem('day-attendant-order-then')||'manual'}catch{}if(!globalThis.dayOrdering.THEN.includes(orderThen))orderThen='manual';
 // The second key only applies where the primary view has sections; elsewhere it stays stored but hidden.
 const activeThen=()=>globalThis.dayOrdering.thenOptions(orderView).includes(orderThen)?orderThen:'manual';
-function syncThen(){const options=globalThis.dayOrdering.thenOptions(orderView),select=$('order-then');$('order-then-wrap').hidden=!options.length;for(const o of select.options)o.hidden=!options.includes(o.value);select.value=activeThen();select.classList.toggle('is-set',activeThen()!=='manual')}
+function syncThen(){document.querySelector('label[for="order-then"]').textContent=tr(orderView==='group'?'category_tasks':'order_then');const options=globalThis.dayOrdering.thenOptions(orderView),select=$('order-then');$('order-then-wrap').hidden=!options.length;for(const o of select.options)o.hidden=!options.includes(o.value);select.value=activeThen();select.classList.toggle('is-set',activeThen()!=='manual')}
 let taskView=['group','chains'].includes(orderView)?orderView:'list',lastSort=['group','chains'].includes(orderView)?'priority':orderView;
 let localOrder=null,orderBase=null,orderSaving=false,drag=null;
 // Motion: a card that changes place glides there from where it was (FLIP), a new one fades in and
@@ -233,7 +233,7 @@ function toggleSectionFold(button){
  for(const a of section.getAnimations({subtree:true}))a.cancel();
  section.classList.toggle('collapsed',folded);button.setAttribute('aria-expanded',String(!folded));
  button.setAttribute('aria-label',tr(folded?'group_expand':'group_collapse').replace('{group}',section.querySelector('h2').textContent));
- section.firstElementChild._html=null;drawDependencies();drawChainLinks();
+ section.firstElementChild._html=null;drawDependencies();drawChainLinks();syncFoldAll();
 }
 function rememberDetails(root,prefix,selector='details.daily-section'){
  [...root.querySelectorAll(selector)].forEach((detail,i)=>{
@@ -259,6 +259,28 @@ function foldTaskLists(){
  }
 }
 
+let categoryOrder='title',manualGroups=[];
+try{categoryOrder=localStorage.getItem('day-attendant-category-order')||'title';manualGroups=JSON.parse(localStorage.getItem('day-attendant-category-manual')||'[]')}catch{}
+if(!['title','manual','priority'].includes(categoryOrder))categoryOrder='title';
+if(!Array.isArray(manualGroups))manualGroups=[];
+function saveCategoryOrder(){try{localStorage.setItem('day-attendant-category-order',categoryOrder);localStorage.setItem('day-attendant-category-manual',JSON.stringify(manualGroups))}catch{}}
+function categoryControls(s,sections,data){
+ if(!s.label)return '';
+ const peers=sections.filter(x=>!!groupSub(x.label)===!!groupSub(s.label)&&(!groupSub(s.label)||groupKey(groupParent(x.label))===groupKey(groupParent(s.label))));
+ const index=peers.indexOf(s),key=groupKey(s.label),priority=data.groupPriorities?.[key]||'none';
+ return '<span class="category-tools"><label><span class="visually-hidden">'+esc(tr('category_priority')+' '+s.label)+'</span><select data-category-priority="'+esc(s.label)+'"'+(data.readOnly?' disabled':'')+'>'+['high','medium','low','none'].map(p=>'<option value="'+p+'"'+(p===priority?' selected':'')+'>'+esc(tr('category_'+p))+'</option>').join('')+'</select></label>'
+ +[-1,1].map((delta,i)=>'<button type="button" class="ib" data-category-move="'+esc(key)+'" data-delta="'+delta+'" aria-label="'+esc(tr(i?'category_down':'category_up')+' '+s.label)+'"'+(categoryOrder!=='manual'||(i?index===peers.length-1:index===0)?' disabled':'')+'>'+(i?'↓':'↑')+'</button>').join('')+'</span>';
+}
+function syncFoldAll(){const buttons=[...$('board').querySelectorAll('[data-fold],[data-section-fold]')];$('fold-all').hidden=!buttons.length||taskView==='focus';const folded=buttons.length>0&&buttons.every(b=>b.getAttribute('aria-expanded')==='false');$('fold-all').textContent=tr(folded?'expand_all':'collapse_all');$('fold-all').setAttribute('aria-expanded',String(!folded))}
+$('fold-all').onclick=()=>{const buttons=[...$('board').querySelectorAll('[data-fold],[data-section-fold]')],fold=buttons.some(b=>b.getAttribute('aria-expanded')==='true');for(const b of buttons)if((b.getAttribute('aria-expanded')==='true')===fold)b.click();syncFoldAll()};
+$('category-order').value=categoryOrder;$('category-order').onchange=()=>{categoryOrder=$('category-order').value;saveCategoryOrder();renderGroupView()};
+$('board').addEventListener('change',e=>{const select=e.target.closest('[data-category-priority]');if(select)request('group_priority_update',{group:select.dataset.categoryPriority,groupPriority:select.value})});
+$('board').addEventListener('click',e=>{const button=e.target.closest('[data-category-move]');if(!button)return;
+ const section=button.closest('.group-section'),parent=section.dataset.parent,peers=[...$('board').querySelectorAll('.group-section')].filter(s=>s.dataset.group&&s.dataset.parent===parent),keys=peers.map(s=>groupKey(s.dataset.group)),from=keys.indexOf(button.dataset.categoryMove),to=from+Number(button.dataset.delta);
+ if(categoryOrder!=='manual'||to<0||to>=keys.length)return;
+ [keys[from],keys[to]]=[keys[to],keys[from]];manualGroups=[...keys,...manualGroups.filter(k=>!keys.includes(k))];saveCategoryOrder();renderGroupView();
+ [...$('board').querySelectorAll('[data-category-move]')].find(b=>b.dataset.categoryMove===button.dataset.categoryMove&&!b.disabled)?.focus();announceStatus(tr('order_saved'));
+});
 let searchText='';
 const matchesSearch=t=>!searchText||String(t.number)===searchText||t.title.toLocaleLowerCase().includes(searchText.toLocaleLowerCase());
 const shownByFilter=t=>matchesSearch(t)&&(groupFilter==='*'||taskGroups(t).some(g=>'group:'+groupKey(g)===groupFilter||'group:'+groupKey(groupParent(g))===groupFilter)||!taskGroups(t).length&&groupFilter==='group:');
@@ -269,7 +291,7 @@ function setGroupFilter(value){groupFilter=value;try{localStorage.setItem('day-a
 function toggleFold(key){if(!foldedGroups.delete(key))foldedGroups.add(key);try{localStorage.setItem('day-attendant-folded-groups',JSON.stringify([...foldedGroups]))}catch{}
  for(const sub of $('board').querySelectorAll('.group-sub[data-parent]'))if(sub.dataset.parent===key)sub.classList.toggle('parent-folded',foldedGroups.has(key));
  const section=[...$('board').querySelectorAll('.group-section')].find(s=>groupKey(s.dataset.group)===key);if(!section)return;
- for(const a of section.getAnimations({subtree:true}))a.cancel();const folded=foldedGroups.has(key),button=section.querySelector('[data-fold]');section.classList.toggle('collapsed',folded);button.setAttribute('aria-expanded',String(!folded));button.setAttribute('aria-label',tr(folded?'group_expand':'group_collapse').replace('{group}',section.querySelector('h2').textContent));section.querySelector('.group-folded').textContent=folded?' · '+tr('group_folded'):'';section.firstElementChild._html=null;drawDependencies()}
+ for(const a of section.getAnimations({subtree:true}))a.cancel();const folded=foldedGroups.has(key),button=section.querySelector('[data-fold]');section.classList.toggle('collapsed',folded);button.setAttribute('aria-expanded',String(!folded));button.setAttribute('aria-label',tr(folded?'group_expand':'group_collapse').replace('{group}',section.querySelector('h2').textContent));section.querySelector('.group-folded').textContent=folded?' · '+tr('group_folded'):'';section.firstElementChild._html=null;drawDependencies();syncFoldAll()}
 function groupInventory(data=flow.snapshot()){const groups=new Map();for(const t of data.tasks)for(const label of taskGroups(t)){const key=groupKey(label),g=groups.get(key)||{label,n:0,recent:''};g.n++;g.recent=[g.recent,t.groupChangedAt||t.createdAt||''].sort().at(-1);groups.set(key,g)}return [...groups.values()]}
 function rankedGroups(data=flow.snapshot()){const all=groupInventory(data),used=[...all].sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label)),recent=[...all].sort((a,b)=>b.recent.localeCompare(a.recent));return [...new Map([...used.slice(0,2),...recent.filter(g=>!used.slice(0,2).includes(g)).slice(0,2),...used].map(g=>[groupKey(g.label),g])).values()]}
 function groupFilters(data){const open=data.tasks.filter(t=>!['done','retired','canceled'].includes(t.state)),groups=groupInventory({...data,tasks:open.map(t=>({...t,groups:[...new Set(taskGroups(t).map(groupParent))]}))}).sort((a,b)=>b.n-a.n||a.label.localeCompare(b.label));
@@ -288,18 +310,17 @@ function groupLanes(data,proposals){
  const open=data.tasks.filter(t=>t.state in STATE_RANK&&(!isNextUp(t)||isBlocked(t))&&matchesSearch(t));
  // Subgroups follow their parent, indented; a parent with only subgroups still gets its heading, and
  // its count and progress include them. Folding the parent folds its subgroups too.
- const sections=globalThis.dayOrdering.arrange(open,'group',{order:localOrder||data.taskOrder||[],then:activeThen()}),have=new Set(sections.map(s=>groupKey(s.label)));
+ let sections=globalThis.dayOrdering.arrange(open,'group',{order:localOrder||data.taskOrder||[],then:activeThen()}),have=new Set(sections.map(s=>groupKey(s.label)));
  for(const s of [...sections])if(groupSub(s.label)&&!have.has(groupKey(groupParent(s.label)))){have.add(groupKey(groupParent(s.label)));sections.push({key:'group:'+groupKey(groupParent(s.label)),label:groupParent(s.label),draggable:true,tasks:[]})}
- const order=s=>[s.label===null?1:0,groupParent(s.label).toLocaleLowerCase(),groupSub(s.label)?1:0,groupSub(s.label).toLocaleLowerCase()];
- sections.sort((a,b)=>{const x=order(a),y=order(b);for(let i=0;i<4;i++){if(x[i]<y[i])return -1;if(x[i]>y[i])return 1}return 0});
+ sections=globalThis.dayOrdering.sortGroups(sections,categoryOrder,manualGroups,data.groupPriorities);
  const lanes=sections.map(s=>{
   const sub=groupSub(s.label),parentKey=groupKey(groupParent(s.label)),key=groupKey(s.label),name=s.label?(sub?'› '+sub:s.label):tr('no_group'),folded=foldedGroups.has(key),parentFolded=!!sub&&foldedGroups.has(parentKey);
   const inParent=t=>taskGroups(t).some(g=>groupKey(g)===key||!sub&&groupKey(groupParent(g))===key);
-  const tasks=[...s.tasks].sort((a,b)=>STATE_RANK[a.state]-STATE_RANK[b.state]),count=sub?tasks.length:open.filter(inParent).length;
+  const tasks=s.tasks,count=sub?tasks.length:open.filter(inParent).length;
   const members=data.tasks.filter(t=>!['retired','canceled'].includes(t.state)&&(inParent(t)||!taskGroups(t).length&&!key)),done=members.filter(t=>t.state==='done').length,pct=members.length?Math.round(100*done/members.length):0;
   const next=tasks.filter(t=>t.due).sort((a,b)=>new Date(a.due)-new Date(b.due))[0],progress=formatted('group_progress',{done,total:members.length});
   const head='<button type="button" class="ib fold" data-fold="'+esc(key)+'" aria-expanded="'+!folded+'" aria-label="'+esc(tr(folded?'group_expand':'group_collapse').replace('{group}',name))+'">'+chevronIcon+'</button>'
-   +'<h2'+(s.label?' data-anon-private="text" tabindex="0" aria-keyshortcuts="F2" data-rename-label="'+esc(s.label)+'" title="'+esc(tr('group_label_hint'))+'"':'')+'>'+(s.label?groupDot(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>')+esc(name)+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+count+'</span>'+sectionAdd(s.label,data)
+   +'<h2'+(s.label?' data-anon-private="text" tabindex="0" aria-keyshortcuts="F2" data-rename-label="'+esc(s.label)+'" title="'+esc(tr('group_label_hint'))+'"':'')+'>'+(s.label?groupDot(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>')+esc(name)+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+count+'</span>'+sectionAdd(s.label,data)+categoryControls(s,sections,data)
    +'<span class="group-progress" data-anon-safe="text title aria-label" role="progressbar" aria-valuemin="0" aria-valuemax="'+members.length+'" aria-valuenow="'+done+'" aria-label="'+esc(progress)+'"><i style="width:'+pct+'%"></i></span>'
    +'<span class="group-summary" data-anon-safe="text title aria-label">'+esc(progress)+(next?' · <span data-anon-safe="text title"'+(new Date(next.due)<NOW?' class="late"':'')+' title="'+esc(full(next.due))+'">'+esc(tr('group_next').replace('{time}',short(next.due)))+'</span>':'')+'<span class="group-folded">'+(folded?' · '+esc(tr('group_folded')):'')+'</span></span>';
   return {id:'group:'+key,cls:' group-section'+(sub?' group-sub'+(parentFolded?' parent-folded':''):'')+(folded?' collapsed':'')+(groupFilter!=='*'&&groupFilter!=='group:'+key&&groupFilter!=='group:'+parentKey?' filtered':''),attrs:' data-group="'+esc(s.label||'')+'"'+(sub?' data-parent="'+esc(parentKey)+'"':''),style:s.label?groupStyle(s.label):'',head,
@@ -732,7 +753,7 @@ function render(data=flow.snapshot()) {
  renderUnblocks(data);
  groupColors=data.groupColors||{};
  const filters=groupFilters(data);if($('group-filters')._html!==filters){$('group-filters').innerHTML=filters;$('group-filters')._html=filters}$('group-filters').hidden=!filters;
- const active=document.activeElement,focusFold=active?.dataset?.sectionFold,focusTask=active?.dataset?.id,focusAction=active?.dataset?.action,focusProposal=active?.dataset?.proposal,reviewAction=active?.dataset?.reviewAction;
+ const active=document.activeElement,focusCategory=active?.dataset?.categoryPriority,focusFold=active?.dataset?.sectionFold,focusTask=active?.dataset?.id,focusAction=active?.dataset?.action,focusProposal=active?.dataset?.proposal,reviewAction=active?.dataset?.reviewAction;
  const openIds=[...$('reviews').querySelectorAll('details[open]')].map(d=>d.dataset.proposal);
  const proposals=data.proposals;
  const newlyRelevant=proposals.find(p=>['review','unavailable'].includes(p.phase)&&!['review','unavailable'].includes(phaseCache.get(p.id)));
@@ -754,7 +775,7 @@ function render(data=flow.snapshot()) {
   const filtered=groupFilter.startsWith('group:')?rankedGroups(data).find(g=>'group:'+groupKey(g.label)===groupFilter)?.label||'':'';
   return {state,head:'<span class="state-dot" aria-hidden="true"></span><h2>'+label+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+rows.length+'</span>'+(state==='todo'&&orderView!=='group'?sectionAdd(filtered,data):''),items};
  }))].reduce((all,l,i,arr)=>{if(l.id==='next-up'&&arr.some(x=>x.state==='active'))return all;all.push(l);if(l.state==='active'&&arr[0]?.id==='next-up')all.push(arr[0]);return all},[]),data);
- foldTaskLists();
+ foldTaskLists();syncFoldAll();
  // A focused control whose card moved keeps its focus.
  if(active?.isConnected&&active!==document.activeElement&&$('board').contains(active))active.focus({preventScroll:true});
  restoreTyping(typing);rendering=false;
@@ -778,7 +799,7 @@ function render(data=flow.snapshot()) {
  const last=data.lastFact;
  // The first view only remembers the latest change; later ones are announced as they arrive.
  if(lastSeenEvent===undefined)lastSeenEvent=last?.id??null;else if(last&&last.id!==lastSeenEvent){lastSeenEvent=last.id;announce(last,data)}
- if(active&&!active.isConnected){requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const current=document.activeElement;if(current&&current!==document.body&&current!==active&&current.isConnected)return;let target;if(focusFold)target=[...$('board').querySelectorAll('[data-section-fold]')].find(b=>b.dataset.sectionFold===focusFold);if(focusProposal)target=$('reviews').querySelector('[data-proposal="'+focusProposal+'"][data-review-action="'+reviewAction+'"]');if(!target&&focusTask)target=$('board').querySelector('[data-id="'+focusTask+'"][data-action="'+focusAction+'"]')||$('board').querySelector('[data-id="'+focusTask+'"][data-action="title"]');if(!target)target=shown.length?$('review-title'):$('list-view');target.focus({preventScroll:true})})}
+ if(active&&!active.isConnected){requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const current=document.activeElement;if(current&&current!==document.body&&current!==active&&current.isConnected)return;let target;if(focusCategory)target=[...$('board').querySelectorAll('[data-category-priority]')].find(s=>s.dataset.categoryPriority===focusCategory);if(focusFold)target=[...$('board').querySelectorAll('[data-section-fold]')].find(b=>b.dataset.sectionFold===focusFold);if(focusProposal)target=$('reviews').querySelector('[data-proposal="'+focusProposal+'"][data-review-action="'+reviewAction+'"]');if(!target&&focusTask)target=$('board').querySelector('[data-id="'+focusTask+'"][data-action="'+focusAction+'"]')||$('board').querySelector('[data-id="'+focusTask+'"][data-action="title"]');if(!target)target=shown.length?$('review-title'):$('list-view');target.focus({preventScroll:true})})}
  if(newlyRelevant)announceStatus(tr("a_pending_change_needs_review"));
  if(menu){const t=data.tasks.find(t=>t.id===menu.id);if(!t||['done','retired','canceled'].includes(t.state))closeMenu(false);else anchorOf(menu.id,menu.action)?.setAttribute('aria-expanded','true')}
 }
@@ -1287,7 +1308,7 @@ function setTaskView(view){closeMenu();if(['group','chains'].includes(view)){if(
  document.body.classList.toggle('focus-mode',view==='focus');$('board').classList.toggle('is-list',['list','group','chains'].includes(view));$('board').classList.toggle('is-focus',view==='focus');
  for(const key of ['list','board','focus','chains','group'])$(key+'-view').setAttribute('aria-pressed',String(view===key));
  placeChat();render();}
-function syncViewControls(){document.querySelector('.order-choice').hidden=['group','chains','focus'].includes(taskView);for(const key of ['list','board','focus','chains','group'])$(key+'-view').setAttribute('aria-pressed',String(taskView===key))}
+function syncViewControls(){document.querySelector('.order-choice').hidden=['chains','focus'].includes(taskView);$('order-choice').hidden=taskView==='group';document.querySelector('label[for="order-choice"]').hidden=taskView==='group';$('category-controls').hidden=taskView!=='group';for(const key of ['list','board','focus','chains','group'])$(key+'-view').setAttribute('aria-pressed',String(taskView===key))}
 $('chains-view').onclick=()=>setTaskView('chains');$('group-view').onclick=()=>setTaskView('group');syncViewControls();
 $('list-view').onclick=()=>setTaskView('list');$('board-view').onclick=()=>setTaskView('board');$('focus-view').onclick=()=>setTaskView('focus');
 $('board').addEventListener('click',e=>{if(e.target.closest('[data-exit-focus]'))setTaskView('list')});
@@ -1406,7 +1427,7 @@ function placeChat(){const modal=$('chat-dialog'),panel=$('assistant'),dock=$('c
 $('chat-dialog').addEventListener('close',()=>{if($('chat-dialog').returnValue==='reflow')return;chatOpen=false;placeChat()});$('chat-toggle').onclick=()=>{chatOpen=!chatOpen;placeChat()};$('chat-close').onclick=()=>{chatOpen=false;placeChat();$('chat-toggle').focus({preventScroll:true})};compact.addEventListener('change',placeChat);placeChat();
 
 
-const aliases={front_activate:'activate',front_todo:'todo',task_snooze:'snooze',task_done:'done',front_retire:'retire',task_restore:'restore',task_add:'add',task_update:'update',task_reopen:'reopen',task_cancel:'cancel_task_action',context_update:'declaration',continuity_update:'declaration',order_update:'order',group_color_update:'group_color',dependency_update:'dependency',related_update:'related',schedule_update:'schedule'};
+const aliases={front_activate:'activate',front_todo:'todo',task_snooze:'snooze',task_done:'done',front_retire:'retire',task_restore:'restore',task_add:'add',task_update:'update',task_reopen:'reopen',task_cancel:'cancel_task_action',context_update:'declaration',continuity_update:'declaration',order_update:'order',group_priority_update:'group_priority',group_color_update:'group_color',dependency_update:'dependency',related_update:'related',schedule_update:'schedule'};
 const domain={activate:'front_activate',todo:'front_todo',snooze:'task_snooze',done:'task_done',retire:'front_retire'};
 // Reads bypass the HTTP cache: otherwise the browser holds a read behind an identical one in flight.
 async function api(path,body){if(body!==undefined&&globalThis.dayAnonymize?.active&&!['/api/session','/api/zone-rules','/api/recovery/inspect'].includes(path))throw Object.assign(Error(tr('the_request_could_not_be_completed')),{status:409});const response=await fetch(path,{method:body===undefined?'GET':'POST',headers:body===undefined?{}:{'Content-Type':'application/json'},credentials:'same-origin',cache:'no-store',body:body===undefined?undefined:JSON.stringify(body)});const result=await response.json();if(!response.ok){const error=Error(errorText(result.error?.code,result.error?.message||tr("the_request_could_not_be_completed")));error.code=result.error?.code;error.status=response.status;throw error;}return result.data;}
