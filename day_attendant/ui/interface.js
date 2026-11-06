@@ -1461,10 +1461,10 @@ class RemoteFlow{
 }
 // The assistant state and the review strip say whether saved changes are still waiting for its later look.
 function renderReview(state){const r=state.review||{},connected=!!state.agent?.connected,busy=connected&&!!(r.running||r.pending);
- const label=!connected?tr('disconnected'):r.running?tr('agent_reviewing'):r.pending?formatted(r.pending===1?'agent_pending_one':'agent_pending',{n:r.pending}):tr('agent_up_to_date');
+ const label=globalThis.dayProactive?.stateLabel(state)||(!connected?tr('disconnected'):r.running?tr('agent_reviewing'):r.pending?formatted(r.pending===1?'agent_pending_one':'agent_pending',{n:r.pending}):tr('agent_up_to_date'));
  const node=$('agent-state');node.classList.toggle('busy',busy);node.classList.toggle('offline',!connected);
  if(node.dataset.label!==label){node.dataset.label=label;node.innerHTML='<span class="dot" aria-hidden="true"></span><span class="state-label" data-anon-safe="text">'+esc(label)+'</span>'}
- const text=!connected?tr('review_strip_offline'):r.running?tr('review_strip_running'):r.pending?formatted('review_strip_waiting',{n:r.pending}):['incomplete','interrupted'].includes(r.status)?tr('review_strip_incomplete'):r.finishedAt?tr('review_strip_done').replace('{time}',short(r.finishedAt)):tr('review_strip_saved');
+ const text=globalThis.dayProactive?.stateLabel(state)?tr('agent_paused_short'):!connected?tr('review_strip_offline'):r.running?tr('review_strip_running'):r.pending?formatted('review_strip_waiting',{n:r.pending}):['incomplete','interrupted'].includes(r.status)?tr('review_strip_incomplete'):r.finishedAt?tr('review_strip_done').replace('{time}',short(r.finishedAt)):tr('review_strip_saved');
  const strip=$('review-strip');strip.setAttribute('data-anon-safe','text');if(strip.dataset.text!==text){strip.dataset.text=text;strip.innerHTML=(busy?'<span class="spinner" aria-hidden="true"></span>':checkIcon)+'<span data-anon-safe="text">'+esc(text)+'</span>'}}
 // Brings a marked card into view from the chat log and opens its suggestion.
 function focusSuggestion(id){const data=flow.snapshot();if(currentSuggestion(id,data))bubbleFor=id;if($('chat-dialog').open){chatOpen=false;placeChat()}render();const card=$('board').querySelector('[data-task-id="'+id+'"]');card?.scrollIntoView({block:'center'});(card?.querySelector('[data-action="suggestion"]')||card?.querySelector('[data-action="title"]'))?.focus({preventScroll:true})}
