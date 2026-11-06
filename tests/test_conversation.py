@@ -34,6 +34,23 @@ class ConversationTests(unittest.TestCase):
         fixture=ChatFixture({'message':'A proposal will be checked by the service.','uncertainties':[],'intent':intent})
         self.board.bridge=fixture;return fixture,Conversation(self.board)
 
+    def test_schedule_omission_preserves_saved_values_and_explicit_clear_works(self):
+        schedule={'repeat':{'every':'weekday'},'reminders':[{'kind':'before','minutes':30},{'kind':'before','minutes':60}]}
+        self.board.request('schedule_update',dict(schedule,uuid=self.uid),'seed-schedule')
+        text='Set weekday reminders'
+        _,chat=self.fixture(text,'schedule_update',taskId=self.uid)
+        chat.submit(text,'omitted-schedule');chat.run('omitted-schedule')
+        self.assertEqual(self.board.snapshot()['schedules'][self.uid],schedule)
+        with self.app.store.connect() as con:
+            row=con.execute("SELECT status,data FROM messages WHERE key='omitted-schedule'").fetchone()
+            self.assertEqual(row['status'],'incomplete')
+            self.assertIn('preserved',json.loads(row['data'])['error'])
+        text='Remove the entire schedule'
+        _,chat=self.fixture(text,'schedule_update',taskId=self.uid,clearSchedule=True)
+        chat.submit(text,'clear-schedule');chat.run('clear-schedule')
+        self.assertNotIn(self.uid,self.board.snapshot()['schedules'])
+        self.assertEqual(self.board.snapshot()['proposals'][-1]['phase'],'applied')
+
     def test_idea_is_not_captured_without_intent(self):
         text='Keep photography as an idea, not a task.';fixture,chat=self.fixture(text)
         chat.submit(text,'idea');chat.run('idea')
