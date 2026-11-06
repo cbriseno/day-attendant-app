@@ -161,6 +161,14 @@ const groupViewNodes=new Map();
 function drawn(lanes){const board=$('board');return board.children.length===lanes.length&&lanes.every((lane,i)=>{const section=board.children[i],box=section.lastElementChild;
  return section._lane===(lane.id||'state:'+lane.state)&&section.className===('lane'+(lane.cls||''))&&(section.getAttribute('style')||'')===(lane.style||'')&&section.firstElementChild._html===lane.head&&box.children.length===lane.items.length&&lane.items.every((item,j)=>box.children[j]._html===item.html)})}
 function morphBoard(lanes,data){
+ // Reuse the group chevron for every unbounded lane; Today and Board share the same keys.
+ lanes=lanes.map(lane=>{
+  if(!lane.head||lane.head.includes('data-fold=')||lane.cls?.includes('focus-section'))return lane;
+  const key='lane:'+(lane.id||lane.state),folded=sectionFolds[key]===true;
+  const label=lane.head.match(/<h2[^>]*>(.*?)<\/h2>/)?.[1]||'';
+  const text=document.createElement('span');text.innerHTML=label;
+  return {...lane,cls:(lane.cls||'')+(folded?' collapsed':''),head:foldButton(key,text.textContent,folded)+lane.head};
+ });
  if(!changingGroupView&&drawn(lanes))return;
  const board=$('board'),animate=moving()&&!changingGroupView,first=animate?cardRects():new Map(),old=new Map(boardCards().map(c=>[c.dataset.rowKey||c.dataset.taskId,c]));
  if(changingGroupView)for(const a of board.getAnimations({subtree:true}))a.cancel();
@@ -170,6 +178,7 @@ function morphBoard(lanes,data){
   if(section?._lane!==id){section=make('<section class="lane"'+(lane.state?' data-state="'+lane.state+'"':'')+(lane.attrs||'')+'><header class="lane-heading"></header><div class="lane-cards"></div></section>');section._lane=id;board.insertBefore(section,board.children[i]||null)}
   if(section.className!==cls)section.className=cls;if((section.getAttribute('style')||'')!==(lane.style||''))section.setAttribute('style',lane.style||'');
   const head=section.firstElementChild,box=section.lastElementChild;if(head._html!==lane.head){head.innerHTML=lane.head;head._html=lane.head}
+  box.id='lane-content-'+encodeURIComponent(id);head.querySelector('.fold')?.setAttribute('aria-controls',box.id);
   const extras=new Map([...box.children].filter(n=>n._key).map(n=>[n._key,n]));
   const wanted=lane.items.map(item=>{const key=item.rowKey||item.id;let node=item.id?old.get(key)||groupViewNodes.get(key):extras.get(item.key);if(item.id)old.delete(key);if(!node||node._html!==item.html){node=make(item.html);node._key=item.key}if(item.id){node.dataset.rowKey=key;groupViewNodes.set(key,node)}return node});
   // What leaves goes first: left in place it would push every row after it down one, each a DOM move.
@@ -214,6 +223,27 @@ function paintGroupColor(data,key){groupColors=data.groupColors||{};const byId=n
 }
 // One click shows a single group, or all of them; the choice and the folded groups stay in this browser.
 let groupFilter='*',foldedGroups=new Set();try{groupFilter=localStorage.getItem('day-attendant-group-filter')??'*';foldedGroups=new Set(JSON.parse(localStorage.getItem('day-attendant-folded-groups')||'[]'))}catch{}
+// Browser-only presentation preferences, following the existing group fold storage.
+let sectionFolds={};try{const saved=JSON.parse(localStorage.getItem('day-attendant-section-folds')||'{}');if(saved&&typeof saved==='object'&&!Array.isArray(saved))sectionFolds=saved}catch{}
+function saveSectionFold(key,folded){sectionFolds[key]=folded;try{localStorage.setItem('day-attendant-section-folds',JSON.stringify(sectionFolds))}catch{}}
+function foldButton(key,label,folded){return '<button type="button" class="ib fold" data-section-fold="'+esc(key)+'" aria-expanded="'+!folded+'" aria-label="'+esc(tr(folded?'group_expand':'group_collapse').replace('{group}',label))+'">'+chevronIcon+'</button>'}
+function toggleSectionFold(button){
+ const section=button.closest('.lane'),folded=button.getAttribute('aria-expanded')==='true';
+ saveSectionFold(button.dataset.sectionFold,folded);
+ for(const a of section.getAnimations({subtree:true}))a.cancel();
+ section.classList.toggle('collapsed',folded);button.setAttribute('aria-expanded',String(!folded));
+ button.setAttribute('aria-label',tr(folded?'group_expand':'group_collapse').replace('{group}',section.querySelector('h2').textContent));
+ section.firstElementChild._html=null;drawDependencies();drawChainLinks();
+}
+function rememberDetails(root,prefix,selector='details.daily-section'){
+ [...root.querySelectorAll(selector)].forEach((detail,i)=>{
+  if(detail.dataset.foldRemembered)return;
+  const key='detail:'+(detail.dataset.foldKey||prefix+':'+i);detail.dataset.foldRemembered='true';
+  if(typeof sectionFolds[key]==='boolean')detail.open=!sectionFolds[key];
+  detail.addEventListener('toggle',()=>saveSectionFold(key,!detail.open));
+ });
+}
+rememberDetails(document,'history','details.closed-list');
 let searchText='';
 const matchesSearch=t=>!searchText||String(t.number)===searchText||t.title.toLocaleLowerCase().includes(searchText.toLocaleLowerCase());
 const shownByFilter=t=>matchesSearch(t)&&(groupFilter==='*'||taskGroups(t).some(g=>'group:'+groupKey(g)===groupFilter||'group:'+groupKey(groupParent(g))===groupFilter)||!taskGroups(t).length&&groupFilter==='group:');
@@ -687,7 +717,7 @@ function render(data=flow.snapshot()) {
  renderUnblocks(data);
  groupColors=data.groupColors||{};
  const filters=groupFilters(data);if($('group-filters')._html!==filters){$('group-filters').innerHTML=filters;$('group-filters')._html=filters}$('group-filters').hidden=!filters;
- const active=document.activeElement,focusTask=active?.dataset?.id,focusAction=active?.dataset?.action,focusProposal=active?.dataset?.proposal,reviewAction=active?.dataset?.reviewAction;
+ const active=document.activeElement,focusFold=active?.dataset?.sectionFold,focusTask=active?.dataset?.id,focusAction=active?.dataset?.action,focusProposal=active?.dataset?.proposal,reviewAction=active?.dataset?.reviewAction;
  const openIds=[...$('reviews').querySelectorAll('details[open]')].map(d=>d.dataset.proposal);
  const proposals=data.proposals;
  const newlyRelevant=proposals.find(p=>['review','unavailable'].includes(p.phase)&&!['review','unavailable'].includes(phaseCache.get(p.id)));
@@ -732,7 +762,7 @@ function render(data=flow.snapshot()) {
  const last=data.lastFact;
  // The first view only remembers the latest change; later ones are announced as they arrive.
  if(lastSeenEvent===undefined)lastSeenEvent=last?.id??null;else if(last&&last.id!==lastSeenEvent){lastSeenEvent=last.id;announce(last,data)}
- if(active&&!active.isConnected){requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const current=document.activeElement;if(current&&current!==document.body&&current!==active&&current.isConnected)return;let target;if(focusProposal)target=$('reviews').querySelector('[data-proposal="'+focusProposal+'"][data-review-action="'+reviewAction+'"]');if(!target&&focusTask)target=$('board').querySelector('[data-id="'+focusTask+'"][data-action="'+focusAction+'"]')||$('board').querySelector('[data-id="'+focusTask+'"][data-action="title"]');if(!target)target=shown.length?$('review-title'):$('list-view');target.focus({preventScroll:true})})}
+ if(active&&!active.isConnected){requestAnimationFrame(()=>{if(document.querySelector('dialog[open]'))return;const current=document.activeElement;if(current&&current!==document.body&&current!==active&&current.isConnected)return;let target;if(focusFold)target=[...$('board').querySelectorAll('[data-section-fold]')].find(b=>b.dataset.sectionFold===focusFold);if(focusProposal)target=$('reviews').querySelector('[data-proposal="'+focusProposal+'"][data-review-action="'+reviewAction+'"]');if(!target&&focusTask)target=$('board').querySelector('[data-id="'+focusTask+'"][data-action="'+focusAction+'"]')||$('board').querySelector('[data-id="'+focusTask+'"][data-action="title"]');if(!target)target=shown.length?$('review-title'):$('list-view');target.focus({preventScroll:true})})}
  if(newlyRelevant)announceStatus(tr("a_pending_change_needs_review"));
  if(menu){const t=data.tasks.find(t=>t.id===menu.id);if(!t||['done','retired','canceled'].includes(t.state))closeMenu(false);else anchorOf(menu.id,menu.action)?.setAttribute('aria-expanded','true')}
 }
@@ -1208,7 +1238,7 @@ $('board').addEventListener('keydown',e=>{const title=e.target.closest('[data-ti
 $('board').addEventListener('click',e=>{const b=e.target.closest('[data-action="done"]');if(!b)return;const t=task(b.dataset.id);if(!t?.blockReason||t.state==='done')return;
  e.stopPropagation();e.preventDefault();const r=b.getBoundingClientRect();openMenu(t.id,'blockdone',{x:r.left,y:r.bottom+4})},true);
 function announceBlock(t,reason){const live=document.querySelector('#board-status,[role=status][aria-live]');if(live)live.textContent=reason?tr('block_announce').replace('{title}',t.title).replace('{reason}',reason):tr('block_announce_clear').replace('{title}',t.title)}
-$('board').onclick=e=>{if(e.target.closest('[data-title-view],.title-format,.att-chips,.att-field'))return;const add=e.target.closest('[data-section-add]');if(add){if(sectionCapture?.anchor===add)closeSectionAdd(true);else openSectionAdd(add);return}const fold=e.target.closest('[data-fold]');if(fold){toggleFold(fold.dataset.fold);return}const sb=e.target.closest('[data-suggestion]');if(sb){const {suggestion,suggestionAction}=sb.dataset;bubbleFor=null;safely(async()=>{const accepted=suggestionAction==='accept'&&flow.snapshot().suggestions.find(s=>s.id===suggestion)?.action;if(accepted)await flow.accept(suggestion,accepted);else{const started=performance.now();timed(flow.observe(await api('/api/suggestions/'+suggestion+'/'+suggestionAction,{})),started);await flow.refresh()}render()});return}if(inlineClick(e))return;const b=e.target.closest('[data-action]');if(!b){const card=e.target.closest('.task');if(card&&!e.target.closest('.assistant-bubble'))toggleExpand(card.dataset.taskId);else if(dependencyFocus&&!card)toggleDependencies(dependencyFocus);return}const {id,action}=b.dataset;if(action==='next-up'){const t=task(id);if(t)request('task_update',{uuid:id,nextUp:!t.nextUp});return}if(action==='suggestion'){bubbleFor=bubbleFor===id?null:id;render();$('board').querySelector('[data-id="'+id+'"][data-action="suggestion"]')?.focus({preventScroll:true});return}if(action==='retire'){openMenu(id,'retire');if(menu)retireConfirm()}else if(action==='group'&&b.dataset.renameLabel&&e.detail){clearTimeout(chipTimer);if(e.detail>1)return;chipTimer=setTimeout(()=>{if(inlineRename||!b.isConnected)return;if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action,undefined,b.dataset.groupName)},DOUBLE_CLICK_MS)}else if(['priority','snooze','more','group','due','block'].includes(action)){if(menu?.id===id&&menu.action===action)closeMenu();else{openMenu(id,action,undefined,b.dataset.groupName);if(action==='block')focusBlockInput()}}else if(action==='dependencies'){if(linesFit())toggleDependencies(id);else if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action)}else if(action==='title'){const t=task(id);if(t&&!t.pending&&!flow.snapshot().readOnly)startTitleEdit(id);else toggleExpand(id)}else if(action==='move')return;else if(action==='pending'){const p=flow.snapshot().proposals.find(p=>p.intent.taskId===id);if(p){collapsedProposals.delete(p.id);expandedProposal=p.id;render();$('review-title').scrollIntoView({block:'nearest'});$('review-title').focus()}}else request(action,{taskId:id})};
+$('board').onclick=e=>{if(e.target.closest('[data-title-view],.title-format,.att-chips,.att-field'))return;const add=e.target.closest('[data-section-add]');if(add){if(sectionCapture?.anchor===add)closeSectionAdd(true);else openSectionAdd(add);return}const sectionFold=e.target.closest('[data-section-fold]');if(sectionFold){toggleSectionFold(sectionFold);return}const fold=e.target.closest('[data-fold]');if(fold){toggleFold(fold.dataset.fold);return}const sb=e.target.closest('[data-suggestion]');if(sb){const {suggestion,suggestionAction}=sb.dataset;bubbleFor=null;safely(async()=>{const accepted=suggestionAction==='accept'&&flow.snapshot().suggestions.find(s=>s.id===suggestion)?.action;if(accepted)await flow.accept(suggestion,accepted);else{const started=performance.now();timed(flow.observe(await api('/api/suggestions/'+suggestion+'/'+suggestionAction,{})),started);await flow.refresh()}render()});return}if(inlineClick(e))return;const b=e.target.closest('[data-action]');if(!b){const card=e.target.closest('.task');if(card&&!e.target.closest('.assistant-bubble'))toggleExpand(card.dataset.taskId);else if(dependencyFocus&&!card)toggleDependencies(dependencyFocus);return}const {id,action}=b.dataset;if(action==='next-up'){const t=task(id);if(t)request('task_update',{uuid:id,nextUp:!t.nextUp});return}if(action==='suggestion'){bubbleFor=bubbleFor===id?null:id;render();$('board').querySelector('[data-id="'+id+'"][data-action="suggestion"]')?.focus({preventScroll:true});return}if(action==='retire'){openMenu(id,'retire');if(menu)retireConfirm()}else if(action==='group'&&b.dataset.renameLabel&&e.detail){clearTimeout(chipTimer);if(e.detail>1)return;chipTimer=setTimeout(()=>{if(inlineRename||!b.isConnected)return;if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action,undefined,b.dataset.groupName)},DOUBLE_CLICK_MS)}else if(['priority','snooze','more','group','due','block'].includes(action)){if(menu?.id===id&&menu.action===action)closeMenu();else{openMenu(id,action,undefined,b.dataset.groupName);if(action==='block')focusBlockInput()}}else if(action==='dependencies'){if(linesFit())toggleDependencies(id);else if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action)}else if(action==='title'){const t=task(id);if(t&&!t.pending&&!flow.snapshot().readOnly)startTitleEdit(id);else toggleExpand(id)}else if(action==='move')return;else if(action==='pending'){const p=flow.snapshot().proposals.find(p=>p.intent.taskId===id);if(p){collapsedProposals.delete(p.id);expandedProposal=p.id;render();$('review-title').scrollIntoView({block:'nearest'});$('review-title').focus()}}else request(action,{taskId:id})};
 $('board').addEventListener('change',e=>{const el=e.target;
  if(el.dataset.schedEvery){const v=el.value,id=el.dataset.schedEvery;saveSchedule(id,n=>{n.repeat=!v?null:v==='week'?{every:'week',days:[zonedWeekday()]}:v==='days'?{every:'days',n:2}:{every:v}})}
  else if(el.dataset.schedN){const v=Math.max(1,Math.min(365,Number(el.value)||1));saveSchedule(el.dataset.schedN,n=>{n.repeat={every:'days',n:v}})}
@@ -1667,7 +1697,7 @@ function attachmentPicker(host,pasteTarget){
  if(host.classList.contains('quick-add'))host.insertBefore(button,host.querySelector('#qa-hash'));else{pasteTarget.after(button);host.closest('dialog')?.addEventListener('close',()=>{captureFiles.delete(pasteTarget.id);renderCaptureFiles(pasteTarget)},{once:true})}
  return {ids:()=>{const files=captureFiles.get(pasteTarget.id)||[];if(files.some(f=>f.uploading))throw Error(tr('files_uploading'));return files.map(f=>f.id)},clear:ids=>{captureFiles.set(pasteTarget.id,ids?(captureFiles.get(pasteTarget.id)||[]).filter(f=>!ids.includes(f.id)):[]);renderCaptureFiles(pasteTarget)}};
 }
-globalThis.dayUI={icons:{close:closeIcon,check:checkIcon,attach:attachIcon},openPriorityPicker,formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
+globalThis.dayUI={rememberDetails,icons:{close:closeIcon,check:checkIcon,attach:attachIcon},openPriorityPicker,formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
 const diagnosticsDialog = document.querySelector('#diagnostics-dialog');
 document.querySelector('#diagnostics-open').addEventListener('click', async () => {
   diagnosticsDialog.showModal();

@@ -177,7 +177,7 @@ html[data-theme=dark] .filter-chip[aria-pressed=true] .group-dot.ungrouped{borde
 .fold{width:28px;height:28px;margin-right:-4px}
 .fold svg{width:16px;height:16px;transition:transform .2s}
 .lane.collapsed .fold svg{transform:rotate(-90deg)}
-.lane.collapsed .lane-cards{display:none}
+.lane.collapsed .lane-cards{display:none!important}
 .lane.collapsed.drop-target .lane-heading{background:var(--tint);border-radius:var(--r-card);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent-text) 30%,transparent)}
 .group-progress{width:90px;height:6px;border-radius:var(--r-ctl);background:var(--soft);overflow:hidden;flex:none}
 .group-progress i{display:block;height:100%;background:color-mix(in srgb,var(--gc,var(--muted)) 60%,var(--muted));transition:width .3s}
@@ -564,6 +564,8 @@ details>summary::before{content:"";width:14px;height:14px;flex:none;background:c
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/14px no-repeat;
   mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/14px no-repeat;transition:transform .12s}
 details[open]>summary::before{transform:rotate(90deg)}
+.closed-list>summary,.daily-section>summary,.org-item>summary{min-height:34px}
+.org-item>summary{align-items:flex-start}.org-item>summary::before{margin-top:4px}.org-item-body{margin-top:6px}
 
 svg{stroke-width:1.75}
 .ib svg,.row-actions svg,.menu-item svg,[role=menuitem] svg{width:16px!important;height:16px!important}
