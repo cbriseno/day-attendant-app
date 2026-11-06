@@ -361,7 +361,7 @@ let chainJustDone=null;
 $('board').addEventListener('click',e=>{if(orderView!=='chains')return;const close=e.target.closest('[data-chain-notice-close]');if(close){e.stopPropagation();chainJustDone=null;render();return}
  const b=e.target.closest('[data-action="done"]');if(!b)return;const data=flow.snapshot(),t=data.tasks.find(x=>x.id===b.dataset.id);if(!t)return;
  const waiting=(t.dependsOn||[]).map(id=>data.tasks.find(x=>x.id===id)).filter(x=>x&&!['done','retired','canceled'].includes(x.state));
- if(waiting.length)return
+ if(waiting.length){e.stopPropagation();e.preventDefault();const r=b.getBoundingClientRect();openMenu(t.id,'waitdone',{x:r.left,y:r.bottom+4});return}
  chainJustDone={id:t.id}},true);
 const PRIORITIES=globalThis.dayOrdering.PRIORITIES;
 function priorityButton(t,off){return '<button type="button" class="priority-pill" data-priority="'+esc(t.priority)+'" data-id="'+t.id+'" data-action="priority" aria-haspopup="menu" aria-expanded="false" title="'+esc(tr('change_priority'))+'"'+(off?' disabled':'')+'><span class="visually-hidden">'+esc(tr('priority'))+': </span>'+esc(tr('priority_'+t.priority))+'</button>'}
@@ -383,25 +383,6 @@ function taskRow(t,s,data,proposal){
  // The chips stand for the other tasks a row names, and the two times for what the clock changes in it.
  const inputs=JSON.stringify([t,s.key,s.draggable,!!proposal,creationAge(t.createdAt),!!t.due&&new Date(t.due)<NOW])+dependencyChips(t,data),kept=rowsKept.get(t.id+'|'+s.key),row=kept?.inputs===inputs?kept:{inputs,html:buildRow(t,s,data,proposal)};
  rowsBuilt.set(t.id+'|'+s.key,row);return row.html}
-const imageFile=file=>['image/png','image/jpeg','image/webp'].includes(file.mime);
-function taskFiles(t,details=false){
- const files=t.files||[];if(!files.length&&!details)return '';
- const items=(details?files:files.slice(0,2)).map(file=>{
-  const content=imageFile(file)?'<button type="button" class="file-preview" data-preview="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(file.name)+'"><img src="/api/attachments/'+esc(file.id)+'" alt=""></button>':'<a class="file-chip" href="/api/attachments/'+esc(file.id)+'" download="'+esc(file.name)+'">'+attachIcon+' '+esc(file.name)+'</a>';
-  return '<span class="task-file">'+content+(details?'<button type="button" class="file-remove" data-file-remove="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(tr('remove_file').replace('{name}',file.name))+'">'+closeIcon+'</button>':'')+'</span>';
- }).join('');
- return '<div class="task-files">'+items+(!details&&files.length>2?'<span>+'+(files.length-2)+'</span>':'')+(details?'<label class="btn ghost">'+esc(tr('attach_files'))+'<input type="file" data-file-add="'+esc(t.id)+'" multiple hidden></label>':'')+'</div>';
-}
-function previewFiles(id,fileId,origin){
- const files=(task(id)?.files||[]).filter(imageFile);let index=files.findIndex(file=>file.id===fileId);if(index<0)return;
- const d=groupDialog(tr('file_preview'),'<div class="preview-body"><img alt=""><p class="hint"></p><div class="actions"><button type="button" class="btn" data-previous>'+esc(tr('file_previous'))+'</button><button type="button" class="btn" data-next>'+esc(tr('file_next'))+'</button></div></div>',origin);
- const draw=()=>{const file=files[index];d.querySelector('img').src='/api/attachments/'+encodeURIComponent(file.id);d.querySelector('img').alt=file.name;d.querySelector('.hint').textContent=file.name+' · '+(index+1)+' / '+files.length;d.querySelector('[data-previous]').disabled=index===0;d.querySelector('[data-next]').disabled=index===files.length-1};
- const move=delta=>{index=Math.max(0,Math.min(files.length-1,index+delta));draw()};d.querySelector('[data-previous]').onclick=()=>move(-1);d.querySelector('[data-next]').onclick=()=>move(1);d.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')move(-1);if(e.key==='ArrowRight')move(1)});draw();
-}
-async function uploadTaskFiles(id,files){
- const ids=[];for(const file of files){if(file.size>20*1024*1024)throw Error(tr('file_too_large'));const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});const saved=await deliver('/api/attachments',{name:file.name,mime:file.type||'application/octet-stream',base64,purpose:'task'},undefined,{refresh:false});ids.push(saved.id)}
- const current=task(id);if(!current)throw Error(tr('reason_not_applied'));await flow.request('attachments_update',{uuid:id,attachmentIds:[...current.attachmentIds,...ids]});
-}
 function buildRow(t,s,data,proposal){
  const stripe=orderView==='group'?s.label:taskGroups(t)[0];
  const off=data.readOnly||t.pending,label=text=>esc(text+': '+t.title);
@@ -412,7 +393,7 @@ function buildRow(t,s,data,proposal){
  return '<article class="task'+(stripe?' grouped':'')+(t.state==='active'?' is-active':'')+(t.blockReason?' is-blocked':'')+(t.pending?' saving':'')+(open?' expanded':'')+(titleEdit?.id===t.id?' editing':'')+'"'+(stripe?' style="'+groupStyle(stripe)+'"':'')+' data-task-id="'+t.id+'" data-section="'+esc(t.state+':'+s.key)+'"><div class="row-main">'
   +'<span class="row-grip">'+handle+'</span>'
   +'<button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+label(tr('complete'))+'" title="'+esc(tr('complete'))+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button>'
-  +'<div class="row-text">'+suggestionReason(t,data)+titleCell(t,data)+taskFiles(t)+'<span class="row-meta">'+rowMeta(t,data,proposal,s)+'</span></div>'
+  +'<div class="row-text">'+suggestionReason(t,data)+titleCell(t,data)+'<span class="row-meta">'+rowMeta(t,data,proposal,s)+'</span></div>'
   +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+starIcon+'</button>':'')+priorityButton(t,off)+''
   +state+'<button type="button" class="ib" data-id="'+t.id+'" data-action="snooze" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('snooze'))+'" title="'+esc(tr('snooze'))+'"'+(off?' disabled':'')+'>'+clockIcon+'</button>'
   +'<button type="button" class="ib more" data-id="'+t.id+'" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('more_actions'))+'" title="'+esc(tr('more_actions_hint'))+'">'+moreIcon+'</button></div>'
@@ -448,7 +429,7 @@ function rowMeta(t,data,proposal,s={}){const time=(key,value,cls)=>'<span data-a
   +(t.awaiting?'<span class="task-wait">'+esc(tr('meta_waiting'))+'</span>':'')
   +blockChip(t,off)
   +(data.context.availableMinutes!==null&&Number.isFinite(t.remainingMinutes)?'<span data-anon-safe="text">'+esc(formatted('meta_remaining',{n:t.remainingMinutes}))+'</span>':'')
-  +creationTime(t)+activityTime(t)+dependencyChips(t,data)+checklistChip(t)
+  +creationTime(t)+activityTime(t)+dependencyChips(t,data)+checklistChip(t)+attachmentChips(t)
   +(proposal?'<button class="pending-badge" type="button"'+(data.readOnly?' disabled':'')+' data-id="'+t.id+'" data-action="pending">'+esc(tr('pending_change_badge'))+'</button>':'')}
 // The assistant's later look leaves a discreet mark on the affected card; it never moves the card.
 const currentSuggestion=(id,data)=>(data.suggestions||[]).find(s=>s.current&&s.taskId===id);
@@ -465,7 +446,7 @@ function suggestionReason(t,data){const order=data.orderSuggestion?.result?.orde
 function sectionAdd(group,data){
  if(data.readOnly)return '';
  const label=tr('section_add_in').replace('{group}',group||tr('no_group'));
- return '<button type="button" class="section-add" data-section-add="'+esc(group||'')+'" aria-label="'+esc(label)+'" title="'+esc(label)+'">+</button>';
+ return '<button type="button" class="section-add" data-section-add="'+esc(group||'')+'" aria-label="'+esc(label)+'" title="'+esc(label)+'" aria-haspopup="dialog" aria-expanded="false">'+plusIcon+'</button>';
 }
 function groupHeading(s,state,data){return '<h3 class="group-heading"'+(s.label?' data-anon-private="text" tabindex="0" aria-keyshortcuts="F2" data-rename-label="'+esc(s.label)+'" title="'+esc(tr('group_label_hint'))+'"':'')+' data-group="'+esc(s.label||'')+'">'+(s.label?groupDot(s.label)+esc(s.label):'<span class="group-dot ungrouped" aria-hidden="true"></span>'+esc(tr('no_group')))+'<span class="lane-count" data-anon-safe="text title aria-label">'+s.tasks.length+'</span>'+(state==='todo'?sectionAdd(s.label,data):'')+'</h3>'}
 // Only the suggested order has something to say or ask; the other orders explain themselves.
@@ -808,36 +789,21 @@ function fieldNote(t,field){const d=drafts.get(draftKey(t.id,field));if(!d)retur
  const cur=d.conflict.current,shown=field==='awaiting'?tr(cur?'value_yes':'value_no'):cur===null||cur===undefined||cur===''?tr('value_empty'):String(cur);
  const b=(kind,label,cls)=>'<button type="button" class="btn '+cls+'" data-conflict="'+kind+'" data-conflict-id="'+t.id+'" data-conflict-field="'+field+'">'+esc(tr(label))+'</button>';
  return '<div class="field-conflict" role="alert"><p>'+esc(tr('conflict_changed').replace('{value}',shown))+'</p><div class="conflict-actions">'+b('mine','conflict_keep_mine','primary')+b('theirs','conflict_use_current','ghost')+'</div></div>'}
-function richText(value){
- const text=String(value),pattern=/\[([^\]\n]+)\]\(([^\s)]+)\)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;let html='',last=0,match;
- while((match=pattern.exec(text))){html+=esc(text.slice(last,match.index));
-  if(match[1]){let url;try{url=new URL(match[2]);if(!['http:','https:'].includes(url.protocol))url=null}catch{url=null}
-   html+=url?'<a href="'+esc(url.href)+'" target="_blank" rel="noopener noreferrer">'+esc(match[1])+'</a>':esc(match[0]);
-  }else html+=match[3]?'<strong>'+esc(match[3])+'</strong>':'<em>'+esc(match[4])+'</em>';
-  last=pattern.lastIndex;
- }return html+esc(text.slice(last));
-}
+const TITLE_MARKS=/\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s()]+)\)|\*\*([^*\n]+)\*\*|(?<![\p{L}\p{N}_])_([^_\n]+)_(?![\p{L}\p{N}_])|\*([^*\n]+)\*/gu;
+const TITLE_LINK=/\[([^\]\n]+)\]\(((?:https?:\/\/|mailto:)[^\s()]+)\)/gu;
+function plain(text){return String(text??'').replace(TITLE_MARKS,(m,lt,url,b,i,j)=>lt??b??i??j)}
+function richTitle(text){let html='',last=0,links=0;const raw=String(text??'');
+ for(const m of raw.matchAll(TITLE_MARKS)){html+=esc(raw.slice(last,m.index));last=m.index+m[0].length;
+  if(m[1]!==undefined)html+='<a class="title-link" href="'+esc(m[2])+'" target="_blank" rel="noopener noreferrer" data-title-link="'+(links++)+'" title="'+esc(m[2])+'">'+esc(m[1])+'</a>';
+  else if(m[3]!==undefined)html+='<strong>'+esc(m[3])+'</strong>';else html+='<em>'+esc(m[4]??m[5])+'</em>'}
+ return {html:html+esc(raw.slice(last)),links}}
+function titleLinks(text){return [...String(text??'').matchAll(TITLE_LINK)].map(m=>({text:m[1],url:m[2],start:m.index,end:m.index+m[0].length}))}
+function richText(value){return richTitle(value).html}
+function formatInput(input){return attachFormatBar(input)}
 let formatLinkOpen=false;
-function formatInput(input){
- const bar=document.createElement('span');bar.className='format-bar';bar.hidden=true;bar.setAttribute('role','toolbar');bar.setAttribute('aria-label',tr('format_text'));
- for(const [kind,label] of [['bold','B'],['italic','I'],['link','link']]){const b=document.createElement('button');b.type='button';b.dataset.format=kind;if(kind==='link')b.innerHTML=externalIcon;else b.textContent=label;b.setAttribute('aria-label',tr('format_'+kind));bar.append(b)}
- input.after(bar);
- const update=()=>{bar.hidden=document.activeElement!==input||input.selectionStart===input.selectionEnd};
- input.addEventListener('select',update);input.addEventListener('focus',update);input.addEventListener('keyup',update);input.addEventListener('pointerup',update);
- const wrap=(start,end,text)=>{input.setRangeText(text,start,end,'select');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();update()};
- const act=kind=>{const start=input.selectionStart,end=input.selectionEnd,selected=input.value.slice(start,end);
-  if(kind!=='link'){const mark=kind==='bold'?'**':'*';wrap(start,end,mark+selected+mark);return}
-  formatLinkOpen=true;const d=groupDialog(tr('format_link'),'<label class="field"><span>'+esc(tr('link_text'))+'</span><input name="label" required></label><label class="field"><span>'+esc(tr('link_address'))+'</span><input name="url" type="text" required></label><button class="btn primary" type="submit">'+esc(tr('save'))+'</button>',input);
-  d.dataset.formatDialog='';d.addEventListener('close',()=>{formatLinkOpen=false});d.querySelector('[name=label]').value=selected;d.querySelector('[name=url]').focus();
-  d.querySelector('form').onsubmit=e=>{e.preventDefault();let url=d.querySelector('[name=url]').value.trim();if(!/^[a-z][a-z0-9+.-]*:/i.test(url))url='https://'+url;try{const parsed=new URL(url);if(!['http:','https:'].includes(parsed.protocol))throw Error();url=parsed.href}catch{d.querySelector('.error').hidden=false;d.querySelector('.error').textContent=tr('invalid_link');return}const label=d.querySelector('[name=label]').value.trim();if(!label)return;d.close();wrap(start,end,'['+label+']('+url+')')};
- };
- bar.addEventListener('pointerdown',e=>e.preventDefault());bar.onclick=e=>{const b=e.target.closest('[data-format]');if(b)act(b.dataset.format)};
- input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.altKey&&['b','i','k'].includes(e.key.toLowerCase())){e.preventDefault();e.stopPropagation();act({b:'bold',i:'italic',k:'link'}[e.key.toLowerCase()])}});
- return bar;
-}
 function titleCell(t,data){
  if(titleEdit?.id===t.id)return '<span class="title-editor"><input class="title-edit" data-id="'+t.id+'" data-field="title" data-anon-private="value text" maxlength="2000" autocomplete="off" value="'+esc(draftValue(t,'title'))+'" aria-label="'+esc(tr('edit_title')+': '+t.title)+'"'+(data.readOnly?' disabled':'')+'><span class="edit-hint">'+esc(tr('title_edit_hint'))+'</span>'+fieldNote(t,'title')+'</span>';
- return '<span class="title-wrap">'+suggestionMark(t,data)+'<span class="task-title" tabindex="0" data-title-view data-anon-private="text" data-id="'+t.id+'" data-action="title" aria-label="'+esc(tr('edit_title')+': '+t.title)+'" title="'+esc(tr('edit_title_hint'))+'">'+richText(t.title)+'</span></span>'}
+ return '<span class="title-wrap">'+suggestionMark(t,data)+'<span class="task-title'+(richTitle(t.title).links?' has-links':'')+'" tabindex="0" data-title-view data-anon-private="text" data-id="'+t.id+'" data-action="title" aria-label="'+esc(tr('edit_title')+': '+t.title)+'" title="'+esc(tr('edit_title_hint'))+'">'+richText(t.title)+'</span></span>'}
 function startTitleEdit(id){const t=task(id),data=flow.snapshot();if(!t||t.pending||data.readOnly||['done','retired','canceled'].includes(t.state))return;closeMenu(false);titleEdit={id};render();const input=$('board').querySelector('.title-edit[data-id="'+id+'"]');if(input){formatInput(input);input.focus({preventScroll:true});input.select()}}
 function commitTitle(id){const d=drafts.get(draftKey(id,'title'));if(d?.conflict||d?.saving)return;titleEdit=null;
  // An emptied title keeps the saved one, as Esc does. A new one leaves before the row is redrawn.
@@ -887,8 +853,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
  const foot=retireAsk===t.id?'<div class="inline-confirm" role="alert"><span>'+esc(tr('retire_this_responsibility_it_will_be_kept_s'))+'</span><button type="button" class="btn danger" data-x="retire-yes">'+esc(tr('yes_retire'))+'</button><button type="button" class="btn" data-x="retire-no">'+esc(tr('cancel'))+'</button></div>'
   :'<button type="button" class="btn ghost danger" data-x="retire"'+off+'>'+esc(tr('retire_7ad0e0'))+'</button><button type="button" class="btn ghost" data-x="duplicate"'+off+'>'+esc(tr('duplicate'))+'</button><button type="button" class="btn ghost" data-x="close">'+esc(tr('close_details'))+'</button><span class="saved-note" aria-live="polite">'+(note?checkIcon+esc(note):'')+'</span>';
  return '<div class="expand" data-expand="'+t.id+'"><div class="xgrid">'
-  +'<div class="xfield"><span class="xlabel">'+esc(tr('files_label'))+'</span>'+taskFiles(t,true)+'</div>'
-  +(t.assistantNotes?'<div class="xfield"><span class="xlabel">'+esc(tr('assistant_notes'))+'</span><p>'+esc(t.assistantNotes)+'</p></div>':'')+(t.original?'<div class="xfield"><span class="xlabel">'+esc(tr('original_capture'))+'</span><p>'+esc(t.original)+'</p></div>':'')+(t.captureError?'<p class="error" role="status">'+esc(tr('capture_failed'))+': '+esc(t.captureError)+'</p>':'')
+  +(t.assistantNotes||t.original?'<div class="xfield xnotes"><span class="xlabel">'+esc(tr('org_notes'))+'</span>'+(t.assistantNotes?'<p data-anon-private="text">'+esc(t.assistantNotes)+'</p>':'')+(t.original?'<details><summary>'+esc(tr('org_original'))+'</summary><p data-anon-private="text">'+esc(t.original)+'</p></details>':'')+'<span class="att-hint">'+esc(tr('org_from'))+' · <button type="button" class="link-button" data-org-history>'+esc(tr('org_open_history'))+'</button></span></div>':'')+(t.captureError?'<p class="error" role="status">'+esc(tr('capture_failed'))+': '+esc(t.captureError)+'</p>':'')
   +field('notes','general_notes','<textarea id="'+id('notes')+'" data-id="'+t.id+'" data-field="notes" data-anon-private="value text" rows="3" maxlength="2000"'+off+'>'+esc(draftValue(t,'notes'))+'</textarea>'+(t.notes?'<div class="note-preview" data-anon-private="text">'+richText(t.notes)+'</div>':''))
   +field('context','where_i_left_off','<textarea id="'+id('context')+'" data-id="'+t.id+'" data-field="context" data-anon-private="value text" rows="2" maxlength="2000" placeholder="'+esc(tr('where_i_left_off_placeholder'))+'"'+off+'>'+esc(draftValue(t,'context'))+'</textarea>')
   +field('next','next_step','<input type="text" id="'+id('next')+'" data-id="'+t.id+'" data-field="next" data-anon-private="value text" maxlength="2000" autocomplete="off" placeholder="'+esc(tr('next_step_placeholder'))+'" value="'+esc(draftValue(t,'next'))+'"'+off+'>')
@@ -900,7 +865,7 @@ function expandView(t,data){const off=data.readOnly||t.pending?' disabled':'',id
   +'<div class="xfield"><span class="xlabel">'+esc(tr('required_by_label'))+'</span><div class="rel-list">'+relationRows(dependents,'dependent',t,data)+'</div></div>'
   +'<div class="xfield"><span class="xlabel">'+esc(tr('related_label'))+'</span><div class="rel-list">'+relationRows(t.relatedTo,'rel',t,data)+'</div>'+pickerInput(t,'rel',data)+'</div>'
   +scheduleFields(t,data)
-  +'<div class="xfield"><span class="xlabel">'+esc(tr('source_and_dates'))+'</span><dl class="meta-grid">'+source.map(([k,v,typed])=>'<dt>'+esc(k)+'</dt><dd'+(typed?' data-anon-safe="text"':' data-anon-private="text"')+'>'+esc(v)+'</dd>').join('')+'</dl>'+'</div>'
+  +'<div class="xfield"><span class="xlabel">'+esc(tr('source_and_dates'))+'</span><dl class="meta-grid">'+source.map(([k,v,typed])=>'<dt>'+esc(k)+'</dt><dd'+(typed?' data-anon-safe="text"':' data-anon-private="text"')+'>'+esc(v)+'</dd>').join('')+'</dl>'+'</div>'+attachmentField(t,data)
   +'</div><div class="expand-foot">'+foot+'</div></div>'}
 function toggleExpand(id,open=expanded!==id){const t=task(id);if(open&&(!t||t.pending))return;flush();expanded=open?id:null;retireAsk=null;savedNote=null;render();
  const card=$('board').querySelector('[data-task-id="'+id+'"]');// An instant scroll: a smooth one would keep scrolling and close a menu opened right after.
@@ -1007,7 +972,7 @@ $('board').addEventListener('focusin',e=>{if(e.target.dataset?.search){hidePicke
 $('board').addEventListener('focusin',e=>{if(e.target.matches('[data-field=notes]')&&!e.target.dataset.formatWired){e.target.dataset.formatWired='1';formatInput(e.target)}});
 $('board').addEventListener('focusout',e=>{if(rendering)return;const {field,id,search}=e.target.dataset||{};
  if(search){setTimeout(()=>{const list=e.target.nextElementSibling;if(list&&!list.contains(document.activeElement)&&document.activeElement!==e.target){list.hidden=true;e.target.setAttribute('aria-expanded','false');if(picker?.id===e.target.dataset.pickerTask)picker=null}},150);return}
- if(!field||!id)return;if(field==='title'){if(formatLinkOpen||e.relatedTarget?.closest?.('[data-conflict],.format-bar,[data-format-dialog]'))return;commitTitle(id)}else if(!formatLinkOpen&&!e.relatedTarget?.closest?.('.format-bar,[data-format-dialog]')&&drafts.has(draftKey(id,field)))saveDraft(id,field)});
+ if(!field||!id)return;if(field==='title'){if(formatLinkOpen||e.relatedTarget?.closest?.('[data-conflict],.title-format,.link-menu'))return;commitTitle(id)}else if(!formatLinkOpen&&!e.relatedTarget?.closest?.('.title-format,.link-menu')&&drafts.has(draftKey(id,field)))saveDraft(id,field)});
 $('board').addEventListener('keydown',e=>{const {field,id,search}=e.target.dataset||{};
  if(field==='title'&&id){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();commitTitle(id)}else if(e.key==='Escape'){e.preventDefault();e.stopPropagation();cancelTitle(id)}return}
  if(search&&e.key==='Enter'){e.preventDefault();e.target.nextElementSibling?.querySelector('[data-pick]')?.click();return}
@@ -1036,8 +1001,8 @@ function snoozeMenu(t,data){const off=data.readOnly||t.pending,today=localValue(
   return menuItem('snooze',esc(tr(key))+(late?'<span class="menu-warn">'+esc(tr('snooze_after_deadline'))+'</span>':''),{value:d.toISOString(),hint:clock(d,key!=='snooze_tomorrow'&&localValue(d).slice(0,10)!==today),title:full(d),disabled:off})}).join('');
  return '<p class="menu-title">'+esc(tr('snooze_until'))+'</p>'+items+(browserZone!==zone?'<p class="menu-note">'+esc(tr('snooze_zone_note').replace('{zone}',zone))+'</p>':'')
   +(t.state==='snoozed'?'<div class="menu-sep" role="separator"></div>'+menuItem('todo',esc(tr('resume_now')),{disabled:off}):'')}
-function moreMenu(t,data){const off=data.readOnly||t.pending,card=cardOf(t.id),ids=card?.querySelector('.drag-handle')?sectionIds(card.dataset.section):[],i=ids.indexOf(t.id);
- return '<p class="menu-title task-name">'+esc(t.title)+'</p>'+(t.state!=='todo'?menuItem('todo',esc(tr('back_to_to_do')),{disabled:off}):'')
+function moreMenu(t,data){const off=data.readOnly||t.pending,card=cardOf(t.id),ids=card?.querySelector('.drag-handle')?sectionIds(card.dataset.section):[],i=ids.indexOf(t.id),link=titleMenuLink===null?null:titleLinks(t.title)[titleMenuLink];titleMenuLink=null;
+ return (link?'<p class="menu-title">'+esc(tr('title_link'))+' · <span data-anon-private="text">'+esc(link.text)+'</span></p>'+menuItem('title-link-open',esc(tr('title_link_open')),{icon:arrowIcon,value:link.url,hint:hostOf(link.url)})+menuItem('title-link-edit',esc(tr('title_link_edit')),{icon:editIcon,value:String(link.start),disabled:off})+menuItem('title-link-remove',esc(tr('title_link_remove')),{icon:linkIcon,value:String(link.start),disabled:off})+'<div class="menu-sep" role="separator"></div>':'')+'<p class="menu-title task-name">'+esc(t.title)+'</p>'+(t.state!=='todo'?menuItem('todo',esc(tr('back_to_to_do')),{disabled:off}):'')
   +menuItem('edit-title',esc(tr('edit_title')),{icon:editIcon,disabled:off})+menuItem('details',esc(tr(expanded===t.id?'hide_details':'more_details')),{icon:arrowIcon,disabled:t.pending})
   +menuItem('set-due',esc(tr(t.due?'change_deadline':'set_deadline')),{icon:calendarIcon,disabled:off})
   +(i>0?menuItem('move',esc(tr('move_up')),{value:i-1}):'')+(i>=0&&i<ids.length-1?menuItem('move',esc(tr('move_down')),{value:i+1}):'')
@@ -1052,47 +1017,31 @@ function groupMenu(t,data,selected){const off=data.readOnly||t.pending,groups=ra
   +'<div class="menu-scroll">'+groups.map(g=>menuItem('group-toggle',groupDot(g)+esc(groupName(g)),{value:g,checked:taskGroups(t).some(x=>groupKey(x)===groupKey(g)),disabled:off}).replace('menuitemradio','menuitemcheckbox')).join('')+'</div><p class="menu-error" role="alert" hidden></p>'
   +(current?'<div class="menu-sep" role="separator"></div><p class="menu-title">'+esc(tr('group_color_of').replace('{group}',current))+'</p><div class="swatches">'+Object.keys(GROUP_COLORS).map(c=>'<button type="button" class="swatch" role="menuitemradio" aria-checked="'+(groupColor(current)===c)+'" data-menu-act="group-color" data-group-name="'+esc(current)+'" data-value="'+c+'" style="--c:'+GROUP_COLORS[c]+'" aria-label="'+esc(tr('color_'+c))+'"'+(off?' disabled':'')+'></button>').join('')+'</div>':'')}
 function groupDialog(title,body,origin){const d=document.createElement('dialog');d.className='group-dialog';d.innerHTML='<form class="modal-form"><header class="modal-header"><h2>'+esc(title)+'</h2><button type="button" class="btn ghost" data-dismiss aria-label="'+esc(tr('close'))+'">'+closeIcon+'</button></header><div class="modal-body">'+body+'<p class="error" role="alert" hidden></p></div></form>';document.body.append(d);registerDialog(d);d.querySelector('[data-dismiss]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());openDialog(d,origin);return d}
-function attachmentPicker(host,pasteTarget){
- const box=document.createElement('div'),input=document.createElement('input'),button=document.createElement('button'),list=document.createElement('div'),error=document.createElement('p');
- box.className='capture-files';input.type='file';input.multiple=true;input.hidden=true;button.type='button';button.className='btn ghost';button.innerHTML=attachIcon+'<span>'+esc(tr('attach_files'))+'</span>';button.setAttribute('aria-label',tr('attach_files'));error.className='error';error.setAttribute('role','alert');box.append(button,input,list,error);host.append(box);
- let files=[],pending=0;
- const draw=()=>{list.replaceChildren();for(const file of files){const row=document.createElement('span');row.className='capture-file';row.append(document.createTextNode(file.name+' '));const remove=document.createElement('button');remove.type='button';remove.innerHTML=closeIcon;remove.setAttribute('aria-label',tr('remove_file').replace('{name}',file.name));remove.onclick=()=>{files=files.filter(f=>f!==file);draw()};row.append(remove);list.append(row)}};
- const add=async selected=>{error.textContent='';pending++;button.disabled=true;try{for(const file of selected){
-  if(file.size>20*1024*1024)throw Error(tr('file_too_large'));
-  const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});
-  files.push(await deliver('/api/attachments',{name:file.name,mime:file.type||'application/octet-stream',base64,purpose:'task'},undefined,{refresh:false}));draw();
- }}catch(err){error.textContent=err.message}finally{pending--;button.disabled=!!pending;input.value=''}};
- button.onclick=()=>input.click();input.onchange=()=>add([...input.files]);
- pasteTarget?.addEventListener('paste',e=>{const images=[...e.clipboardData.files].filter(f=>f.type.startsWith('image/'));if(images.length){e.preventDefault();add(images)}});
- return {ids:()=>{if(pending)throw Error(tr('files_uploading'));return files.map(f=>f.id)},clear:ids=>{files=ids?files.filter(f=>!ids.includes(f.id)):[];draw()}};
-}
-function openSectionCapture(origin){
- const group=origin.dataset.sectionAdd||'';
- const dialog=groupDialog(tr('section_add_in').replace('{group}',group||tr('no_group')),
-  '<label class="field"><span>'+esc(tr('section_title'))+'</span><textarea name="title" maxlength="2000" rows="3" required></textarea></label><p class="hint">'+esc(tr('section_keys'))+'</p>'
-  +'<label class="field"><span>'+esc(tr('priority'))+'</span><select name="priority">'+globalThis.dayOrdering.PRIORITIES.map(p=>'<option value="'+p+'"'+(p==='medium'?' selected':'')+'>'+esc(tr('priority_'+p))+'</option>').join('')+'</select></label>'
-  +'<details><summary>'+esc(tr('groups_open'))+'</summary><div class="section-groups">'+rankedGroups().map(g=>'<label><input type="checkbox" name="groups" value="'+esc(g.label)+'"'+(groupKey(g.label)===groupKey(group)?' checked':'')+'>'+esc(g.label)+'</label>').join('')+'</div><label class="field"><span>'+esc(tr('add_group'))+'</span><input name="newgroup" maxlength="120"></label></details>'
-  +'<button type="submit" class="btn primary">'+esc(tr('section_submit'))+'</button>',origin);
- dialog.classList.add('section-capture');
- const form=dialog.querySelector('form'),input=form.elements.title,button=form.querySelector('[type=submit]'),error=form.querySelector('.error'),files=attachmentPicker(form.querySelector('.modal-body'),input);
- input.addEventListener('keydown',e=>{
-  if(e.key!=='Enter'||e.isComposing||e.shiftKey)return;
-  if(e.ctrlKey||e.metaKey){e.preventDefault();input.setRangeText('\n',input.selectionStart,input.selectionEnd,'end');return}
-  e.preventDefault();form.requestSubmit();
- });
- form.onsubmit=async e=>{
-  e.preventDefault();const title=input.value.trim();if(!title||button.disabled)return;
-  button.disabled=true;error.hidden=true;
-  try{const groups=[...form.querySelectorAll('[name=groups]:checked')].map(el=>el.value),newgroup=form.elements.newgroup.value.trim();if(newgroup&&!groups.some(g=>groupKey(g)===groupKey(newgroup)))groups.push(newgroup);if(group&&!rankedGroups().some(g=>groupKey(g.label)===groupKey(group))&&!groups.some(g=>groupKey(g)===groupKey(group)))groups.push(group);
-   const result=await flow.request('task_add',{title,priority:form.elements.priority.value,source:'general',groups,attachmentIds:files.ids()});
-   if(result.phase!=='applied')throw Error(tr('reason_not_applied'));
-   input.value='';files.clear();input.focus();
-  }catch(err){error.textContent=err.message;error.hidden=false}
-  finally{button.disabled=false}
- };
- form.elements.newgroup.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.focus()}});
- formatInput(input);input.focus();
-}
+let sectionCapture=null;
+function closeSectionAdd(restore){if(!sectionCapture)return;const {node,scrim,anchor}=sectionCapture;sectionCapture=null;captureFiles.delete('section-capture-input');node.remove();scrim?.remove();const live=anchor?.isConnected?anchor:$('board').querySelector('[data-section-add][data-section-add="'+CSS.escape(anchor?.dataset.sectionAdd||'')+'"]');live?.setAttribute('aria-expanded','false');if(restore)live?.focus({preventScroll:true})}
+function openSectionAdd(anchor){const data=flow.snapshot();if(data.readOnly||document.querySelector('dialog[open]'))return;closeMenu(false);closeSectionAdd(false);
+ const chosen=anchor.dataset.sectionAdd||'',groups=rankedGroups(data).map(g=>g.label);if(chosen&&!groups.some(g=>groupKey(g)===groupKey(chosen)))groups.unshift(chosen);
+ const node=document.createElement('div');node.className='row-menu section-capture';node.setAttribute('role','dialog');node.setAttribute('aria-label',tr('section_add_in').replace('{group}',chosen||tr('no_group')));
+ node.innerHTML='<p class="menu-title">'+esc(tr('section_add_title'))+'</p><div class="section-capture-body"><textarea class="menu-input section-capture-title" id="section-capture-input" rows="1" maxlength="2000" data-anon-private="value" aria-label="'+esc(tr('section_add_title'))+'" aria-describedby="section-capture-hint" placeholder="'+esc(tr('section_add_placeholder'))+'"></textarea>'
+  +'<div class="section-capture-row"><div class="capture-options" role="group" aria-label="'+esc(tr('capture_options'))+'"></div>'
+  +'<button type="button" class="btn primary section-capture-add">'+esc(tr('section_add_button'))+'</button></div></div><p class="section-capture-hint" id="section-capture-hint" role="status">'+esc(tr('section_add_keys'))+'</p>';
+ const sheet=sheetMedia.matches,scrim=sheet?document.createElement('div'):null;if(scrim){scrim.className='menu-scrim';document.body.append(scrim);scrim.onclick=()=>closeSectionAdd(true)}
+ node.classList.toggle('sheet',sheet);document.body.append(node);sectionCapture={node,scrim,anchor};anchor.setAttribute('aria-expanded','true');if(!sheet){const r=anchor.getBoundingClientRect();placeMenu(node,null,{x:r.left-8,y:r.bottom+6})}
+ const input=node.querySelector('textarea'),hint=node.querySelector('.section-capture-hint');attachFormatBar(input);
+ const options=captureOptions(node.querySelector('.capture-options'),{input,groups:chosen?[chosen]:[],onChange:()=>input.focus({preventScroll:true})});
+ const grow=()=>{input.style.height='auto';input.style.height=Math.min(input.scrollHeight+2,160)+'px'};
+  const add=()=>{const title=input.value.trim();if(!title){hint.textContent=tr('section_add_empty');hint.classList.add('warn');input.focus();return}
+  if((captureFiles.get(input.id)||[]).some(f=>f.uploading)){hint.textContent=tr('files_uploading');return}
+  const opt=options.get(),payload={title,priority:opt.priority,source:'general',groups:opt.groups,attachmentIds:(captureFiles.get(input.id)||[]).filter(f=>f.id).map(f=>f.id)};input.value='';grow();input.focus();
+  hint.classList.remove('warn');hint.textContent=tr('section_add_done').replace('{group}',opt.groups.join(', ')||tr('no_group'));
+  safely(async()=>{try{const created=await flow.request('task_add',payload);captureFiles.delete(input.id);renderCaptureFiles(input)}catch(error){if(sectionCapture?.node===node&&!input.value){input.value=title;grow();hint.textContent=error.message;hint.classList.add('warn')}throw error}})};
+ node.querySelector('.section-capture-add').onclick=add;
+ input.oninput=()=>{grow();hint.classList.remove('warn');hint.textContent=tr('section_add_keys')};
+ input.onkeydown=e=>{if(e.key!=='Enter'||e.isComposing||e.shiftKey)return;e.preventDefault();if(e.ctrlKey||e.metaKey){input.setRangeText('\n',input.selectionStart,input.selectionEnd,'end');grow();return}add()};
+ node.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeSectionAdd(true)}else if(e.key==='Tab'){const items=[input,...node.querySelectorAll('.capture-chip'),node.querySelector('.section-capture-add')],i=items.indexOf(document.activeElement);e.preventDefault();items[(i+(e.shiftKey?-1:1)+items.length)%items.length].focus()}});
+ input.focus({preventScroll:true})}
+document.addEventListener('pointerdown',e=>{if(sectionCapture&&!sectionCapture.node.contains(e.target)&&e.target!==sectionCapture.scrim&&!e.target.closest?.('[data-section-add],.link-menu,.capture-picker,.capture-scrim')&&!(linkMenu&&e.target===linkMenu.scrim))closeSectionAdd(false)},true);
+addEventListener('resize',()=>{if(sectionCapture&&!sectionCapture.node.classList.contains('sheet'))closeSectionAdd(false)});
 const renameViews=new Map();try{for(const [k,v] of JSON.parse(sessionStorage.getItem('day-attendant-rename-views')||'[]'))renameViews.set(k,v)}catch{}
 function saveGroupPreferences(){try{localStorage.setItem('day-attendant-group-filter',groupFilter);localStorage.setItem('day-attendant-folded-groups',JSON.stringify([...foldedGroups]));sessionStorage.setItem('day-attendant-rename-views',JSON.stringify([...renameViews]))}catch{}}
 function renameGroup(label,origin){closeMenu(false);const revision=flow.snapshot().revision,d=groupDialog(tr('rename_group'),'<label class="field"><span>'+esc(tr('group'))+'</span><input name="name" maxlength="120" required value="'+esc(label)+'"></label><p class="hint" data-impact></p><button type="submit" class="btn primary">'+esc(tr('save'))+'</button>',origin),input=d.querySelector('input');
@@ -1150,7 +1099,7 @@ function linksMenu(t,data){const off=data.readOnly||t.pending,find=id=>data.task
  const section=(label,ids,kind)=>'<p class="menu-title">'+esc(tr(label))+'</p>'+(ids.map(find).filter(Boolean).map(o=>'<div class="menu-link">'+menuItem('link-go',relationTitle(o,data),{value:o.id,title:tr('go_to_task')})+(off?'':'<button type="button" class="menu-link-remove" data-menu-act="link-remove" data-value="'+kind+':'+o.id+'" aria-label="'+esc(tr('remove_link')+': '+o.title)+'" title="'+esc(tr('remove_link'))+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>')+'</div>').join('')||'<p class="menu-note">'+esc(tr('links_none'))+'</p>');
  return '<p class="menu-title task-name">'+esc(tr('links_of').replace('{title}',t.title))+'</p>'+section('links_blocked_by',t.dependsOn,'dep')+section('links_blocks',dependents,'dependent')+section('links_related',t.relatedTo,'rel')
   +'<div class="menu-sep" role="separator"></div>'+menuItem('connect-needs',esc(tr('add_requirement')),{icon:linkIcon,disabled:off})+menuItem('connect',esc(tr('this_blocks')),{icon:linkIcon,disabled:off})}
-const menuBodies={block:blockMenu,blockdone:t=>'<p class="menu-confirm">'+esc(tr('block_done_confirm').replace('{reason}',t.blockReason))+'</p><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn" data-menu-act="block-done">'+esc(tr('block_done_anyway'))+'</button></div>',cldone:t=>{const {done,n}=checklistCount(t);return '<p class="menu-confirm">'+esc(formatted('checklist_done_confirm',{left:n-done,n}))+'</p><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn" data-menu-act="cl-done-anyway">'+esc(tr('checklist_done_anyway'))+'</button></div>'},clconvert:t=>{const i=checklistOf(t).find(x=>x.id===clMenuItem);return '<p class="menu-confirm">'+esc(tr('checklist_convert_title').replace('{title}',i?.text||''))+'</p><button type="button" class="menu-item" role="menuitem" data-menu-act="cl-convert"><span class="menu-label">'+esc(tr('checklist_convert_plain'))+'</span></button><button type="button" class="menu-item" role="menuitem" data-menu-act="cl-convert-dep"><span class="menu-label">'+esc(tr('checklist_convert_dep'))+'</span></button>'},retire:()=>'',priority:priorityMenu,snooze:snoozeMenu,more:moreMenu,group:groupMenu,due:dueMenu,dependencies:linksMenu};
+const menuBodies={waitdone:t=>{const d=flow.snapshot(),w=(t.dependsOn||[]).map(id=>d.tasks.find(x=>x.id===id)).filter(x=>x&&!['done','retired','canceled'].includes(x.state));return '<p class="menu-confirm">'+esc(tr('chain_done_waiting').replace('{title}',t.title).replace('{others}',w.map(x=>x.title).join('» y «')))+'</p><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn" data-menu-act="links">'+esc(tr('see_links'))+'</button></div>'},block:blockMenu,blockdone:t=>'<p class="menu-confirm">'+esc(tr('block_done_confirm').replace('{reason}',t.blockReason))+'</p><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn" data-menu-act="block-done">'+esc(tr('block_done_anyway'))+'</button></div>',cldone:t=>{const {done,n}=checklistCount(t);return '<p class="menu-confirm">'+esc(formatted('checklist_done_confirm',{left:n-done,n}))+'</p><div class="menu-confirm-actions"><button type="button" class="btn" data-menu-act="keep">'+esc(tr('cancel'))+'</button><button type="button" class="btn" data-menu-act="cl-done-anyway">'+esc(tr('checklist_done_anyway'))+'</button></div>'},clconvert:t=>{const i=checklistOf(t).find(x=>x.id===clMenuItem);return '<p class="menu-confirm">'+esc(tr('checklist_convert_title').replace('{title}',i?.text||''))+'</p><button type="button" class="menu-item" role="menuitem" data-menu-act="cl-convert"><span class="menu-label">'+esc(tr('checklist_convert_plain'))+'</span></button><button type="button" class="menu-item" role="menuitem" data-menu-act="cl-convert-dep"><span class="menu-label">'+esc(tr('checklist_convert_dep'))+'</span></button>'},retire:()=>'',priority:priorityMenu,snooze:snoozeMenu,more:moreMenu,group:groupMenu,due:dueMenu,dependencies:linksMenu};
 function openMenu(id,action,point,selectedGroup){const data=flow.snapshot(),t=data.tasks.find(t=>t.id===id);if(!t||document.querySelector('dialog[open]'))return;closeMenu(false);
  const node=document.createElement('div');node.className='row-menu';node.setAttribute('role','menu');node.innerHTML=menuBodies[action](t,data,selectedGroup);localizedDates(node);
  const sheet=sheetMedia.matches,scrim=sheet?document.createElement('div'):null;if(scrim){scrim.className='menu-scrim';document.body.append(scrim)}
@@ -1185,6 +1134,9 @@ function menuAct(b){const {id}=menu,t=task(id),act=b.dataset.menuAct,value=b.dat
  if(act==='details'){closeMenu(false);toggleExpand(id);return}
  if(act==='edit-title'){closeMenu(false);startTitleEdit(id);return}
  if(act==='set-due'){swapMenu('due');return}
+ if(act==='title-link-open'){closeMenu(false);window.open(value,'_blank','noopener');return}
+ if(act==='title-link-edit'||act==='title-link-remove'){const at=Number(value),link=titleLinks(t.title).find(l=>l.start===at);closeMenu(false);if(!link)return;if(act==='title-link-remove'){request('task_update',{uuid:id,title:t.title.slice(0,link.start)+link.text+t.title.slice(link.end)});return}
+  openLinkMenu({text:link.text,url:link.url,anchor:cardOf(id)?.querySelector('[data-title-link]')||anchorOf(id,'title'),onSave:(text,url)=>request('task_update',{uuid:id,title:t.title.slice(0,link.start)+'['+text+']('+url+')'+t.title.slice(link.end)}),onRemove:()=>request('task_update',{uuid:id,title:t.title.slice(0,link.start)+link.text+t.title.slice(link.end)}),restore:()=>anchorOf(id,'title')?.focus({preventScroll:true})});return}
  if(act==='links'){swapMenu('dependencies');return}
  if(act==='link-remove'){const [kind,other]=value.split(':');unlinkFrom(id,kind,other);swapMenu('dependencies');return}
  if(act==='link-go'){closeMenu(false);goTo(value);return}
@@ -1220,17 +1172,13 @@ document.addEventListener('keydown',e=>{if(!menu||!menu.node.contains(document.a
 // from a button follows it, and closes once the button leaves the screen; one opened at the pointer closes.
 addEventListener('scroll',e=>{if(!menu||menu.node.classList.contains('sheet')||!(e.target===document||e.target.contains?.($('board'))))return;const a=anchorOf(menu.id,menu.action),r=a?.getClientRects().length?a.getBoundingClientRect():null;
  if(menu.point||!r||r.bottom<0||r.top>innerHeight)closeMenu(false);else placeMenu(menu.node,a)},true);addEventListener('resize',()=>{if(!document.activeElement?.matches?.('.menu-input'))closeMenu(false)});
-$('board').addEventListener('contextmenu',e=>{const card=e.target.closest('.task');if(!card)return;if(drag){e.preventDefault();return}e.preventDefault();if(menu?.id===card.dataset.taskId&&performance.now()-menu.at<800)return;openMenu(card.dataset.taskId,'more',{x:e.clientX,y:e.clientY})});
+$('board').addEventListener('contextmenu',e=>{const card=e.target.closest('.task');if(!card)return;if(drag){e.preventDefault();return}e.preventDefault();const link=e.target.closest('a.title-link');titleMenuLink=link?Number(link.dataset.titleLink):null;if(menu?.id===card.dataset.taskId&&performance.now()-menu.at<800)return;openMenu(card.dataset.taskId,'more',{x:e.clientX,y:e.clientY})});
 $('board').addEventListener('dblclick',e=>{const title=e.target.closest('[data-title-view]');if(title&&!e.target.closest('a'))startTitleEdit(title.dataset.id)});
 $('board').addEventListener('keydown',e=>{const title=e.target.closest('[data-title-view]');if(title&&(e.key==='Enter'||e.key==='F2')){e.preventDefault();startTitleEdit(title.dataset.id)}});
-$('board').addEventListener('paste',e=>{const input=e.target.closest('.title-edit');if(!input)return;const files=[...e.clipboardData.files].filter(file=>file.type.startsWith('image/'));if(files.length){e.preventDefault();safely(()=>uploadTaskFiles(input.dataset.id,files))}});
-$('board').addEventListener('dragover',e=>{if(e.target.closest('.title-edit')&&e.dataTransfer.types.includes('Files'))e.preventDefault()});
-$('board').addEventListener('drop',e=>{const input=e.target.closest('.title-edit');if(!input||!e.dataTransfer.files.length)return;e.preventDefault();e.stopPropagation();safely(()=>uploadTaskFiles(input.dataset.id,[...e.dataTransfer.files]))});
-$('board').addEventListener('change',e=>{const input=e.target.closest('[data-file-add]');if(!input||!input.files.length)return;const id=input.dataset.fileAdd,files=[...input.files];input.value='';safely(()=>uploadTaskFiles(id,files))});
 $('board').addEventListener('click',e=>{const b=e.target.closest('[data-action="done"]');if(!b)return;const t=task(b.dataset.id);if(!t?.blockReason||t.state==='done')return;
  e.stopPropagation();e.preventDefault();const r=b.getBoundingClientRect();openMenu(t.id,'blockdone',{x:r.left,y:r.bottom+4})},true);
 function announceBlock(t,reason){const live=document.querySelector('#board-status,[role=status][aria-live]');if(live)live.textContent=reason?tr('block_announce').replace('{title}',t.title).replace('{reason}',reason):tr('block_announce_clear').replace('{title}',t.title)}
-$('board').onclick=e=>{const preview=e.target.closest('[data-preview]');if(preview){previewFiles(preview.dataset.fileTask,preview.dataset.preview,preview);return}const remove=e.target.closest('[data-file-remove]');if(remove){const t=task(remove.dataset.fileTask);if(t)safely(()=>flow.request('attachments_update',{uuid:t.id,attachmentIds:t.attachmentIds.filter(id=>id!==remove.dataset.fileRemove)}));return}if(e.target.closest('[data-title-view],.format-bar,.task-files'))return;const add=e.target.closest('[data-section-add]');if(add){openSectionCapture(add);return}const fold=e.target.closest('[data-fold]');if(fold){toggleFold(fold.dataset.fold);return}const sb=e.target.closest('[data-suggestion]');if(sb){const {suggestion,suggestionAction}=sb.dataset;bubbleFor=null;safely(async()=>{const accepted=suggestionAction==='accept'&&flow.snapshot().suggestions.find(s=>s.id===suggestion)?.action;if(accepted)await flow.accept(suggestion,accepted);else{const started=performance.now();timed(flow.observe(await api('/api/suggestions/'+suggestion+'/'+suggestionAction,{})),started);await flow.refresh()}render()});return}if(inlineClick(e))return;const b=e.target.closest('[data-action]');if(!b){const card=e.target.closest('.task');if(card&&!e.target.closest('.assistant-bubble'))toggleExpand(card.dataset.taskId);else if(dependencyFocus&&!card)toggleDependencies(dependencyFocus);return}const {id,action}=b.dataset;if(action==='next-up'){const t=task(id);if(t)request('task_update',{uuid:id,nextUp:!t.nextUp});return}if(action==='suggestion'){bubbleFor=bubbleFor===id?null:id;render();$('board').querySelector('[data-id="'+id+'"][data-action="suggestion"]')?.focus({preventScroll:true});return}if(action==='retire'){openMenu(id,'retire');if(menu)retireConfirm()}else if(action==='group'&&b.dataset.renameLabel&&e.detail){clearTimeout(chipTimer);if(e.detail>1)return;chipTimer=setTimeout(()=>{if(inlineRename||!b.isConnected)return;if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action,undefined,b.dataset.groupName)},DOUBLE_CLICK_MS)}else if(['priority','snooze','more','group','due','block'].includes(action)){if(menu?.id===id&&menu.action===action)closeMenu();else{openMenu(id,action,undefined,b.dataset.groupName);if(action==='block')focusBlockInput()}}else if(action==='dependencies'){if(linesFit())toggleDependencies(id);else if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action)}else if(action==='title'){const t=task(id);if(t&&!t.pending&&!flow.snapshot().readOnly)startTitleEdit(id);else toggleExpand(id)}else if(action==='move')return;else if(action==='pending'){const p=flow.snapshot().proposals.find(p=>p.intent.taskId===id);if(p){collapsedProposals.delete(p.id);expandedProposal=p.id;render();$('review-title').scrollIntoView({block:'nearest'});$('review-title').focus()}}else request(action,{taskId:id})};
+$('board').onclick=e=>{if(e.target.closest('[data-title-view],.title-format,.att-chips,.att-field'))return;const add=e.target.closest('[data-section-add]');if(add){if(sectionCapture?.anchor===add)closeSectionAdd(true);else openSectionAdd(add);return}const fold=e.target.closest('[data-fold]');if(fold){toggleFold(fold.dataset.fold);return}const sb=e.target.closest('[data-suggestion]');if(sb){const {suggestion,suggestionAction}=sb.dataset;bubbleFor=null;safely(async()=>{const accepted=suggestionAction==='accept'&&flow.snapshot().suggestions.find(s=>s.id===suggestion)?.action;if(accepted)await flow.accept(suggestion,accepted);else{const started=performance.now();timed(flow.observe(await api('/api/suggestions/'+suggestion+'/'+suggestionAction,{})),started);await flow.refresh()}render()});return}if(inlineClick(e))return;const b=e.target.closest('[data-action]');if(!b){const card=e.target.closest('.task');if(card&&!e.target.closest('.assistant-bubble'))toggleExpand(card.dataset.taskId);else if(dependencyFocus&&!card)toggleDependencies(dependencyFocus);return}const {id,action}=b.dataset;if(action==='next-up'){const t=task(id);if(t)request('task_update',{uuid:id,nextUp:!t.nextUp});return}if(action==='suggestion'){bubbleFor=bubbleFor===id?null:id;render();$('board').querySelector('[data-id="'+id+'"][data-action="suggestion"]')?.focus({preventScroll:true});return}if(action==='retire'){openMenu(id,'retire');if(menu)retireConfirm()}else if(action==='group'&&b.dataset.renameLabel&&e.detail){clearTimeout(chipTimer);if(e.detail>1)return;chipTimer=setTimeout(()=>{if(inlineRename||!b.isConnected)return;if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action,undefined,b.dataset.groupName)},DOUBLE_CLICK_MS)}else if(['priority','snooze','more','group','due','block'].includes(action)){if(menu?.id===id&&menu.action===action)closeMenu();else{openMenu(id,action,undefined,b.dataset.groupName);if(action==='block')focusBlockInput()}}else if(action==='dependencies'){if(linesFit())toggleDependencies(id);else if(menu?.id===id&&menu.action===action)closeMenu();else openMenu(id,action)}else if(action==='title'){const t=task(id);if(t&&!t.pending&&!flow.snapshot().readOnly)startTitleEdit(id);else toggleExpand(id)}else if(action==='move')return;else if(action==='pending'){const p=flow.snapshot().proposals.find(p=>p.intent.taskId===id);if(p){collapsedProposals.delete(p.id);expandedProposal=p.id;render();$('review-title').scrollIntoView({block:'nearest'});$('review-title').focus()}}else request(action,{taskId:id})};
 $('board').addEventListener('change',e=>{const el=e.target;
  if(el.dataset.schedEvery){const v=el.value,id=el.dataset.schedEvery;saveSchedule(id,n=>{n.repeat=!v?null:v==='week'?{every:'week',days:[zonedWeekday()]}:v==='days'?{every:'days',n:2}:{every:v}})}
  else if(el.dataset.schedN){const v=Math.max(1,Math.min(365,Number(el.value)||1));saveSchedule(el.dataset.schedN,n=>{n.repeat={every:'days',n:v}})}
@@ -1535,7 +1483,159 @@ safely(boot);
 function poll(){safely(()=>flow.poll()).finally(()=>setTimeout(poll,document.hidden?5000:900))}
 setTimeout(poll,900);document.addEventListener('visibilitychange',()=>{if(!document.hidden)safely(()=>flow.poll())});
 globalThis.daySnapshot=()=>structuredClone(flow.snapshot());
-globalThis.dayUI={icons:{close:closeIcon,check:checkIcon,attach:attachIcon},formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
+const clipIcon=attachIcon;
+const plusIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>';
+const formatBar=forId=>'<span class="title-format" role="toolbar" aria-label="'+esc(tr('title_format'))+'" data-format-for="'+esc(forId)+'" hidden>'+formatButton('bold','<b>B</b>','title_bold','Ctrl+B')+formatButton('italic','<i>I</i>','title_italic','Ctrl+I')+formatButton('link',externalIcon,'title_link','Ctrl+K')+'<span class="format-sep" aria-hidden="true"></span>'+formatButton('attach',clipIcon,'attach_files','')+'</span>';
+const formatButton=(kind,icon,label,keys)=>'<button type="button" class="format-btn" data-format="'+kind+'" aria-label="'+esc(tr(label))+'" title="'+esc(tr(label)+' · '+keys)+'">'+icon+'</button>';
+let linkMenu=null;
+const hostOf=url=>{try{return url.startsWith('mailto:')?url.slice(7):new URL(url).host}catch{return ''}};
+function normalizeUrl(raw){const v=raw.trim();if(!v)return null;if(/^(https?:\/\/|mailto:)/i.test(v))return /\s/.test(v)?null:v;if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))return 'mailto:'+v;if(/^[^\s/]+\.[^\s]{2,}/.test(v))return 'https://'+v;return null}
+const coarse=matchMedia('(pointer:coarse)');
+const formatHost=input=>input?.closest?.('.title-editor,[data-format-host]');
+function updateFormatBar(input){const host=formatHost(input),bar=host?.querySelector(':scope>.title-format');if(!bar)return;const has=input.selectionStart!==input.selectionEnd,capture=input.hasAttribute('data-format-input');
+ // On a phone, selecting text is fiddly: a capture box keeps its bar while it is focused and has text.
+ bar.hidden=!(has||titleLinks(input.value).some(l=>input.selectionStart>l.start&&input.selectionStart<l.end)||capture&&coarse.matches&&document.activeElement===input&&input.value.trim());if(bar.hidden)return;
+ if(capture){bar.setAttribute('aria-label',tr('title_format'));for(const b of bar.querySelectorAll('[data-format]')){const [key,keys]={bold:['title_bold','Ctrl+B'],italic:['title_italic','Ctrl+I'],link:['title_link','Ctrl+K'],attach:['attach_files','']}[b.dataset.format];b.setAttribute('aria-label',tr(key));b.title=tr(key)+' · '+keys}}  // Built before the profile language loads.
+ if(input.tagName==='TEXTAREA'){bar.style.left=input.offsetLeft+'px';return}const c=(updateFormatBar.canvas||=document.createElement('canvas')).getContext('2d'),st=getComputedStyle(input);c.font=st.fontWeight+' '+st.fontSize+' '+st.fontFamily;const x=c.measureText(input.value.slice(0,input.selectionStart)).width+parseFloat(st.paddingLeft)-input.scrollLeft;bar.style.left=Math.max(0,Math.min(input.offsetLeft+x,host.clientWidth-bar.offsetWidth))+'px'}
+function setTitleValue(input,value,start,end){input.value=value;input.focus({preventScroll:true});input.setSelectionRange(start,end);input.dispatchEvent(new Event('input',{bubbles:true}));updateFormatBar(input)}
+function applyFormat(input,kind){const v=input.value,a=input.selectionStart,b=input.selectionEnd,sel=v.slice(a,b);
+ if(kind==='link'){const inside=titleLinks(v).find(l=>a>=l.start&&b<=l.end&&(a>l.start||b<l.end||a===b));const lead=sel.length-sel.trimStart().length,trail=sel.length-sel.trimEnd().length,range=inside?[inside.start,inside.end]:a===b?[a,b]:[a+lead,Math.max(a+lead,b-trail)],id=input.dataset.formatInput===undefined?input.dataset.id:null,titleInput=key=>id?titleInputOf(key):input;
+  openLinkMenu({text:inside?.text??sel.trim(),url:inside?.url??'',anchor:formatHost(input),editing:!!inside,
+   onSave:(text,url)=>{const node=titleInput(id);if(!node)return;const md='['+text+']('+url+')';setTitleValue(node,node.value.slice(0,range[0])+md+node.value.slice(range[1]),range[0]+md.length,range[0]+md.length)},
+   onRemove:inside?()=>{const node=titleInput(id);if(node)setTitleValue(node,node.value.slice(0,range[0])+inside.text+node.value.slice(range[1]),range[0],range[0]+inside.text.length)}:null,
+   restore:()=>{const node=titleInput(id);node?.focus({preventScroll:true})}});return}
+ const mark=kind==='bold'?'**':'_';if(a===b)return;
+ if(v.slice(a-mark.length,a)===mark&&v.slice(b,b+mark.length)===mark)setTitleValue(input,v.slice(0,a-mark.length)+sel+v.slice(b+mark.length),a-mark.length,b-mark.length);
+ else if(sel.startsWith(mark)&&sel.endsWith(mark)&&sel.length>2*mark.length)setTitleValue(input,v.slice(0,a)+sel.slice(mark.length,-mark.length)+v.slice(b),a,b-2*mark.length);
+ else{const lead=sel.match(/^\s*/)[0],trail=sel.match(/\s*$/)[0],core=sel.trim();if(!core)return;setTitleValue(input,v.slice(0,a)+lead+mark+core+mark+trail+v.slice(b),a+lead.length+mark.length,a+lead.length+mark.length+core.length)}}
+const titleInputOf=id=>$('board').querySelector('.title-edit[data-id="'+id+'"]'),titleInput=titleInputOf;
+const formatInputOf=bar=>{const key=bar.dataset.formatFor;return titleInputOf(key)||document.getElementById(key)};
+// Capture boxes (new task, a section's +) reuse the same bar: the box is the bar's host.
+function attachFormatBar(input){if(!input||input.hasAttribute('data-format-bar-wired'))return;input.setAttribute('data-format-bar-wired','');input.id||=input.dataset.id||'format-'+crypto.randomUUID();const host=input.parentElement;host.setAttribute('data-format-host','');if(!input.matches('.title-edit'))input.setAttribute('data-format-input','');input.setAttribute('aria-keyshortcuts','Control+B Control+I Control+K');host.insertAdjacentHTML('afterbegin',formatBar(input.dataset.id||input.id));
+ input.addEventListener('keydown',e=>{const k=(e.ctrlKey||e.metaKey)&&!e.altKey&&!e.shiftKey&&{b:'bold',i:'italic',k:'link'}[e.key.toLowerCase()];if(k){e.preventDefault();e.stopPropagation();applyFormat(input,k)}});
+ for(const type of ['input','focus'])input.addEventListener(type,()=>updateFormatBar(input));
+ input.addEventListener('blur',e=>{if(linkMenu||host.contains(e.relatedTarget))return;host.querySelector(':scope>.title-format').hidden=true})}
+function openLinkMenu({text,url,anchor,editing,onSave,onRemove,restore}){closeLinkMenu(false);formatLinkOpen=true;
+ const node=document.createElement('div');node.className='row-menu link-menu';node.setAttribute('role','dialog');node.setAttribute('aria-label',tr('title_link'));
+ node.innerHTML='<p class="menu-title">'+esc(tr(onRemove?'title_link_edit':'title_link_add'))+'</p><label class="link-field"><span>'+esc(tr('title_link_text'))+'</span><input type="text" class="menu-input" data-link-input="text" maxlength="200" autocomplete="off" value="'+esc(text||'')+'"></label><label class="link-field"><span>'+esc(tr('title_link_url'))+'</span><input type="url" class="menu-input" data-link-input="url" inputmode="url" autocomplete="off" placeholder="https://" value="'+esc(url||'')+'"></label><p class="menu-error" role="alert" hidden></p><div class="menu-confirm-actions">'+(onRemove?'<button type="button" class="btn ghost danger-text" data-link-act="remove">'+esc(tr('title_link_remove'))+'</button>':'')+'<button type="button" class="btn" data-link-act="cancel">'+esc(tr('cancel'))+'</button><button type="button" class="btn primary" data-link-act="save">'+esc(tr('save'))+'</button></div>';
+ const sheet=sheetMedia.matches,scrim=sheet?document.createElement('div'):null;if(scrim){scrim.className='menu-scrim';scrim.onclick=()=>closeLinkMenu();document.body.append(scrim)}
+ node.classList.toggle('sheet',sheet);document.body.append(node);linkMenu={node,scrim,onSave,onRemove,restore};
+ if(!sheet){const r=anchor?.getBoundingClientRect?.();placeMenu(node,null,r?{x:r.left,y:r.bottom+6}:{x:8,y:8})}
+ const fields=node.querySelectorAll('.menu-input');(text?fields[1]:fields[0]).focus({preventScroll:true});
+ const error=msg=>{const e=node.querySelector('.menu-error');e.textContent=msg;e.hidden=false};
+ node.addEventListener('click',e=>{const act=e.target.closest('[data-link-act]')?.dataset.linkAct;if(!act)return;
+  if(act==='cancel')closeLinkMenu();else if(act==='remove'){const m=linkMenu;closeLinkMenu();m.onRemove()}
+  else{const t=fields[0].value.replace(/[\[\]\n]/g,'').trim(),u=normalizeUrl(fields[1].value);if(!u)return error(tr('title_link_bad_url'));const m=linkMenu;closeLinkMenu();m.onSave(t||hostOf(u)||u,u)}});
+ node.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeLinkMenu()}else if(e.key==='Enter'&&!e.isComposing&&e.target.matches('input')){e.preventDefault();node.querySelector('[data-link-act=save]').click()}else if(e.key==='Tab'){const items=[...node.querySelectorAll('input,button')],i=items.indexOf(document.activeElement);e.preventDefault();items[(i+(e.shiftKey?-1:1)+items.length)%items.length].focus()}})}
+function closeLinkMenu(restore=true){if(!linkMenu)return;const {node,scrim,restore:back}=linkMenu;linkMenu=null;formatLinkOpen=false;node.remove();scrim?.remove();if(restore)back?.()}
+let titleMenuLink=null;
+document.addEventListener('pointerdown',e=>{if(linkMenu&&!linkMenu.node.contains(e.target)&&e.target!==linkMenu.scrim)closeLinkMenu()},true);
+document.addEventListener('pointerdown',e=>{if(e.target.closest?.('.title-format'))e.preventDefault()});
+document.addEventListener('click',e=>{const f=e.target.closest?.('[data-format]');if(!f)return;const input=formatInputOf(f.closest('.title-format'));if(!input)return;if(f.dataset.format==='attach'){pickFiles(input);return}applyFormat(input,f.dataset.format)});
+for(const type of ['select','keyup','mouseup','selectionchange'])document.addEventListener(type,()=>{const a=document.activeElement;if(a?.matches?.('.title-edit,[data-format-input]'))updateFormatBar(a)});
+
+// Task attachments: images show a small preview; other files are a compact chip that downloads.
+// Files upload first (POST /api/attachments, purpose task), then one undoable attachments_update links them.
+const fileSize=n=>n==null?'':n<1024?n+' B':n<1048576?Math.round(n/1024)+' KB':(n/1048576).toFixed(1).replace('.0','')+' MB';
+const isImage=f=>/^image\/(png|jpeg|webp)$/.test(f.mime);
+const attUrl=f=>'/api/attachments/'+encodeURIComponent(f.id);
+function attachmentChips(t){const files=t.files||[];if(!files.length)return '';const imgs=files.filter(isImage),docs=files.filter(f=>!isImage(f));
+ const shown=[...imgs.slice(0,2),...docs.slice(0,imgs.length>=2?0:1)],rest=files.length-shown.length;
+ return '<span class="att-chips">'+shown.map(f=>isImage(f)
+  ?'<button type="button" class="att-thumb" data-att-open="'+esc(f.id)+'" data-att-task="'+t.id+'" aria-label="'+esc(tr('attachment_view').replace('{name}',f.name))+'" title="'+esc(f.name)+'"><img src="'+attUrl(f)+'" alt="'+esc(f.name)+'" loading="lazy" decoding="async"></button>'
+  :'<a class="att-file" href="'+attUrl(f)+'" download="'+esc(f.name)+'" data-anon-private="text" title="'+esc(tr('attachment_download')+': '+f.name)+'">'+clipIcon+'<span class="att-name">'+esc(f.name)+'</span><span class="att-size">'+esc(fileSize(f.size))+'</span></a>').join('')
+  +(rest>0?'<button type="button" class="att-more" data-att-open="'+esc(files[0].id)+'" data-att-task="'+t.id+'" aria-label="'+esc(tr('attachments_more').replace('{n}',rest))+'">+'+rest+'</button>':'')+'</span>'}
+function attachmentField(t,data){const files=t.files||[],off=data.readOnly||t.pending;
+ return '<div class="xfield att-field"><span class="xlabel">'+esc(tr('attachments_label'))+'</span>'
+  +(files.length?'<ul class="att-list">'+files.map(f=>'<li>'+(isImage(f)?'<button type="button" class="att-thumb lg" data-att-open="'+esc(f.id)+'" data-att-task="'+t.id+'" aria-label="'+esc(tr('attachment_view').replace('{name}',f.name))+'"><img src="'+attUrl(f)+'" alt="'+esc(f.name)+'" loading="lazy"></button>':'<span class="att-icon" aria-hidden="true">'+clipIcon+'</span>')
+   +'<a class="att-link" href="'+attUrl(f)+'" download="'+esc(f.name)+'" data-anon-private="text">'+esc(f.name)+'</a><span class="att-size">'+esc(fileSize(f.size))+'</span>'
+   +(off?'':'<button type="button" class="rel-remove" data-att-remove="'+esc(f.id)+'" data-att-task="'+t.id+'" aria-label="'+esc(tr('attachment_remove')+': '+f.name)+'" title="'+esc(tr('attachment_remove'))+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>')+'</li>').join('')+'</ul>':'<p class="rel-none">'+esc(tr('attachments_none'))+'</p>')
+  +(off?'':'<button type="button" class="btn ghost att-add" data-att-add="'+t.id+'">'+clipIcon+esc(tr('attach_files'))+'</button><span class="att-hint">'+esc(tr('attachments_hint'))+'</span>')+'</div>'}
+const readBase64=file=>new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=()=>reject(r.error);r.readAsDataURL(file)});
+async function uploadFiles(files){const out=[];for(const file of files){
+ if(file.size>20*1024*1024)throw Error(tr('file_too_large'));
+ const saved=await api('/api/attachments',{name:file.name||tr('attachment_pasted'),mime:file.type||'application/octet-stream',base64:await readBase64(file),key:crypto.randomUUID(),purpose:'task'});out.push(saved)}return out}
+// A capture box keeps its files until the task exists; an existing task links them at once.
+const captureFiles=new Map();
+function renderCaptureFiles(input){const host=formatHost(input)||input.parentElement;let box=host.parentElement.querySelector(':scope>.att-pending[data-for="'+input.id+'"]');const files=captureFiles.get(input.id)||[];
+ if(!files.length){box?.remove();return}
+ if(!box){box=document.createElement('div');box.className='att-pending';box.dataset.for=input.id;box.setAttribute('aria-live','polite');host.after(box)}
+ box.innerHTML=files.map((f,i)=>'<span class="att-pill'+(f.uploading?' busy':'')+'">'+(f.uploading?'<span class="spin" aria-hidden="true"></span>':isImage(f)?'<img src="'+attUrl(f)+'" alt="">':clipIcon)+'<span class="att-name">'+esc(f.name)+'</span>'+(f.uploading?'':'<button type="button" data-att-unpend="'+i+'" data-for="'+esc(input.id)+'" aria-label="'+esc(tr('attachment_remove')+': '+f.name)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>')+'</span>').join('')
+  +'<span class="att-hint">'+esc(tr('attachments_pending_hint'))+'</span>'}
+async function addFiles(target,files){files=[...files].filter(f=>f&&f.size>=0);if(!files.length)return;
+ const id=target.matches?.('.title-edit')?target.dataset.id:target.dataset?.attAdd||null;
+ if(id&&!target.matches?.('[data-format-input]')){const t=task(id);if(!t)return;announceStatus(tr('attachments_uploading'));
+  const saved=await safely(()=>uploadFiles(files));if(!saved?.length)return;await request('attachments_update',{uuid:id,attachmentIds:[...(t.attachmentIds||[]),...saved.map(f=>f.id)]});announceStatus(tr('attachments_added').replace('{n}',saved.length));return}
+ const list=captureFiles.get(target.id)||[];const temp=files.map(f=>({name:f.name||tr('attachment_pasted'),mime:f.type,uploading:true}));captureFiles.set(target.id,[...list,...temp]);renderCaptureFiles(target);
+ const saved=await safely(()=>uploadFiles(files));captureFiles.set(target.id,[...list,...(saved||[])]);renderCaptureFiles(target);target.focus({preventScroll:true})}
+function pickFiles(target){const picker=document.createElement('input');picker.type='file';picker.multiple=true;picker.hidden=true;document.body.append(picker);
+ picker.onchange=()=>{const files=[...picker.files];picker.remove();addFiles(target,files)};picker.oncancel=()=>picker.remove();picker.click()}
+function takeCaptureFiles(id){const files=(captureFiles.get(id)||[]).filter(f=>f.id);captureFiles.delete(id);const input=document.getElementById(id);if(input)renderCaptureFiles(input);return files}
+async function linkCaptured(uuid,files){if(uuid&&files.length)await request('attachments_update',{uuid,attachmentIds:files.map(f=>f.id)})}
+// Paste or drop files into a capture box or a title being edited.
+document.addEventListener('paste',e=>{const input=e.target.closest?.('[data-format-input],.title-edit');const files=[...(e.clipboardData?.files||[])];if(!input||!files.length)return;e.preventDefault();addFiles(input,files)});
+document.addEventListener('dragover',e=>{const host=e.target.closest?.('[data-format-host],.title-editor');if(!host||![...(e.dataTransfer?.types||[])].includes('Files'))return;e.preventDefault();host.classList.add('att-drop')});
+document.addEventListener('dragleave',e=>{e.target.closest?.('[data-format-host],.title-editor')?.classList.remove('att-drop')});
+document.addEventListener('drop',e=>{const host=e.target.closest?.('[data-format-host],.title-editor');if(!host||!e.dataTransfer?.files?.length)return;e.preventDefault();host.classList.remove('att-drop');const input=host.querySelector('[data-format-input],.title-edit');if(input)addFiles(input,e.dataTransfer.files)});
+// Larger preview in a dialog: Escape or the close button returns focus to the thumbnail.
+function openLightbox(taskId,fileId,origin){const t=task(taskId);const imgs=(t?.files||[]).filter(isImage);let f=(t?.files||[]).find(x=>x.id===fileId);if(f&&!isImage(f)){f=imgs[0]}if(!f)return;
+ let dlg=document.getElementById('att-lightbox');if(!dlg){dlg=document.createElement('dialog');dlg.id='att-lightbox';dlg.className='att-lightbox';document.body.append(dlg);
+  dlg.addEventListener('click',e=>{if(e.target===dlg||e.target.closest('[data-att-close]'))dlg.close();const nav=e.target.closest('[data-att-nav]');if(nav)show(Number(nav.dataset.attNav))});
+  dlg.addEventListener('close',()=>dlg._origin?.focus?.({preventScroll:true}));
+  dlg.addEventListener('keydown',e=>{if(['ArrowRight','ArrowLeft'].includes(e.key)&&dlg._imgs?.length>1){e.preventDefault();show((dlg._i+(e.key==='ArrowRight'?1:-1)+dlg._imgs.length)%dlg._imgs.length)}})}
+ function show(i){const img=dlg._imgs[i];dlg._i=i;dlg.setAttribute('aria-label',img.name);
+  dlg.innerHTML='<figure><img src="'+attUrl(img)+'" alt="'+esc(img.name)+'"><figcaption><span class="att-name" data-anon-private="text">'+esc(img.name)+'</span><span class="att-size">'+esc(fileSize(img.size))+'</span>'+(dlg._imgs.length>1?'<span class="att-count">'+(i+1)+' / '+dlg._imgs.length+'</span>':'')+'<a class="btn ghost" href="'+attUrl(img)+'" download="'+esc(img.name)+'">'+esc(tr('attachment_download'))+'</a><button type="button" class="btn" data-att-close autofocus>'+esc(tr('attachment_close'))+'</button></figcaption>'
+   +(dlg._imgs.length>1?'<button type="button" class="att-nav prev" data-att-nav="'+((i-1+dlg._imgs.length)%dlg._imgs.length)+'" aria-label="'+esc(tr('attachment_prev'))+'">‹</button><button type="button" class="att-nav next" data-att-nav="'+((i+1)%dlg._imgs.length)+'" aria-label="'+esc(tr('attachment_next'))+'">›</button>':'')+'</figure>';
+  dlg.querySelector('[data-att-close]').focus({preventScroll:true})}
+ dlg._imgs=imgs;dlg._origin=origin;if(!dlg.open)dlg.showModal();show(Math.max(0,imgs.indexOf(f)))}
+document.addEventListener('click',e=>{const el=e.target.closest?.('[data-att-open],[data-att-remove],[data-att-add],[data-att-unpend],.att-file,.att-link');if(!el)return;e.stopPropagation();
+ if(el.matches('.att-file,.att-link'))return;e.preventDefault();
+ if(el.dataset.attOpen){const t=task(el.dataset.attTask),f=t?.files.find(x=>x.id===el.dataset.attOpen);if(f&&!isImage(f)&&!(t.files||[]).some(isImage)){toggleExpand(t.id,true);return}openLightbox(el.dataset.attTask,el.dataset.attOpen,el);return}
+ if(el.dataset.attAdd){pickFiles(el);return}
+ if(el.dataset.attUnpend!==undefined){const list=captureFiles.get(el.dataset.for)||[];list.splice(Number(el.dataset.attUnpend),1);const input=document.getElementById(el.dataset.for);if(input){renderCaptureFiles(input);input.focus({preventScroll:true})}return}
+ const t=task(el.dataset.attTask);if(t)request('attachments_update',{uuid:t.id,attachmentIds:(t.attachmentIds||[]).filter(x=>x!==el.dataset.attRemove)})},true);
+
+// Options shared by every place that creates a task (quick line, a section's +, the detailed form):
+// a priority chip and a categories chip that open small menus like the row's own.
+let capturePicker=null;
+function closeCapturePicker(restore=true){if(!capturePicker)return;const {node,scrim,anchor}=capturePicker;capturePicker=null;node.remove();scrim?.remove();anchor?.setAttribute('aria-expanded','false');if(restore)anchor?.focus({preventScroll:true})}
+function showCapturePicker(anchor,html,wire){closeCapturePicker(false);const node=document.createElement('div');node.className='row-menu capture-picker';node.setAttribute('role','menu');node.innerHTML=html;
+ const sheet=sheetMedia.matches,scrim=sheet?document.createElement('div'):null;if(scrim){scrim.className='menu-scrim capture-scrim';scrim.onclick=()=>closeCapturePicker();document.body.append(scrim)}
+ node.classList.toggle('sheet',sheet);document.body.append(node);capturePicker={node,scrim,anchor};anchor.setAttribute('aria-expanded','true');if(!sheet){const r=anchor.getBoundingClientRect();placeMenu(node,null,{x:r.left,y:r.bottom+6})}
+ node.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeCapturePicker()}else if(['ArrowDown','ArrowUp'].includes(e.key)){const items=[...node.querySelectorAll('.menu-item,input')],i=items.indexOf(document.activeElement);e.preventDefault();items[(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length]?.focus()}});
+ wire(node);(node.querySelector('[aria-checked=true]')||node.querySelector('.menu-item,input'))?.focus({preventScroll:true})}
+document.addEventListener('pointerdown',e=>{if(capturePicker&&!capturePicker.node.contains(e.target)&&e.target!==capturePicker.scrim&&!capturePicker.anchor.contains(e.target))closeCapturePicker(false)},true);
+function capturePriorityChip(p){return '<span class="priority-pill" data-priority="'+p+'">'+esc(tr('priority_'+p))+'</span>'}
+function openPriorityPicker(anchor,current,onPick){
+ showCapturePicker(anchor,'<p class="menu-title">'+esc(tr('capture_priority_title'))+'</p>'+PRIORITIES.map(p=>menuItem('cap-priority',capturePriorityChip(p),{value:p,checked:p===current})).join(''),
+  node=>node.addEventListener('click',e=>{const b=e.target.closest('[data-menu-act=cap-priority]');if(!b)return;closeCapturePicker();onPick(b.dataset.value)}))}
+function openGroupsPicker(anchor,selected,onChange){let chosen=[...selected];
+ const labels=()=>{const all=rankedGroups().map(g=>g.label);for(const g of chosen)if(!all.some(x=>groupKey(x)===groupKey(g)))all.unshift(g);return all};
+ const items=q=>labels().filter(g=>groupKey(g).includes(groupKey(q||''))).map(g=>menuItem('cap-group',groupDot(g)+'<span data-anon-private="text">'+esc(g)+'</span>',{value:g,checked:chosen.some(x=>groupKey(x)===groupKey(g))})).join('')||'<p class="menu-note">'+esc(tr('capture_groups_none_found'))+'</p>';
+ showCapturePicker(anchor,'<p class="menu-title">'+esc(tr('capture_groups_title'))+'</p><div class="menu-form"><input type="text" class="menu-input" maxlength="120" data-cap-group-new placeholder="'+esc(tr('group_search_create'))+'" aria-label="'+esc(tr('group_search_create'))+'"></div><div class="capture-group-list">'+items('')+'</div>',node=>{
+  const input=node.querySelector('[data-cap-group-new]'),list=node.querySelector('.capture-group-list');node.setAttribute('aria-multiselectable','true');
+  const toggle=g=>{chosen=chosen.some(x=>groupKey(x)===groupKey(g))?chosen.filter(x=>groupKey(x)!==groupKey(g)):[...chosen,g];onChange([...chosen])};
+  input.oninput=()=>{list.innerHTML=items(input.value)};
+  input.onkeydown=e=>{if(e.key!=='Enter'||e.isComposing)return;e.preventDefault();const v=input.value.trim();if(!v)return;const known=labels().find(x=>groupKey(x)===groupKey(v));if(!chosen.some(x=>groupKey(x)===groupKey(known||v)))toggle(known||v);input.value='';list.innerHTML=items('')};
+  node.addEventListener('click',e=>{const b=e.target.closest('[data-menu-act=cap-group]');if(!b)return;toggle(b.dataset.value);const v=b.dataset.value;list.innerHTML=items(input.value);list.querySelector('[data-value="'+CSS.escape(v)+'"]')?.focus({preventScroll:true})})});
+ capturePicker.node.querySelector('[data-cap-group-new]').focus({preventScroll:true})}
+// The chips themselves, kept in one place so every capture box looks and behaves the same.
+function captureOptions(host,{input,priority='medium',groups=[],onChange=()=>{}}){const state={priority,groups:[...groups]};
+ const draw=()=>{host.innerHTML='<button type="button" class="capture-chip cap-priority" aria-haspopup="menu" aria-expanded="false" aria-label="'+esc(tr('capture_priority_label').replace('{p}',tr('priority_'+state.priority)))+'">'+capturePriorityChip(state.priority)+'</button>'
+  +'<button type="button" class="capture-chip cap-groups" aria-haspopup="menu" aria-expanded="false" aria-label="'+esc(tr('capture_groups_label').replace('{g}',state.groups.join(', ')||tr('no_group')))+'"><span class="cap-hash" aria-hidden="true">#</span>'+(state.groups.length?state.groups.map(g=>'<span class="cap-group">'+groupDot(g)+'<span data-anon-private="text">'+esc(g)+'</span></span>').join(''):'<span class="cap-empty">'+esc(tr('no_group'))+'</span>')+'</button>'
+  +'<button type="button" class="capture-chip cap-attach" aria-label="'+esc(tr('attach_files'))+'" title="'+esc(tr('attach_files'))+'">'+clipIcon+'</button>'};
+ draw();
+ host.addEventListener('click',e=>{const b=e.target.closest('.capture-chip');if(!b)return;
+  if(b.classList.contains('cap-priority'))openPriorityPicker(b,state.priority,p=>{state.priority=p;draw();onChange(state);host.querySelector('.cap-priority').focus({preventScroll:true})});
+  else if(b.classList.contains('cap-groups'))openGroupsPicker(b,state.groups,g=>{state.groups=g;draw();onChange(state);if(capturePicker)capturePicker.anchor=host.querySelector('.cap-groups')});
+  else pickFiles(input)});
+ return {get:()=>({priority:state.priority,groups:[...state.groups]}),set:v=>{Object.assign(state,v);draw()}}}
+function attachmentPicker(host,pasteTarget){
+ formatInput(pasteTarget);pasteTarget.closest('.field')?.classList.add('capture-title-field');const button=document.createElement('button');button.type='button';button.className=host.classList.contains('quick-add')?'btn ghost qa-attach':'btn ghost capture-attach';button.innerHTML=clipIcon+(host.classList.contains('quick-add')?'':esc(tr('attach_files')));button.setAttribute('aria-label',tr('attach_files'));button.title=tr('attach_files');button.onclick=()=>pickFiles(pasteTarget);
+ if(host.classList.contains('quick-add'))host.insertBefore(button,host.querySelector('#qa-hash'));else{pasteTarget.after(button);host.closest('dialog')?.addEventListener('close',()=>{captureFiles.delete(pasteTarget.id);renderCaptureFiles(pasteTarget)},{once:true})}
+ return {ids:()=>{const files=captureFiles.get(pasteTarget.id)||[];if(files.some(f=>f.uploading))throw Error(tr('files_uploading'));return files.map(f=>f.id)},clear:ids=>{captureFiles.set(pasteTarget.id,ids?(captureFiles.get(pasteTarget.id)||[]).filter(f=>!ids.includes(f.id)):[]);renderCaptureFiles(pasteTarget)}};
+}
+globalThis.dayUI={icons:{close:closeIcon,check:checkIcon,attach:attachIcon},openPriorityPicker,formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
 const diagnosticsDialog = document.querySelector('#diagnostics-dialog');
 document.querySelector('#diagnostics-open').addEventListener('click', async () => {
   diagnosticsDialog.showModal();

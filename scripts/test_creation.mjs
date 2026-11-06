@@ -19,7 +19,7 @@ for(const locale of ['en','es']){
  assert.match(sandbox.creationTime({createdAt:'invalid'}),locale==='es'?/desconocida/:/unknown/);
  assert.equal(sandbox.creationTime({pending:true,createdAt:null}),'');
  assert.match(sandbox.creationTime({createdAt:'2020-01-01T12:00:00Z'}),/datetime="2020-01-01T12:00:00Z".*aria-label=/);
- sandbox.activityNodes=[{dateTime:new Date(+sandbox.NOW-600000).toISOString(),dataset:{active:'true'},textContent:''}];sandbox.refreshCreationAges();assert.match(sandbox.activityNodes[0].textContent,/10 min/);sandbox.activityNodes=[];
+ const activeText={textContent:''};sandbox.activityNodes=[{dateTime:new Date(+sandbox.NOW-600000).toISOString(),dataset:{active:'true'},querySelector:selector=>selector==='.active-text'?activeText:null}];sandbox.refreshCreationAges();assert.match(activeText.textContent,/10 min/);sandbox.activityNodes=[];
  assert.equal(sandbox.creationAge('2026-10-30T12:00:00Z'),'2026-10-30T12:00:00.000Z');
  sandbox.nodes=[{dateTime:new Date(+sandbox.NOW-59000).toISOString(),textContent:'old'}];
  sandbox.refreshCreationAges();assert.equal(sandbox.nodes[0].textContent,locale==='es'?'ahora':'now');
