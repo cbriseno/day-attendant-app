@@ -70,3 +70,26 @@ class ChatContract(unittest.TestCase):
                     self.assertIn('No autonomous',contract['limits'][1]);self.assertIn('never proves',contract['limits'][2])
                     self.assertIn('Answer read questions',prompt)
                 self.assertEqual(board.snapshot()['revision'],before)
+
+    def test_existing_groups_classify_chat_and_organized_capture_without_losing_memberships(self):
+        for provider in ('codex','claude'):
+            with self.subTest(provider=provider),controlled_board(provider) as (board,folder):
+                first=board.request('task_add',{'title':'Synthetic launch','groups':['Launch','Shared']},'launch')['result']['uuid']
+                board.request('task_add',{'title':'Synthetic support','groups':['Support']},'support')
+                before={t['id']:t for t in board.snapshot()['tasks']}
+                ctx,_,_=turn(board,folder,'What categories exist?','groups')
+                self.assertEqual(ctx['existingGroups'],['Launch','Shared','Support'])
+                turn(board,folder,'Create and organize Review rollout','create','task_add',title='Review rollout',groups=['Launch'],classifyGroups=True)
+                created=next(t for t in board.snapshot()['tasks'] if t['title']=='Review rollout')
+                self.assertEqual(created['groups'],['Launch'])
+                self.assertEqual({t['id']:t for t in board.snapshot()['tasks'] if t['id'] in before},before)
+                turn(board,folder,'Classify the launch task for support too','classify','task_update',taskId=first,groups=['Support'],classifyGroups=True)
+                self.assertEqual(next(t for t in board.snapshot()['tasks'] if t['id']==first)['groups'],['Launch','Shared','Support'])
+                turn(board,folder,'Organize this when the category is unclear','ambiguous')
+                uid=board.request('task_add',{'title':'Review synthetic support request','groups':['Shared']},'raw')['result']['uuid']
+                (folder/'output.json').write_text(json.dumps({'tasks':[{'title':'Review synthetic support request','notes':'Synthetic request','groups':['Shared','Support'],'after':[]}]}))
+                board.normalize_capture(uid,'Review synthetic support request',board.snapshot()['revision'])
+                self.assertEqual(next(t for t in board.snapshot()['tasks'] if t['id']==uid)['groups'],['Shared','Support'])
+                if provider=='claude':prompt=(folder/'prompt.txt').read_text()
+                else:prompt=[r['params']['input'][0]['text'] for r in map(json.loads,(folder/'requests.jsonl').read_text().splitlines()) if r.get('method')=='turn/start'][-1]
+                self.assertIn('Existing categories: ["Launch","Shared","Support"]',prompt)

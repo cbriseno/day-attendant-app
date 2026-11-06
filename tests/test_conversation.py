@@ -51,6 +51,13 @@ class ConversationTests(unittest.TestCase):
         self.assertNotIn(self.uid,self.board.snapshot()['schedules'])
         self.assertEqual(self.board.snapshot()['proposals'][-1]['phase'],'applied')
 
+    def test_classification_does_not_invent_a_catalog(self):
+        text='Create and organize Synthetic work'
+        _,chat=self.fixture(text,'task_add',title='Synthetic work',groups=['Invented catalog'],classifyGroups=True)
+        chat.submit(text,'unknown-group');chat.run('unknown-group')
+        self.assertEqual(len(self.board.snapshot()['tasks']),4)
+        self.assertEqual(self.board.snapshot()['messages'][-1]['status'],'incomplete')
+
     def test_idea_is_not_captured_without_intent(self):
         text='Keep photography as an idea, not a task.';fixture,chat=self.fixture(text)
         chat.submit(text,'idea');chat.run('idea')

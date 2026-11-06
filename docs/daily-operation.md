@@ -154,6 +154,12 @@ the review state under `review`. `board accept ID` applies a suggested change as
 request, with Undo; `board dismiss ID` hides it for good. Neither the review nor a
 suggestion ever changes a task by itself.
 
+Chat and organized capture see the union of groups assigned to all tasks, including
+closed work. Asking chat to organize a new task or classify a specified task allows
+it to choose a relevant existing label with `classifyGroups=true`; this adds to
+existing memberships. Ambiguous categories need a question. A new chat label must
+be named by the human; no independent category catalog is invented.
+
 Chat receives the current tasks, events, saved schedules, notification policy and a
 compact capability contract on every turn, identically for Codex and Claude. The
 contract separates product support, representable chat actions and current execution
