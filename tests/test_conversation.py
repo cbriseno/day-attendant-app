@@ -58,6 +58,17 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(len(self.board.snapshot()['tasks']),4)
         self.assertEqual(self.board.snapshot()['messages'][-1]['status'],'incomplete')
 
+    def test_invalid_or_conflicting_schedule_changes_preserve_existing_values(self):
+        schedule={'repeat':{'every':'weekday'},'reminders':[{'kind':'before','minutes':60}]}
+        self.board.request('schedule_update',dict(schedule,uuid=self.uid),'seed-invalid')
+        for n,values in enumerate(({'reminders':[{'kind':'before','minutes':0}]},
+                {'clearSchedule':True,'repeat':{'every':'day'}},{'clearRepeat':True,'repeat':{'every':'week','days':[0]}})):
+            text='Change the schedule'
+            _,chat=self.fixture(text,'schedule_update',taskId=self.uid,**values)
+            chat.submit(text,f'invalid-schedule-{n}');chat.run(f'invalid-schedule-{n}')
+            self.assertEqual(self.board.snapshot()['schedules'][self.uid],schedule)
+            self.assertEqual(self.board.snapshot()['messages'][-1]['status'],'incomplete')
+
     def test_idea_is_not_captured_without_intent(self):
         text='Keep photography as an idea, not a task.';fixture,chat=self.fixture(text)
         chat.submit(text,'idea');chat.run('idea')

@@ -93,3 +93,28 @@ class ChatContract(unittest.TestCase):
                 if provider=='claude':prompt=(folder/'prompt.txt').read_text()
                 else:prompt=[r['params']['input'][0]['text'] for r in map(json.loads,(folder/'requests.jsonl').read_text().splitlines()) if r.get('method')=='turn/start'][-1]
                 self.assertIn('Existing categories: ["Launch","Shared","Support"]',prompt)
+
+    def test_schedule_round_trip_and_partial_updates_in_both_harnesses(self):
+        for provider in ('codex','claude'):
+            with self.subTest(provider=provider),controlled_board(provider) as (board,folder):
+                turn(board,folder,'Create Synthetic rollout','create','task_add',title='Synthetic rollout',due='2026-12-09T16:00:00Z')
+                uid=board.snapshot()['tasks'][0]['id']
+                alerts=[{'kind':'before','minutes':30},{'kind':'before','minutes':60}]
+                turn(board,folder,'Repeat Monday to Friday with alerts 30 and 60 minutes before due','configure','schedule_update',taskId=uid,repeat={'every':'weekday','days':None,'n':None},reminders=alerts)
+                ctx,schema,prompt=turn(board,folder,'What reminders are saved?','query')
+                self.assertEqual(ctx['schedules'][uid],{'repeat':{'every':'weekday'},'reminders':alerts})
+                self.assertIn('milestone stop condition',prompt)
+                self.assertIn('reminders',ctx['capabilities']['chatActions']['schedule_update'])
+                self.assertIn('repeat',schema['properties']['intent']['anyOf'][1]['properties'])
+                turn(board,folder,'Change only repetition to daily','repeat','schedule_update',taskId=uid,repeat={'every':'day','days':None,'n':None})
+                self.assertEqual(board.snapshot()['schedules'][uid]['reminders'],alerts)
+                alerts[0]['minutes']=15
+                turn(board,folder,'Change only the first alert to 15 minutes','modify','schedule_update',taskId=uid,reminders=alerts)
+                self.assertEqual(board.snapshot()['schedules'][uid],{'repeat':{'every':'day'},'reminders':alerts})
+                turn(board,folder,'Remove repetition but keep the alerts','clear-repeat','schedule_update',taskId=uid,clearRepeat=True)
+                self.assertEqual(board.snapshot()['schedules'][uid],{'repeat':None,'reminders':alerts})
+                custom=[{'kind':'day_before','time':'09:00'},{'kind':'at','at':'2026-12-08T12:00:00-07:00'}]
+                turn(board,folder,'Set the day before at 09:00 and December 8 at noon Edmonton','custom','schedule_update',taskId=uid,reminders=custom)
+                self.assertEqual(board.snapshot()['schedules'][uid]['reminders'],[custom[0],{'kind':'at','at':'2026-12-08T19:00:00Z'}])
+                turn(board,folder,'Cancel the entire schedule','cancel','schedule_update',taskId=uid,clearSchedule=True)
+                self.assertNotIn(uid,board.snapshot()['schedules'])

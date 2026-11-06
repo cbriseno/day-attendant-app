@@ -160,6 +160,14 @@ it to choose a relevant existing label with `classifyGroups=true`; this adds to
 existing memberships. Ambiguous categories need a question. A new chat label must
 be named by the human; no independent category catalog is invented.
 
+For a saved task UUID, chat can configure repetition and up to ten reminders via
+`schedule_update`. Omitted/null fields preserve saved settings. A reminders list
+replaces that list and must retain alerts not requested for removal. `clearRepeat`
+removes only repetition; `clearSchedule` explicitly removes the whole schedule.
+Repeating advances the due date on completion; it does not check external progress,
+observe a milestone or account for holidays. A new task is captured first; scheduling
+remains an explicit follow-up until the task has its permanent UUID.
+
 Chat receives the current tasks, events, saved schedules, notification policy and a
 compact capability contract on every turn, identically for Codex and Claude. The
 contract separates product support, representable chat actions and current execution
