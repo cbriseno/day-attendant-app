@@ -22,6 +22,7 @@ from .archives import upgrade_tasks
 from .harnesses import create_harness,discover_catalog
 from .connected import Connected, FOLLOWUP_DELAY
 from .conversation import Conversation
+from .api_contract import ROUTES
 from .errors import AssistantError
 from .service import Assistant, encoded
 from .platforms import exclusive
@@ -36,7 +37,7 @@ class LocalServer(ThreadingHTTPServer):
 
     def __init__(self, app, bridge, port=0, token=None):
         self.board=Connected(app,bridge)
-        self.chat=Conversation(self.board)
+        self.chat=Conversation(self.board,self.run_app_operation)
         self.pool=ThreadPoolExecutor(max_workers=3,thread_name_prefix="day-request")
         self.token=token or secrets.token_urlsafe(32)
         self.harness_lock=threading.Lock()
@@ -45,6 +46,41 @@ class LocalServer(ThreadingHTTPServer):
         self.review_timer=None
         super().__init__((LOOPBACK_HOST,port),Handler)
         self.origin=local_origin(self.server_port)
+
+    def run_app_operation(self, name, arguments, key, revision=None):
+        """Conversation uses the same authenticated endpoints as the UI, on this server only."""
+        from urllib.request import Request, urlopen
+        from urllib.parse import quote, urlencode
+        from urllib.error import HTTPError
+        from .api_contract import OPERATIONS, supplied
+        method,route,_,fields=OPERATIONS[name]
+        if set(arguments)-set(fields):raise AssistantError('invalid_request','Unknown operation arguments.')
+        body=supplied(arguments)
+        if '{id}' in route:route=route.replace('{id}',quote(str(body.pop('id')),safe=''))
+        if name=='zone_rules':route+='?'+urlencode(body);body={}
+        if name=='profile_configure':
+            values=body['values']
+            for field in body.pop('clearSettings',[]):
+                if field not in ('model','effort'):raise AssistantError('invalid_settings','Only model and effort can be reset to null.')
+                values[field]=None
+            if 'notification_policy' in values:
+                old=self.board.store.state_value('notification_policy') or {}
+                policy=values['notification_policy']
+                values['notification_policy']={**old,**policy,'kinds':{**old.get('kinds',{}),**policy.get('kinds',{})}}
+        if name.startswith('checkins_'):
+            body['op']={'checkins_settings':'settings','checkins_run':'run','checkins_answer':'answer'}[name]
+        if name=='chat_retry':body={'key':body['message_key']}
+        elif name in {'profile_configure','checkins_answer','undo_fact','undo_message','undo_proposals','undo_organization','order_suggest','backup_create','suggestion_accept','suggestion_dismiss','attachment_upload'}:body['key']=key
+        if name in {'profile_configure','undo_fact','undo_message','undo_proposals'}:body['expected_revision']=revision
+        request=Request(self.origin+route,data=encoded(body).encode() if method=='POST' else None,method=method,
+            headers={'Content-Type':'application/json','Origin':self.origin,'Authorization':'Bearer '+self.token})
+        try:
+            with urlopen(request,timeout=60) as response:
+                if name=='attachment_read':return {'id':arguments['id'],'mime':response.headers.get('Content-Type'),'bytes':len(response.read())}
+                return json.load(response)['data']
+        except HTTPError as error:
+            detail=json.load(error).get('error',{})
+            raise AssistantError(detail.get('code','operation_failed'),detail.get('message','The local operation failed.')) from error
 
     def schedule(self, result=None):
         """Changes apply in their own request; the assistant looks at them once activity pauses."""
@@ -146,18 +182,18 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200,(ASSETS/self.path[1:]).read_bytes(),'text/javascript; charset=utf-8');return
         if not self.authenticated():
             self.reply(401,{'error':{'code':'session_required','message':'Open the local link for this session.'}});return
-        if match:=re.fullmatch(r'/api/attachments/([a-f0-9-]+)',self.path):
+        if match:=re.fullmatch(ROUTES['attachment_read'].replace('{id}',r'([a-f0-9-]+)'),self.path):
             try:
                 from .attachments import load
                 data,mime=load(self.server.board.app,match[1]);self.reply(200,data,mime)
             except AssistantError as error:self.reply(404,{'error':{'code':error.code,'message':str(error)}})
             return
         route,_,query=self.path.partition('?')
-        if route=='/api/state' or self.path in ('/api/doctor','/api/backups','/api/models'):
+        if route=='/api/state' or self.path in (ROUTES['doctor'],ROUTES['backup_list'],ROUTES['model_list']):
             try:
-                if self.path=='/api/doctor':data=self.server.board.app.doctor()
-                elif self.path=='/api/models':data=self.server.models()
-                elif self.path=='/api/backups':
+                if self.path==ROUTES['doctor']:data=self.server.board.app.doctor()
+                elif self.path==ROUTES['model_list']:data=self.server.models()
+                elif self.path==ROUTES['backup_list']:
                     from .archives import list_backups
                     data=list_backups(self.server.board.app)
                 else:
@@ -174,9 +210,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply(200,{'data':data})
             except AssistantError as error:self.reply(409,{'error':{'code':error.code,'message':str(error)}})
             return
-        if route=='/api/diagnostics/preview':
+        if route==ROUTES['diagnostics_preview']:
             self.reply(200,{'data':{'preview':diagnostics.export(['day-attendant'],preview=True)}});return
-        if route=='/api/zone-rules':
+        if route==ROUTES['zone_rules']:
             try:self.reply(200,{'data':self.server.board.zone_year(int(parse_qs(query)['year'][0]))})
             except (KeyError,ValueError):self.reply(400,{'error':{'code':'invalid_time','message':'Choose a calendar year.'}})
             except AssistantError as error:self.reply(400,{'error':{'code':error.code,'message':str(error)}})
@@ -206,9 +242,9 @@ class Handler(BaseHTTPRequestHandler):
         board=self.server.board
         review=False  # The later review is scheduled after the reply, never before it.
         try:
-            if self.path=='/api/diagnostics/export':
+            if self.path==ROUTES['diagnostics_export']:
                 result={'file':str(diagnostics.export(['day-attendant']))}
-            elif self.path=='/api/attachments':
+            elif self.path==ROUTES['attachment_upload']:
                 if set(body)-{'purpose'}!={'name','mime','base64','key'} or body.get('purpose','image') not in ('image','task'):raise ValueError('fields')
                 from .attachments import save
                 result=save(board.app,body['name'],body['mime'],body['base64'],body['key'],task_file=body.get('purpose')=='task')
@@ -219,13 +255,13 @@ class Handler(BaseHTTPRequestHandler):
                 if body['action']=='task_add' and result.get('phase')=='applied' and body['payload'].get('organize',True) and board.store.state_value('profile',{}).get('autoOrganize',True) and (len(body['payload'].get('title',''))>120 or '\n' in body['payload'].get('title','')):
                     uid=result.get('result',{}).get('uuid');revision=result.get('result',{}).get('revision')
                     if uid and revision is not None:self.server.pool.submit(board.normalize_capture,uid,body['payload'].get('captureText',body['payload']['title']).strip(),revision,body['payload']['title'].strip())
-            elif match:=re.fullmatch(r'/api/proposals/([a-f0-9-]+)/(?P<action>confirm|cancel|retry)',self.path):
+            elif match:=re.fullmatch(ROUTES['proposal_confirm'].rsplit('/',1)[0].replace('{id}',r'([a-f0-9-]+)')+r'/(?P<action>confirm|cancel|retry)',self.path):
                 identity=match[1];action=match['action']
                 if action=='confirm':result=board.confirm(identity,body['generation'],without_review=body.get('without_review',False) is True);review=True
                 elif action=='cancel':result=board.cancel(identity)
                 else:
                     result=board.retry(identity);review=True
-            elif self.path=='/api/undo':
+            elif self.path==ROUTES['undo_fact']:
                 if 'message_key' in body:
                     if set(body)-{'message_key','key','expected_revision'}:raise ValueError('fields')
                     result=board.undo_message(body['message_key'],body['key'],body.get('expected_revision'))
@@ -234,10 +270,10 @@ class Handler(BaseHTTPRequestHandler):
                     result=[board.announced(p) for p in board.undo_proposals(body['proposal_ids'],body['key'],body.get('expected_revision'))]
                 else:result=board.announced(board.undo(int(body['fact_id']),body['key'],body.get('expected_revision')))
                 review=True
-            elif self.path=='/api/organization/undo':
+            elif self.path==ROUTES['undo_organization']:
                 if set(body)-{'fact_id','key','partial'} or type(body.get('partial',False)) is not bool:raise ValueError('fields')
                 result=board.announced(board.undo_organization(int(body['fact_id']),body['key'],body.get('partial',False)));review=True
-            elif match:=re.fullmatch(r'/api/suggestions/([a-f0-9-]+)/(?P<action>accept|dismiss)',self.path):
+            elif match:=re.fullmatch(ROUTES['suggestion_accept'].rsplit('/',1)[0].replace('{id}',r'([a-f0-9-]+)')+r'/(?P<action>accept|dismiss)',self.path):
                 if set(body)-{'key'}:raise ValueError('fields')
                 if match['action']=='accept':result=board.announced(board.accept_suggestion(match[1]));review=True
                 else:result=board.dismiss_suggestion(match[1])
@@ -245,18 +281,18 @@ class Handler(BaseHTTPRequestHandler):
                 if set(body)-{'text','key','attachments','capture_only'}:raise ValueError('fields')
                 result=self.server.chat.submit(body['text'],body['key'],body.get('attachments'),body.get('capture_only',False))
                 if result['status']=='pending':self.server.pool.submit(self.server.run_chat,body['key'])
-            elif self.path=='/api/suggestion':
+            elif self.path==ROUTES['order_suggest']:
                 if set(body)!={'key'}:raise ValueError('fields')
                 result=board.request_suggestion(body['key'])
                 if result['request'].get('key')==body['key'] and result['request'].get('status')=='pending':self.server.pool.submit(board.suggest_order,body['key'])
             elif self.path=='/api/chat/clear':
                 if set(body)!={'key'}:raise ValueError('fields')
                 result=self.server.chat.clear(body['key'])
-            elif self.path=='/api/chat/retry':
+            elif self.path==ROUTES['chat_retry']:
                 if set(body)!={'key'}:raise ValueError('fields')
                 result=self.server.chat.retry(body['key'])
                 if result['status']=='pending':self.server.pool.submit(self.server.run_chat,body['key'])
-            elif self.path=='/api/proactive':
+            elif self.path==ROUTES['checkins_settings']:
                 from . import proactive
                 op=body.get('op')
                 if op in ('tick','run') and set(body)=={'op'}:
@@ -270,27 +306,27 @@ class Handler(BaseHTTPRequestHandler):
                         result=proactive.answer(board,body['id'],body['answer'],body['key'],board.store.state_value('timezone','UTC'))
                     if result.get('result'):review=True
                 else:raise ValueError('op')
-            elif self.path=='/api/agent-mode':
+            elif self.path==ROUTES['assistant_mode']:
                 if set(body)-{'mode','duration'}:raise ValueError('fields')
                 from .agent_mode import set_mode
                 result=set_mode(board.app,body['mode'],body.get('duration'))
-            elif self.path=='/api/settings':
+            elif self.path==ROUTES['profile_configure']:
                 if set(body)-{'values','key','expected_revision'}:raise ValueError('fields')
                 result=configure(board.app,body['values'],body['key'],body.get('expected_revision'))
                 if result['engine_changed']:self.server.pool.submit(self.server.configure_harness)
-            elif self.path=='/api/backups':
+            elif self.path==ROUTES['backup_list']:
                 if set(body)-{'key'}:raise ValueError('fields')
                 from .archives import snapshot
                 result=snapshot(board.app,key=body.get('key'))
-            elif self.path=='/api/recovery/inspect':
+            elif self.path==ROUTES['recovery_inspect']:
                 if set(body)!={'operation_key'}:raise ValueError('fields')
                 from .recovery import inspect
                 result=inspect(board.app,body['operation_key'])
-            elif self.path=='/api/recovery/resolve':
+            elif self.path==ROUTES['recovery_resolve']:
                 if set(body)!={'operation_key','resolution','precondition'}:raise ValueError('fields')
                 from .recovery import resolve
                 result=resolve(board.app,body['operation_key'],body['resolution'],body['precondition'])
-            elif self.path=='/api/shutdown':
+            elif self.path==ROUTES['service_shutdown']:
                 # Answer completely before stopping, so the caller never sees a truncated reply.
                 self.reply(200,{'data':{'stopping':True}})
                 threading.Thread(target=self.server.shutdown,daemon=True).start();return

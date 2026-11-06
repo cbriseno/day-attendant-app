@@ -87,3 +87,7 @@ def action_contract():
     return {action:{'description':DESCRIPTIONS[action],
             'fields':{('taskId' if field=='uuid' else field):SCHEMAS[field] for field in sorted(names)}}
             for action,names in ALLOWED.items()}
+
+# Existing API removal values; absent nullable model fields still mean no change.
+CLEAR_VALUES={**{k:'' for k in ('context','next','notes','original','assistantNotes','blockReason')},
+    **{k:[] for k in ('groups','dependsOn','relatedTo','attachmentIds','checklist','order')}}

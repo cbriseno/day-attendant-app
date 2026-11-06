@@ -26,7 +26,10 @@ def controlled_board(provider):
             script=script.replace("text=json.loads", "(Path(__file__).parent/'schema.json').write_text(sys.argv[sys.argv.index('--json-schema')+1])\ntext=json.loads")
             script=script.replace("if text=='hang':", "(Path(__file__).parent/'prompt.txt').write_text(text)\nif text=='hang':")
         binary=folder/provider;binary.write_text(script);binary.chmod(0o700)
-        with patch.dict(os.environ,{'CODEX_HOME':str(folder/'codex-home')}):
+        from day_attendant.fm_diagnostics import export as export_diagnostics
+        def isolated_export(components,**kwargs):
+            return export_diagnostics(components,downloads=folder/'downloads',**kwargs)
+        with patch('day_attendant.fm_diagnostics.export',side_effect=isolated_export),patch.dict(os.environ,{'CODEX_HOME':str(folder/'codex-home'),'XDG_STATE_HOME':str(folder/'xdg-state'),'FM_DIAGNOSTICS_HOME':str(folder/'diagnostics')}):
             bridge=(CodexBridge if provider=='codex' else ClaudeBridge)(folder,binary=str(binary))
             try:
                 board=Connected(Assistant(folder/'profile'),bridge);board.initialize(kind='personal',zone='America/Edmonton')

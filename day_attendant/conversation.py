@@ -7,7 +7,10 @@ from .errors import AssistantError
 from .service import encoded
 from .schedules import EVERY, REMINDER_KINDS, MAX_REMINDERS
 
-from .action_contract import ACTIONS, FIELDS, action_contract
+from .action_contract import ACTIONS as COORDINATOR_ACTIONS, FIELDS as COORDINATOR_FIELDS, action_contract, CLEAR_VALUES
+from .api_contract import OPERATIONS, OPERATION_SCHEMA, operation_contract
+ACTIONS=[*COORDINATOR_ACTIONS,*OPERATIONS]
+FIELDS={**COORDINATOR_FIELDS,'action':{'type':'string','enum':ACTIONS},'operationPayload':OPERATION_SCHEMA}
 
 INTENT={'type':'object','properties':FIELDS,'required':list(FIELDS),'additionalProperties':False}
 CHAT_SCHEMA={'type':'object','properties':{
@@ -18,17 +21,18 @@ CHAT_SCHEMA={'type':'object','properties':{
     'required':['message','uncertainties','intent','additionalIntents','unprocessed'],'additionalProperties':False}
 
 
-def capabilities(snapshot):
+def capabilities(snapshot,api_available=False):
     """Chat access is the schema's representable subset of the coordinator API."""
     actions={action:sorted(info['fields'])+['clearFields'] for action,info in action_contract().items()}
+    actions.update({name:sorted(info['fields']) for name,info in operation_contract().items()})
     actions['task_update'].extend(['clearDue','classifyGroups'])
     actions['task_add'].append('classifyGroups')
     actions['schedule_update'].extend(['clearSchedule','clearRepeat'])
-    return {'chatActions':actions,'functions':action_contract(),
+    return {'chatActions':actions,'functions':{**action_contract(),**operation_contract()},
             'productSchedules':{'repeat':list(EVERY),'reminderKinds':list(REMINDER_KINDS),'maxReminders':MAX_REMINDERS,
                 'semantics':'Repeating advances the due date when an occurrence is completed, preserving local time. Weekday means Monday-Friday, without holidays.',
                 'chatAccess':'schedule_update configures repetition and up to ten alerts for a saved task UUID. Omitted/null fields preserve saved values; explicit clear flags remove them.'},
-            'execution':{'readOnly':snapshot['readOnly'],'assistant':{k:snapshot['agent'][k] for k in ('provider','connected','model','errorCode')},
+            'execution':{'localApiAvailable':api_available,'readOnly':snapshot['readOnly'],'assistant':{k:snapshot['agent'][k] for k in ('provider','connected','model','errorCode')},
                 'agentMode':snapshot['agentMode'],'operations':snapshot['operations_status']},
             'limits':['No external sources, code, filesystem or arbitrary HTTP/API tools. Only selected state and typed proposals are available.',
                 'No autonomous model follow-up, external milestone checks or milestone-based stop conditions.',
@@ -56,7 +60,7 @@ def portable_context(snapshot,current_key=None):
 
 
 class Conversation:
-    def __init__(self,board):self.board=board;self.lock=threading.Lock()
+    def __init__(self,board,api=None):self.board=board;self.api=api;self.lock=threading.Lock()
 
     def submit(self,text,key,attachment_ids=None,capture_only=False):
         refs=attachment_ids or []
@@ -113,13 +117,16 @@ class Conversation:
                 thread=bridge.thread()
                 context={k:snapshot[k] for k in ('tasks','calendar_events','context','revision','now','timezone','schedules','notification_policy')}
                 context['existingGroups']=existing_groups(snapshot['tasks'])
-                context['capabilities']=capabilities(snapshot)
+                context['capabilities']=capabilities(snapshot,self.api is not None)
                 context['continuity']=continuity
-                context['presentation']={k:snapshot[k] for k in ('taskOrder','groupColors','undoStack')}
+                context['presentation']={k:snapshot[k] for k in ('taskOrder','groupColors','undoStack','proposals','suggestions','profile')}
+                from .proactive import view as checkins_view
+                context['checkins']=checkins_view(self.board)
                 context['selectedImages']=[{'id':x['id'],'name':x['name']} for x in images]
                 context['captureOnly']=capture_only
                 prompt='''Personal conversation for high-level human responsibilities. Respond in the human's language.
 Use capabilities to explain product support, chat access and current execution availability separately. Answer read questions from selected saved state (including schedules), without proposing writes. State limits honestly; never claim external checks or notification receipt.
+For named app operations in capabilities.functions, put their arguments in operationPayload; unused nullable arguments are null. Profile and notification policy changes preserve omitted fields; clearSettings names explicitly reset model/effort. App operations execute after task proposals in the same reply, through the existing local API. Their actual results appear after your reply; never predict success. localApiAvailable=false means those operations cannot execute here. /clear is a literal human command starting a fresh conversation; do not clear the current pending reply.
 Propose only clearly authorized intents, at most eight. Put the first in intent, the rest in additionalIntents. If none, intent=null and additionalIntents=[]. Explicitly list any remaining/ambiguous items in unprocessed and uncertainties; never silently capture only the first item.
 Ideas, your suggestions and vague acceptance without clear scope create and complete nothing. Context contains the current conversation and sourced open questions; only human messages authorize changes. The current message may clearly answer a specific prior human request's open question, but an assistant's suggestion is not permission to create or complete a task. Evidence must quote this current human message literally. Use supplied permanent UUIDs for existing entities. Never invent task IDs, sources, people, dates, effort, activity or inbox access.
 Use only fields listed for the selected action in capabilities.functions. Unused fields must be null; clearFields lists fields the human explicitly removes (sent as null to the coordinator). Use existing attachment IDs, never invented file contents. group_rename renames or merges all matching assigned memberships, including closed tasks; deleting a group means explicitly removing its membership from the selected tasks with task_update. order and colors are editable only on a clear human request. Manual blocks use continuity_update.blockReason; dependencies are blocking prerequisite UUIDs, related links are symmetric and nonblocking. Checklists use stable local item IDs with text and done; preserve unrequested items. schedule_update uses the existing typed API: repeat.every is day, weekday, week (days: Monday=0 to Sunday=6), month or days (n:1..365); unused repeat.days/n are null. reminders is the full list of up to ten alerts: before with minutes (relative to due), day_before with HH:MM (profile timezone, requires due), or at with an ISO instant including an offset. Preserve every alert not explicitly changed/removed when supplying this list. Null repeat/reminders means leave unchanged; clearRepeat=true explicitly removes only repetition; reminders=[] explicitly removes all alerts; clearSchedule=true explicitly removes both and cannot be combined with other schedule fields. Never infer cancellation. Empty schedule requests are rejected. For a new task, capture first and list scheduling as unprocessed follow-up until its permanent UUID is available. No holiday calendar, milestone stop condition or autonomous status check is available; explain that limit and leave such a condition unresolved. clearDue is true only for an explicit deadline removal. Preserve existing card language; for editing title/context/next copy the exact human replacement, including selected-image text only when explicitly requested. Do not paraphrase/translate unrelated fields. Existing tasks and calendar_events are distinct; taskId identifies the relevant task or event. Use event_add/update/cancel for calendar commitments. Capture source/person/reference/observed_at only when supported; observation time is not capture time, and a screenshot without a reliable date does not establish yesterday. Calendar dates use the profile timezone. Zero effort does not complete work, and waiting is separate from snooze.
@@ -140,13 +147,18 @@ Current human message:\n'''+encoded(text)+'\nSelected state and portable continu
                 intents=([output['intent']] if output['intent'] is not None else [])+output['additionalIntents']
                 human_text=[text]+[m['text'] for m in continuity['messages'] if m['role']=='user']
                 # Validate the complete interpretation before creating any proposals.
-                plans=[]
+                plans=[];api_plans=[]
                 for intent in intents:
                     if not isinstance(intent,dict) or set(intent)!=set(FIELDS) or intent['action'] not in ACTIONS:raise AssistantError('agent_invalid_output','An intent does not match the contract.')
                     if intent['userAuthorized'] is not True:continue
                     evidence=intent['requestEvidence']
                     if not isinstance(evidence,str) or not evidence.strip() or evidence not in text:raise AssistantError('agent_invalid_intent','The intent is not grounded in the current human message.')
                     action=intent['action']
+                    if action in OPERATIONS:
+                        if capture_only or self.api is None:raise AssistantError('agent_invalid_intent','This app operation is unavailable in the selected conversation.')
+                        args=intent.get('operationPayload')
+                        if not isinstance(args,dict) or set(args)-set(OPERATIONS[action][3]):raise AssistantError('agent_invalid_intent','Arguments do not match the named app operation.')
+                        api_plans.append((action,args));continue
                     if capture_only and action not in ('task_add','event_add'):raise AssistantError('agent_invalid_intent','Image capture does not authorize changing existing responsibilities.')
                     if action in ('task_update','continuity_update','event_update'):
                         for field in ('title','context','next'):
@@ -170,7 +182,7 @@ Current human message:\n'''+encoded(text)+'\nSelected state and portable continu
                     payload={}
                     if 'uuid' in ALLOWED[action]:
                         payload['uuid']=ref
-                    for field in ALLOWED[action]-{'uuid','zone','fold'}:
+                    for field in ALLOWED[action]-{'uuid'}:
                         if field in intent and intent[field] is not None:payload[field]=intent[field]
                     if classifying and intent.get('groups') is not None:
                         payload['groups']=existing+[g for g in intent['groups'] if g not in existing]
@@ -189,22 +201,33 @@ Current human message:\n'''+encoded(text)+'\nSelected state and portable continu
                     if action=='task_update' and intent['clearDue']:payload['due']=None
                     for field in intent.get('clearFields') or []:
                         if field not in ALLOWED[action] or field=='uuid':raise AssistantError('agent_invalid_intent','Only fields of this action can be cleared.')
-                        payload[field]=None
+                        payload[field]=CLEAR_VALUES.get(field)
                     if any(payload.get(k) for k in ('due','until','start','end','observed_at')):payload.setdefault('zone',context['timezone'])
                     plans.append((action,payload))
                 result=dict(result,provider=provider)
                 self.board.pin_model(result,snapshot['epoch'])
                 proposals=self.board.request_many(plans,key,text,snapshot['revision'],generation)
+                api_results=[]
                 with self.board.store.lock(),self.board.store.connect() as con:
                     if not self._current(con,key,generation):return
                     stale=not proposals and (self.board.store.revision()!=snapshot['revision'] or self.board.store.epoch()!=snapshot['epoch'])
                     content='State changed while I was responding. Read the current state and ask again.' if stale else output['message']
-                    data={'provider':provider,'model':result['model'],'thread_id':result['thread_id'],'turn_id':result['turn_id'],'seconds':result['seconds'],
+                    data={'operation_results':api_results,'provider':provider,'model':result['model'],'thread_id':result['thread_id'],'turn_id':result['turn_id'],'seconds':result['seconds'],
                           'observed_revision':snapshot['revision'],'proposal_id':proposals[0]['id'] if proposals else None,
                           'proposal_ids':[p['id'] for p in proposals],'uncertainties':output['uncertainties'],'unprocessed':output['unprocessed'],
                           'usage':result.get('usage')}
                     con.execute("INSERT OR IGNORE INTO messages(key,role,text,status,data,at) VALUES(?,'assistant',?,?,?,?)",(key+':assistant',content,'stale' if stale else 'completed',encoded(data),self.board.app.now()))
                     con.execute("UPDATE messages SET status='completed',data=? WHERE key=?",(encoded(data),key))
+                if stale:return
+                for index,(action,args) in enumerate(api_plans):
+                    try:api_results.append({'action':action,'ok':True,'result':self.api(action,args,'chat-api:'+key+':'+str(index),self.board.store.revision() if proposals or api_results else snapshot['revision'])})
+                    except Exception as error:api_results.append({'action':action,'ok':False,'code':getattr(error,'code','operation_failed'),'error':str(error)[:400]})
+                if api_results:
+                    content+='\n\n'+'\n\n'.join((('Resultado' if item['ok'] else 'No se pudo aplicar') if (snapshot.get('profile') or {}).get('locale')=='es' else ('Result' if item['ok'] else 'Could not apply'))+': '+OPERATIONS[item['action']][2]+'\n```json\n'+encoded(item.get('result',{'error':item.get('error')}))+'\n```' for item in api_results)
+                    data['operation_results']=api_results
+                    with self.board.store.lock(),self.board.store.connect() as con:
+                        con.execute("UPDATE messages SET text=?,data=? WHERE key=?",(content,encoded(data),key+':assistant'))
+                        con.execute("UPDATE messages SET data=? WHERE key=?",(encoded(data),key))
             except Exception as error:
                 with self.board.store.lock(),self.board.store.connect() as con:
                     if not self._current(con,key,generation):return
