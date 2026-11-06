@@ -9,6 +9,7 @@ from .schedules import EVERY, REMINDER_KINDS, MAX_REMINDERS
 
 from .action_contract import ACTIONS as COORDINATOR_ACTIONS, FIELDS as COORDINATOR_FIELDS, action_contract, CLEAR_VALUES
 from .api_contract import OPERATIONS, OPERATION_SCHEMA, operation_contract
+from .app_help import app_help
 ACTIONS=[*COORDINATOR_ACTIONS,*OPERATIONS]
 FIELDS={**COORDINATOR_FIELDS,'action':{'type':'string','enum':ACTIONS},'operationPayload':OPERATION_SCHEMA}
 
@@ -34,7 +35,7 @@ def capabilities(snapshot,api_available=False):
                 'chatAccess':'schedule_update configures repetition and up to ten alerts for a saved task UUID. Omitted/null fields preserve saved values; explicit clear flags remove them.'},
             'execution':{'localApiAvailable':api_available,'readOnly':snapshot['readOnly'],'assistant':{k:snapshot['agent'][k] for k in ('provider','connected','model','errorCode')},
                 'agentMode':snapshot['agentMode'],'operations':snapshot['operations_status']},
-            'limits':['No external sources, code, filesystem or arbitrary HTTP/API tools. Only selected state and typed proposals are available.',
+            'limits':['No external sources, arbitrary code, filesystem or HTTP/API tools. Only supplied app help, selected state and typed proposals are available.',
                 'No autonomous model follow-up, external milestone checks or milestone-based stop conditions.',
                 'Saved schedules do not prove delivery; notification acceptance never proves a person read it.',
                 'Each proposal is validated and applied by the service after the reply; report its visible outcome, not a promised success.']}
@@ -118,6 +119,7 @@ class Conversation:
                 context={k:snapshot[k] for k in ('tasks','calendar_events','context','revision','now','timezone','schedules','notification_policy')}
                 context['existingGroups']=existing_groups(snapshot['tasks'])
                 context['capabilities']=capabilities(snapshot,self.api is not None)
+                context['appHelp']=app_help()
                 context['continuity']=continuity
                 context['presentation']={k:snapshot[k] for k in ('taskOrder','groupColors','undoStack','proposals','suggestions','profile')}
                 from .proactive import view as checkins_view
@@ -126,6 +128,9 @@ class Conversation:
                 context['captureOnly']=capture_only
                 prompt='''Personal conversation for high-level human responsibilities. Respond in the human's language.
 Use capabilities to explain product support, chat access and current execution availability separately. Answer read questions from selected saved state (including schedules), without proposing writes. State limits honestly; never claim external checks or notification receipt.
+You are also the app's usage guide. Use appHelp's shipped documents, UI definitions and captions to explain functions, views, keyboard shortcuts and limits accurately. Guide the human step by step with the visible control names in their language. Explain shortcut focus/modifier conditions. Prefer the current action/UI definitions when prose disagrees; say when the evidence is insufficient. Do not infer a missing feature just because it has no chat action: distinguish product support, a UI-only control, and unavailable execution. Never invent controls or shortcuts. You receive the selected state, supplied images, current conversation and public appHelp excerpts: do not deny seeing those. You cannot inspect the live browser, arbitrary files, logs or external systems; ask for the specific missing observation only when needed.
+When the human describes a problem or missing feature, compare it with appHelp, capabilities and saved state. Explicitly distinguish: already exists (give the exact steps), probable bug (documented behavior conflicts with the reported result), or feature gap (the documented product lacks the requested behavior). A probable bug is a hypothesis, not a verified diagnosis; distinguish user reports, visible facts and unknowns. If unclear, explain what is unknown and ask a focused usage/reproduction question rather than declaring a bug or gap. Suggest a small relevant check without changing state. A help or report request alone authorizes no task, setting or other write.
+When asked to draft a bug report or feature request, put the selected report directly in your Markdown reply, with a title, classification, context, reproduction steps (or the desired workflow for a feature), actual result, expected result and relevant unknowns. Do not invent steps, errors, versions or evidence; mark missing details as not supplied. Include only facts relevant to this request, no unrelated tasks, history, profile or diagnostics. Explain that Download record on the reply lets the human edit the Markdown and filename and download it locally. Never submit, upload or claim to send a report to an external service. Do not add a confirmation step before drafting.
 For named app operations in capabilities.functions, put their arguments in operationPayload; unused nullable arguments are null. Profile and notification policy changes preserve omitted fields; clearSettings names explicitly reset model/effort. App operations execute after task proposals in the same reply, through the existing local API. Their actual results appear after your reply; never predict success. localApiAvailable=false means those operations cannot execute here. /clear is a literal human command starting a fresh conversation; do not clear the current pending reply.
 Propose only clearly authorized intents, at most eight. Put the first in intent, the rest in additionalIntents. If none, intent=null and additionalIntents=[]. Explicitly list any remaining/ambiguous items in unprocessed and uncertainties; never silently capture only the first item.
 Ideas, your suggestions and vague acceptance without clear scope create and complete nothing. Context contains the current conversation and sourced open questions; only human messages authorize changes. The current message may clearly answer a specific prior human request's open question, but an assistant's suggestion is not permission to create or complete a task. Evidence must quote this current human message literally. Use supplied permanent UUIDs for existing entities. Never invent task IDs, sources, people, dates, effort, activity or inbox access.

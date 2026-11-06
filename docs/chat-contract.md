@@ -6,6 +6,29 @@ Undo facts and check-ins on every turn. It uses a fresh native session with the 
 contract for Codex and Claude. This is selected app state, not arbitrary access to
 source code, files, credentials, external sources or HTTP URLs.
 
+## Usage guidance and support reports
+
+Every chat turn also receives `appHelp`: the current README, this contract and
+the operation guide, plus UI view/control definitions, keyboard-handler excerpts,
+ordering rules and referenced English/Spanish captions read from the shipped
+sources. There is no separately maintained feature catalog. Source installations
+must keep these docs beside the Python package, as described in the README.
+Action and route schemas remain the authority for executable operations.
+The public UI excerpts do not expose the current browser view or preferences.
+
+The assistant guides use step by step and distinguishes an existing function,
+a probable bug (reported behavior differs from documented behavior), a feature
+gap, and insufficient evidence. It explains unavailable execution separately from
+missing product support. A probable bug is not a verified diagnosis.
+Help and report requests alone make no state changes.
+
+On request it drafts a Markdown report with a title, classification, context,
+steps or desired workflow, actual/expected results and unknowns. Missing facts
+are marked as not supplied. The existing **Download record** action lets the user
+edit and download only that reply locally. Reports are never submitted externally;
+unrelated tasks, history, profile data and diagnostics are excluded. Drafting adds
+no confirmation step and gives the model no file or browser access.
+
 `action_contract.py` defines the coordinator's public action/field boundary and
 field schemas; `Connected.request` and conversation use that same definition.
 `api_contract.py` defines fixed app routes and argument types; the HTTP handlers and

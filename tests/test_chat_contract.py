@@ -38,11 +38,11 @@ def controlled_board(provider):
             finally:bridge.close()
 
 
-def turn(board,folder,text,key,action=None,**values):
+def turn(board,folder,text,key,action=None,reply='Controlled response',**values):
     intent=None
     if action:
         intent=dict.fromkeys(FIELDS);intent.update(action=action,clearDue=False,userAuthorized=True,requestEvidence=text,**values)
-    output={'message':'Controlled response','uncertainties':[],'intent':intent,'additionalIntents':[],'unprocessed':[]}
+    output={'message':reply,'uncertainties':[],'intent':intent,'additionalIntents':[],'unprocessed':[]}
     (folder/'output.json').write_text(json.dumps(output))
     chat=Conversation(board);chat.submit(text,key);chat.run(key)
     reply=next(m for m in board.snapshot()['messages'] if m['key']==key+':assistant')

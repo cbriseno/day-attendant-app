@@ -52,6 +52,14 @@ with tempfile.TemporaryDirectory(prefix='day-record-') as temp:
     bridge.output['message'] = selected
     server.chat.submit('Prepara un registro Markdown de los puntos acordados.', 'record')
     server.chat.run('record')
+    bridge.output['message'] = ('# Solicitud: sincronización\n\nClasificación: carencia\n\n'
+        '## Contexto\nConsultar tareas desde dos dispositivos.\n\n'
+        '## Flujo deseado\n1. Abrir ambos dispositivos.\n2. Consultar los mismos cambios.\n\n'
+        '## Resultado actual\nNo hay sincronización automática documentada.\n\n'
+        '## Resultado esperado\nSincronizar los cambios.\n\n'
+        '## Datos pendientes\nVersión y dispositivos: no proporcionados.')
+    server.chat.submit('Redacta una solicitud de sincronización entre dispositivos.', 'support')
+    server.chat.run('support')
     before = server.board.snapshot()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

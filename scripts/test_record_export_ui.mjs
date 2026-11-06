@@ -3,7 +3,7 @@ await page.click('[data-key="record:assistant"] [data-record-export]');
 console.log(JSON.stringify(await page.eval(async()=>{
  const $=id=>document.getElementById(id),checks=[];
  const assert=(ok,name)=>{if(!ok)throw Error(name);checks.push(name)};
- const form=$('record-export-dialog').querySelector('form'),save=form.querySelector('[type=submit]');
+ let form=$('record-export-dialog').querySelector('form'),save=form.querySelector('[type=submit]');
  const tick=()=>new Promise(r=>setTimeout(r,0));
  const submit=async()=>{form.requestSubmit();await tick();for(let i=0;save.disabled&&i<200;i++)await new Promise(r=>setTimeout(r,10))};
  assert($('record-export-content').value==='# Registro 🚀\n\nCafé, español y 日本語.\n\nOmitir esta línea.','only selected original Markdown');
@@ -21,6 +21,19 @@ console.log(JSON.stringify(await page.eval(async()=>{
  await submit();
  assert(closed&&written===content&&suggested==='registro-café-🚀.md','picker writes exact edited Unicode content and filename');
  assert($('record-export-status').textContent==='File saved.','success only after stream close');
+ $('record-export-dialog').close();
+ document.querySelector('[data-key="support:assistant"] [data-record-export]').click();
+ form=$('record-export-dialog').querySelector('form');save=form.querySelector('[type=submit]');
+ const report=$('record-export-content').value;
+ for(const section of ['# Solicitud: sincronización','Clasificación: carencia','## Contexto','## Flujo deseado','## Resultado actual','## Resultado esperado','## Datos pendientes'])assert(report.includes(section),'support report contains '+section);
+ assert(!report.includes('PRIVATE')&&!report.includes('Café'),'support report excludes other messages and task state');
+ $('record-export-name').value='solicitud.md';written=undefined;closed=false;
+ await submit();assert(closed&&written===report&&suggested==='solicitud.md','support report downloads exact selected Markdown');
+ $('record-export-dialog').close();
+ document.querySelector('[data-key="record:assistant"] [data-record-export]').click();
+ form=$('record-export-dialog').querySelector('form');save=form.querySelector('[type=submit]');
+ $('record-export-content').value=content;
+ $('record-export-name').value='registro-café-🚀.md';
  for(const stage of ['picker','write','close']){
   window.showSaveFilePicker=async()=>{if(stage==='picker')throw Error('Controlled error');return {createWritable:async()=>({write:async()=>{if(stage==='write')throw Error('Controlled error')},close:async()=>{throw Error('Controlled error')},abort:async()=>{}})}};
   await submit();assert(!$('record-export-error').hidden&&!$('record-export-status').textContent,'failure shown without success: '+stage);
