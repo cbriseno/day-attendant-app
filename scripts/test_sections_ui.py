@@ -61,6 +61,8 @@ with tempfile.TemporaryDirectory(prefix='day-sections-ui-') as state:
                   'expectedTitle': 'Synthetic responsibility 2', 'tasks': [
                       {'title': 'Synthetic organized task', 'notes': 'Synthetic notes', 'groups': ['Example'], 'after': []}]},
                   'organization', origin='assistant', expected_revision=board.snapshot()['revision'])
+    apply('continuity_update', {'uuid': ids[0], 'checklist': [{'id': f'item-{i}', 'text': f'Synthetic step {i + 1}', 'done': False} for i in range(30)]}, 'checklist')
+    apply('related_update', {'uuid': ids[0], 'relatedTo': ids[2:9]}, 'related')
     revision = board.snapshot()['revision']
     server = LocalServer(app, bridge)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -73,10 +75,10 @@ with tempfile.TemporaryDirectory(prefix='day-sections-ui-') as state:
             report['behavior'] = json.loads(axi('run', script=(ROOT / 'scripts/test_sections_ui.mjs').read_text()).strip().splitlines()[-1])
         for width, height in ((1440, 1000), (390, 844)):
             axi('resize', str(width), str(height))
-            axi('run', script="await page.eval(()=>{if(document.querySelector('#chat-dialog').open)document.querySelector('#chat-close').click()});")
+            axi('run', script="await page.eval(()=>{document.querySelector('#chat-close').click()});")
             for theme in ('light', 'dark'):
                 axi('run', script=f"await page.eval(()=>{{const e=document.querySelector('#theme-choice');e.value='{theme}';e.dispatchEvent(new Event('change',{{bubbles:true}}));document.querySelector('#list-view').click();const b=document.querySelector('[data-state=todo] [data-section-fold]');if(b.getAttribute('aria-expanded')==='true')b.click();scrollTo(0,0)}});")
-                axi('run', script="await page.eval(()=>document.querySelector('[data-state=todo] [data-section-fold]').focus());await page.press('Enter');await page.press('Space');await page.eval(()=>{if(document.querySelector('[data-state=todo] [data-section-fold]').getAttribute('aria-expanded')!=='false')throw Error('Viewport keyboard fold');scrollTo(0,0)});")
+                axi('run', script="await page.eval(()=>document.querySelector('[data-state=todo] [data-section-fold]').focus());await page.press('Enter');await page.eval(()=>{if(document.querySelector('[data-state=todo] [data-section-fold]').getAttribute('aria-expanded')!=='true')throw Error('Viewport keyboard expansion')});await page.press('Space');await page.eval(()=>{if(document.querySelector('[data-state=todo] [data-section-fold]').getAttribute('aria-expanded')!=='false')throw Error('Viewport keyboard fold');scrollTo(0,0)});")
                 axi('screenshot', str(out / f'today-folded-{width}-{theme}.png'))
                 axi('run', script="await page.click('[data-state=todo] [data-section-fold]');")
                 axi('screenshot', str(out / f'today-open-{width}-{theme}.png'))

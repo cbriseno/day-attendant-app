@@ -47,4 +47,15 @@ await check(`if(document.querySelector('details.org-item').open)throw Error('Org
 
 await page.click('#list-view');
 await check(`const b=document.querySelector('[data-state=todo] [data-section-fold]');if(b.getBoundingClientRect().height<28)throw Error('Touch target too small');if(document.documentElement.scrollWidth>innerWidth)throw Error('Horizontal overflow');const set=Storage.prototype.setItem;Storage.prototype.setItem=()=>{throw Error('Unavailable storage')};try{b.click()}finally{Storage.prototype.setItem=set}if(b.getAttribute('aria-expanded')!=='false')throw Error('Fold must work without storage');`);
-console.log(JSON.stringify({click:true,enterSpace:true,reload:true,orderings:4,board:true,nestedGroups:true,chains:true,nextUp:true,closedCanceled:true,settings:true,calendar:true,history:true,storageUnavailable:true}));
+// Long lists inside a task can be folded independently without closing the task.
+await page.eval(()=>dayUI.expandTask(daySnapshot().tasks.find(t=>t.checklist?.length).id));
+await page.wait('.checklist .task-section');
+await check(`const lists=[...document.querySelectorAll('details.task-section')];if(lists.length<3)throw Error('Checklist and relation lists need controls');for(const d of lists)d.open=false;if(!document.querySelector('[data-expand]'))throw Error('Folding a list closed the task');`);
+await page.eval(()=>location.reload());await page.wait('[data-cl-open]');
+await page.eval(()=>dayUI.expandTask(daySnapshot().tasks.find(t=>t.checklist?.length).id));
+await check(`if([...document.querySelectorAll('details.task-section')].some(d=>d.open))throw Error('Task list folds lost after reload');`);
+await page.click('.checklist .task-section>summary');
+await check(`if(!document.querySelector('.checklist details').open||!document.querySelector('[data-expand]'))throw Error('Checklist summary must expand only the list');`);
+await page.click('.checklist .task-section>summary');await page.click('[data-cl-open]');
+await check(`if(!document.querySelector('.checklist details').open)throw Error('Checklist chip must reveal its list');`);
+console.log(JSON.stringify({click:true,enterSpace:true,reload:true,orderings:4,board:true,nestedGroups:true,chains:true,nextUp:true,closedCanceled:true,settings:true,calendar:true,history:true,taskLists:true,storageUnavailable:true}));

@@ -99,3 +99,14 @@ console.log(JSON.stringify(await page.eval(async()=>{
 // The notice survives a reload and a change that happens while the board is not looking.
 await page.eval(()=>location.reload());await page.wait('[data-unblocked-go]');
 console.log(JSON.stringify(await page.eval(()=>{const [a,b,c,d]=JSON.parse(sessionStorage.getItem('relations-test-ids'));if(!document.querySelector('[data-unblocked-go="'+b+'"]')||!document.querySelector('[data-task-id="'+b+'"].just-unblocked'))throw Error('ready notice lost on reload');return {reload:true}})));
+
+// Following the ready notice reveals the task even when its lane was folded.
+console.log(JSON.stringify(await page.eval(()=>{
+ const [a,b]=JSON.parse(sessionStorage.getItem('relations-test-ids'));
+ const row=()=>document.querySelector('[data-task-id="'+b+'"]');
+ row().closest('.lane').querySelector('.fold').click();
+ if(row().getClientRects().length)throw Error('Fixture lane must be folded');
+ document.querySelector('[data-unblocked-go="'+b+'"]').click();
+ if(!row().getClientRects().length||document.activeElement.dataset.id!==b)throw Error('Ready link must reveal and focus folded task');
+ return {foldedReadyNavigation:true};
+})));
