@@ -1,6 +1,18 @@
 // Authored interface copy only. Never apply these catalogs to card or chat content.
 globalThis.dayTranslations = {
   "en": {
+    "record_export": "Download record",
+    "record_scope": "Only this reply starts the document. Edit the content below to choose exactly what to share.",
+    "record_filename": "Markdown filename",
+    "record_content": "Content to share",
+    "record_download": "Download Markdown",
+    "record_name_error": "Use a filename ending in .md, without folders or control characters (up to 120 characters).",
+    "record_empty": "Select some content to download.",
+    "record_failed": "Download failed. Your draft is still here; try again.",
+    "record_requested": "Download requested. Check your browser for completion or errors.",
+    "record_saved": "File saved.",
+    "record_cancelled": "Download canceled. Your draft is still here.",
+
     "error_group_color_conflict": "Equivalent group names have different saved colors. Nothing was changed; preserve the profile for reconciliation.",
     "last_active_now": "active just now",
     "in_progress_now": "in progress now",
@@ -193,6 +205,18 @@ globalThis.dayTranslations = {
     "priority_hint_someday": "No rush, just don't forget it"
   },
   "es": {
+    "record_export": "Descargar registro",
+    "record_scope": "El documento parte sólo de esta respuesta. Edita el contenido para elegir exactamente qué compartir.",
+    "record_filename": "Nombre del archivo Markdown",
+    "record_content": "Contenido para compartir",
+    "record_download": "Descargar Markdown",
+    "record_name_error": "Usa un nombre terminado en .md, sin carpetas ni caracteres de control (hasta 120 caracteres).",
+    "record_empty": "Selecciona contenido para descargar.",
+    "record_failed": "La descarga falló. Tu borrador sigue aquí; inténtalo de nuevo.",
+    "record_requested": "Descarga solicitada. Consulta su resultado o errores en el navegador.",
+    "record_saved": "Archivo guardado.",
+    "record_cancelled": "Descarga cancelada. Tu borrador sigue aquí.",
+
     "error_group_color_conflict": "Dos nombres equivalentes tienen colores guardados distintos. No se cambió nada; conserva el perfil para reconciliarlo.",
     "last_active_now": "activa ahora",
     "in_progress_now": "en curso ahora",

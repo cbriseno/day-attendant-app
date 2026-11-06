@@ -142,7 +142,7 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(204,b'', 'image/x-icon');return
         if self.path=='/themes.css':
             self.reply(200,(ASSETS/'themes.css').read_bytes(),'text/css; charset=utf-8');return
-        if self.path in ('/interface.js','/locales.js','/daily.js','/ordering.js','/theme.js','/anonymize.js','/anonymize-boot.js','/proactive.js'):
+        if self.path in ('/interface.js','/locales.js','/daily.js','/ordering.js','/theme.js','/anonymize.js','/anonymize-boot.js','/proactive.js','/record-export.js'):
             self.reply(200,(ASSETS/self.path[1:]).read_bytes(),'text/javascript; charset=utf-8');return
         if not self.authenticated():
             self.reply(401,{'error':{'code':'session_required','message':'Open the local link for this session.'}});return

@@ -117,6 +117,13 @@ the recorded closing instant. Older records without a closing date say so instea
 using their creation date. The conversation formats emphasis, lists, code and web/mail
 links; supplied HTML remains text.
 
+To share a Markdown record, ask for the selected content in chat, then choose
+**Download record** on that reply. Review or trim the content and choose a `.md`
+filename before downloading. Only the editor content is included, with Unicode;
+no profile or diagnostics are added. Canceling or a write error keeps the draft.
+Browsers without a save picker report a download request; check the browser for
+its final result. The model receives no filesystem access.
+
 `board request` applies a valid change in the same call (phase `applied`) or rejects it
 with a stable code (`dependency_cycle`, `invalid_uuid`, `task_not_found`,
 `stale_revision`…); no model reviews it first. `board list` returns current proposal
