@@ -10,6 +10,7 @@ from day_attendant import archives
 from day_attendant.connected import Connected
 from day_attendant.errors import AssistantError
 from day_attendant.service import Assistant, upgraded_record
+from day_attendant.taskstore import SCHEMA
 from test_connected import NOW, ReviewFixture
 from test_daily_domain import DailyBase
 
@@ -150,13 +151,13 @@ class V5UpgradeTests(DailyBase):
     def test_verified_upgrade_idempotent_restore_legacy_archive_and_old_undo(self):
         before=self.app.tasks.rows();revision=self.app.store.revision()
         receipt=archives.upgrade_tasks(self.app)
-        self.assertEqual(self.app.tasks.schema(),3)
+        self.assertEqual(self.app.tasks.schema(),SCHEMA)
         self.assertEqual(self.app.tasks.rows(),[upgraded_record(r) for r in before])
         self.assertEqual(self.app.store.revision(),revision);number=self.board.snapshot()['tasks'][0]['number']
         self.assertIsNone(archives.upgrade_tasks(self.app));self.assertEqual(self.app.tasks.aliases()[self.uid],number)
         archives.verify(receipt['backup']['path'])
         target=Path(self.out.name)/'rollback-new';archives.restore(receipt['backup']['path'],target)
-        restored=Assistant(target);self.assertEqual(restored.tasks.schema(),3);self.assertEqual(restored.tasks.rows(),self.app.tasks.rows())
+        restored=Assistant(target);self.assertEqual(restored.tasks.schema(),SCHEMA);self.assertEqual(restored.tasks.rows(),self.app.tasks.rows())
         self.board.undo(self.fact,'historical-undo');self.assertEqual(self.app.tasks.get(self.uid)['description'],'Old')
 
     def test_failed_backup_leaves_old_bytes_and_schema_and_no_alias(self):
@@ -172,7 +173,7 @@ class V5UpgradeTests(DailyBase):
         with self.assertRaises(AssistantError):archives.upgrade_tasks(self.app)
         self.assertEqual(self.app.tasks.schema(),2);self.assertEqual(self.app.tasks.rows(),before)
         with sqlite3.connect(self.app.tasks.database) as con:con.execute('DROP TRIGGER fail_upgrade')
-        archives.upgrade_tasks(self.app);self.assertEqual(self.app.tasks.schema(),3)
+        archives.upgrade_tasks(self.app);self.assertEqual(self.app.tasks.schema(),SCHEMA)
 
     def test_mixed_date_formats_and_unknown_entry_keep_dates_and_get_deterministic_aliases(self):
         from uuid import uuid4
