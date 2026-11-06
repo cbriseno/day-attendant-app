@@ -6,11 +6,6 @@ const lang=()=>(document.documentElement.lang||'en').startsWith('es')?'es-MX':'e
 Object.assign(globalThis.dayTranslations.es,{
  checkins_title:'Seguimiento',checkins_run:'Revisar ahora',checkins_running:'Revisando…',checkins_next:'Próxima revisión {time}',checkins_quiet:'En horas de descanso: no te escribo',checkins_off:'Seguimiento apagado',
  checkins_empty:'Todo en orden por ahora. Te escribo si algo se atora.',checkins_limit:'Ya llegué al máximo de {n} preguntas por hoy; lo puedes cambiar en Configuración.',checkins_nothing_new:'Revisé y no hay nada nuevo que preguntarte.',checkins_more:'y {n} más',
- checkins_demo_tag:'ejemplo',checkin_overdue:'«{title}» ya venció ({due}). ¿Ya la hiciste? Si no, la muevo para que no se te pierda.',
- checkin_due_soon:'«{title}» vence {due}. ¿Quieres empezarla hoy?',checkin_active_long:'«{title}» lleva {days} días en curso. ¿Ya quedó o la dejamos para mañana?',
- checkin_stale:'Veo que «{title}» lleva {days} días sin movimiento. ¿Sigue en pie, la pospongo o ya no aplica?',
- checkin_important:'«{title}» suena muy importante. ¿Ya la hiciste o la empezamos ahora?',
- checkin_risk:'«{title}» espera a «{blocker}», que no se ha movido. Si empiezas por «{blocker}», destrabas lo importante.',
  why_due:'Por qué: tiene fecha',why_stale:'Por qué: sin movimiento',why_important:'Por qué: prioridad alta y sin empezar',why_risk:'Por qué: un requisito detiene algo importante',
  answer_done:'Ya la hice',answer_start:'Empezar',answer_snooze:'Mañana',answer_retire:'Ya no aplica',answer_later:'Luego',
  answered_done:'Listo, la marqué como hecha.',answered_start:'La puse en curso.',answered_snooze:'La moví a mañana a las 9:00.',answered_retire:'La retiré; Deshacer la regresa.',answered_later:'Te pregunto más tarde.',
@@ -26,11 +21,6 @@ Object.assign(globalThis.dayTranslations.es,{
 Object.assign(globalThis.dayTranslations.en,{
  checkins_title:'Check-ins',checkins_run:'Check now',checkins_running:'Checking…',checkins_next:'Next check {time}',checkins_quiet:'Rest hours: I will not write',checkins_off:'Check-ins off',
  checkins_empty:'All good for now. I will write if something gets stuck.',checkins_limit:'I reached the limit of {n} questions for today; change it in Settings.',checkins_nothing_new:'Checked: nothing new to ask.',checkins_more:'and {n} more',
- checkins_demo_tag:'example',checkin_overdue:'«{title}» is past due ({due}). Did you do it? If not, I can move it so it does not get lost.',
- checkin_due_soon:'«{title}» is due {due}. Want to start it today?',checkin_active_long:'«{title}» has been in progress for {days} days. Is it done, or tomorrow?',
- checkin_stale:'«{title}» has not moved in {days} days. Still on, postpone, or no longer relevant?',
- checkin_important:'«{title}» sounds important. Did you do it, or shall we start now?',
- checkin_risk:'«{title}» waits for «{blocker}», which has not moved. Starting «{blocker}» unblocks what matters.',
  why_due:'Why: it has a date',why_stale:'Why: no movement',why_important:'Why: high priority, not started',why_risk:'Why: a prerequisite holds something important',
  answer_done:'Done',answer_start:'Start',answer_snooze:'Tomorrow',answer_retire:'No longer relevant',answer_later:'Later',
  answered_done:'Marked as done.',answered_start:'Started.',answered_snooze:'Moved to tomorrow 9:00.',answered_retire:'Retired; Undo brings it back.',answered_later:'I will ask later.',
@@ -56,7 +46,7 @@ function render(){
  const shown=P.checkins.slice(0,3),rest=P.checkins.length-shown.length;
  box.innerHTML='<div class="checkins-head"><h3 id="checkins-title">'+esc(tr('checkins_title'))+(P.checkins.length?' <span class="checkins-count">'+P.checkins.length+'</span>':'')+'</h3><span class="checkins-meta" data-anon-safe="text">'+esc(meta)+'</span><button type="button" class="link-button" id="checkins-run"'+(busy||state.readOnly||modeOf(state).mode!=='active'?' disabled':'')+'>'+esc(tr(busy?'checkins_running':'checkins_run'))+'</button></div>'
   +(flash?'<p class="checkins-flash" role="status">'+esc(flash)+'</p>':'')
-  +(shown.length?shown.map(c=>'<article class="checkin" data-kind="'+c.kind+'" aria-label="'+esc(message(c))+'"><p class="checkin-text" data-anon-private="text">'+esc(message(c))+'</p><p class="checkin-why"><span>'+esc(tr('why_'+c.kind))+'</span>'+(c.origin==='demo-model'?'<span class="checkin-tag" title="'+esc(tr('checkins_demo'))+'">'+esc(tr('checkins_demo_tag'))+'</span>':'')+'</p><div class="checkin-actions">'
+  +(shown.length?shown.map(c=>'<article class="checkin" data-kind="'+c.kind+'" aria-label="'+esc(message(c))+'"><p class="checkin-text" data-anon-private="text">'+esc(message(c))+'</p><p class="checkin-why"><span>'+esc(tr('why_'+c.kind))+'</span>'+'</p><div class="checkin-actions">'
    +c.answers.filter(a=>a!=='later').map((a,i)=>'<button type="button" class="btn'+(i===0?' primary':'')+'" data-checkin="'+c.id+'" data-answer="'+a+'"'+(state.readOnly?' disabled':'')+'>'+esc(tr('answer_'+a))+'</button>').join('')
    +'<button type="button" class="link-button" data-checkin="'+c.id+'" data-answer="later">'+esc(tr('answer_later'))+'</button></div></article>').join('')
    +(rest>0?'<p class="checkins-more">'+esc(T('checkins_more',{n:rest}))+'</p>':''):'<p class="checkins-empty">'+esc(tr('checkins_empty'))+'</p>')
@@ -91,7 +81,7 @@ function toggleMenu(anchor){if(document.querySelector('.agent-mode-menu')){close
  const opts=[['active','agent_resume',m==='active'?'agent_mode_active':'agent_resume'],['paused:1h','agent_pause_1h'],['paused:today','agent_pause_today'],['paused:forever','agent_pause_forever'],['off','agent_turn_off']];
  const node=document.createElement('div');node.className='row-menu agent-mode-menu';node.setAttribute('role','menu');
  const cur=m==='paused'?('paused:'+(modeOf(state).duration||(modeOf(state).until?'1h':'forever'))):m;
- node.innerHTML='<p class="menu-title">'+esc(tr('agent_mode_label'))+'</p>'+opts.map(([v,k,label])=>'<button type="button" class="menu-item" role="menuitemradio" aria-checked="'+(v===cur)+'" data-agent-mode="'+v+'">'+esc(v===cur&&v==='paused:1h'?T('agent_paused_until',{time:hour(modeOf(state).until)}):tr(label||k))+'</button>').join('')+'<p class="menu-confirm agent-mode-foot">'+esc(tr('agent_mode_hint'))+' '+esc(tr('agent_paused_hint'))+'</p>';
+ node.innerHTML='<p class="menu-title">'+esc(tr('agent_mode_label'))+'</p>'+opts.map(([v,k,label])=>'<button type="button" class="menu-item" role="menuitemradio" aria-checked="'+(v===cur)+'" data-agent-mode="'+v+'">'+esc(v===cur&&v==='paused:1h'?T('agent_paused_until',{time:hour(modeOf(state).until)}):tr(label||k))+(v===cur?'<span class="tick">'+globalThis.dayUI.icons.check+'</span>':'')+'</button>').join('')+'<p class="menu-confirm agent-mode-foot">'+esc(tr('agent_mode_hint'))+' '+esc(tr('agent_paused_hint'))+'</p>';
  const host=anchor.closest('dialog')||document.body,sheet=matchMedia('(max-width: 600px)').matches;if(sheet){node.classList.add('sheet');const scrim=document.createElement('div');scrim.className='menu-scrim agent-mode-scrim';host.append(scrim)}
  host.append(node);anchor.setAttribute('aria-expanded','true');
  if(!sheet){const r=anchor.getBoundingClientRect();node.style.position='fixed';node.style.top=(r.bottom+6)+'px';node.style.left=Math.max(8,Math.min(r.right-node.offsetWidth,innerWidth-node.offsetWidth-8))+'px'}

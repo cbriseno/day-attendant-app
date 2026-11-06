@@ -60,6 +60,12 @@ const arrowIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6
 const gripIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"/></svg>';
 const checkIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
 const playIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 5 12 7-12 7z"/></svg>';
+const closeIcon='<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>';
+const attachIcon='<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 12 6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l9-9M6 14l8-8"/></svg>';
+const repeatIcon='<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m16 3 4 4-4 4M4 11V9a2 2 0 0 1 2-2h14M8 21l-4-4 4-4m12 0v2a2 2 0 0 1-2 2H4"/></svg>';
+const externalIcon='<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6m0-6L10 14m0-10H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>';
+const listCheckIcon='<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg>';
+const starIcon='<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.8 5.7 6.3.9-4.6 4.5 1.1 6.3-5.6-3-5.6 3 1.1-6.3L3 9.6l6.2-.9z"/></svg>';
 const pauseIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>';
 const editIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
 const calendarIcon='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>';
@@ -315,12 +321,13 @@ function chainLanes(data,proposals){
    // Counts here describe only what this chain shows; links outside it name the other chain instead.
    html=html.replace(/<button type="button" class="dependency-chip[^>]*>[^<]*<\/button>/g,'');
    const unlocks=openAfter(t.id),inside=unlocks.map(id=>index.get(id)).filter(Boolean).sort((a,b)=>a-b),outside=unlocks.filter(id=>!index.has(id));
-   const jump=(target,label,hint)=>'<button type="button" class="chain-jump" data-chain-jump="'+esc('chain:'+target.goal.id)+'" title="'+esc(hint)+'" aria-label="'+esc(hint)+'"><span data-anon-private="text">'+esc(label)+'</span> ↗</button>';
+   const jump=(target,label,hint)=>'<button type="button" class="chain-jump" data-chain-jump="'+esc('chain:'+target.goal.id)+'" title="'+esc(hint)+'" aria-label="'+esc(hint)+'"><span data-anon-private="text">'+esc(label)+'</span> '+externalIcon+'</button>';
    const others=lines.filter(l=>l.goal!==goal&&l.steps.some(x=>x.id===t.id));
    const unlockTag=(inside.length?'<span class="chain-unlocks" data-anon-safe="text">'+esc(tr(inside.length>1?'chain_unlocks_many':'chain_unlocks').replace('{steps}',andList(inside)))+'</span>':'')
     +outside.map(id=>{const target=chainOf(id),title=byId.get(id).title;return jump(target,tr(inside.length?'chain_also_unlocks':'chain_only_unlocks').replace('{title}',title),tr('chain_jump_hint').replace('{title}',target.goal.title))}).join('')
     +(!outside.length&&others.length?others.map(o=>jump(o,tr('chain_also_in').replace('{title}',o.goal.title),tr('chain_jump_hint').replace('{title}',o.goal.title))).join(''):'');
    html=html.replace('<article class="task','<article data-step="'+(i+1)+'" data-unlocks="'+inside.join(',')+'" class="task chain-step'+(now?' chain-now':'')+(ready?' chain-ready':' chain-waiting')+(isGoal?' chain-goal':'')+(i===steps.length-1?' chain-last':''));
+   if(isGoal)html=html.replace('<div class="row-main">','<span class="chain-goal-icon" aria-hidden="true">'+starIcon+'</span><div class="row-main">');
    const tag='<span class="chain-step-label" data-anon-safe="text">'+esc(formatted('chain_step',{n:i+1}))+'</span>'
     +(now?'<span class="chain-start" data-anon-safe="text">'+esc(tr(t.state==='active'?'chain_doing':'chain_start_here'))+'</span>':ready?'<span class="chain-start soft" data-anon-safe="text">'+esc(tr('chain_free_now'))+'</span>':'<span class="chain-wait" data-anon-safe="text">'+esc(tr(waits.length>1?'chain_waits_many':'chain_waits').replace('{steps}',andList(waits)))+'</span>')
     +(isGoal?'<span class="chain-goal-label" data-anon-safe="text">'+esc(tr('chain_goal'))+'</span>':'')
@@ -340,7 +347,7 @@ function chainLanes(data,proposals){
   head:(foldable?'<button type="button" class="ib fold" data-fold="'+CHAIN_FREE+'" aria-expanded="'+!folded+'" aria-label="'+esc(tr(folded?'group_expand':'group_collapse').replace('{group}',tr('chain_free')))+'">'+chevronIcon+'</button>':'')+'<h2>'+esc(tr('chain_free'))+'</h2><span class="lane-count" data-anon-safe="text title aria-label">'+shownFree.length+'</span><span class="group-summary" data-anon-safe="text title aria-label">'+esc(tr('chain_free_hint'))+'<span class="group-folded">'+(folded?' · '+esc(tr('group_folded')):'')+'</span></span>',
   items:shownFree.map(t=>({id:t.id,rowKey:t.id+'|chain:free',html:taskRow(t,{key:'chain:free',label:null,draggable:false},data,proposals.find(p=>p.intent.taskId===t.id))}))}]:[];
  const justDone=chainJustDone&&byId.get(chainJustDone.id),freed=justDone&&isDone(justDone)?openAfter(justDone.id).map(id=>byId.get(id)).filter(t=>!waitsOn(t).length):[];
- const notice=justDone&&isDone(justDone)?[{id:'chains:notice',cls:' chain-intro-lane',head:'',items:[{key:'notice',html:'<p class="chain-notice" role="status" data-anon-safe="aria-label">'+checkIcon+'<span data-anon-private="text">'+esc(freed.length?tr('chain_done_freed').replace('{title}',justDone.title).replace('{next}',freed.map(t=>t.title).join('», «')):tr('chain_done_plain').replace('{title}',justDone.title))+'</span><button type="button" class="ib" data-chain-notice-close aria-label="'+esc(tr('close'))+'" title="'+esc(tr('close'))+'">×</button></p>'}]}]:[];
+ const notice=justDone&&isDone(justDone)?[{id:'chains:notice',cls:' chain-intro-lane',head:'',items:[{key:'notice',html:'<p class="chain-notice" role="status" data-anon-safe="aria-label">'+checkIcon+'<span data-anon-private="text">'+esc(freed.length?tr('chain_done_freed').replace('{title}',justDone.title).replace('{next}',freed.map(t=>t.title).join('», «')):tr('chain_done_plain').replace('{title}',justDone.title))+'</span><button type="button" class="ib" data-chain-notice-close aria-label="'+esc(tr('close'))+'" title="'+esc(tr('close'))+'">'+closeIcon+'</button></p>'}]}]:[];
  return [intro,...notice,...lanes,...freeLane];
 }
 // A finished prerequisite keeps its place in the chain: checked, muted, with when it was done.
@@ -380,8 +387,8 @@ const imageFile=file=>['image/png','image/jpeg','image/webp'].includes(file.mime
 function taskFiles(t,details=false){
  const files=t.files||[];if(!files.length&&!details)return '';
  const items=(details?files:files.slice(0,2)).map(file=>{
-  const content=imageFile(file)?'<button type="button" class="file-preview" data-preview="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(file.name)+'"><img src="/api/attachments/'+esc(file.id)+'" alt=""></button>':'<a class="file-chip" href="/api/attachments/'+esc(file.id)+'" download="'+esc(file.name)+'">📎 '+esc(file.name)+'</a>';
-  return '<span class="task-file">'+content+(details?'<button type="button" class="file-remove" data-file-remove="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(tr('remove_file').replace('{name}',file.name))+'">×</button>':'')+'</span>';
+  const content=imageFile(file)?'<button type="button" class="file-preview" data-preview="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(file.name)+'"><img src="/api/attachments/'+esc(file.id)+'" alt=""></button>':'<a class="file-chip" href="/api/attachments/'+esc(file.id)+'" download="'+esc(file.name)+'">'+attachIcon+' '+esc(file.name)+'</a>';
+  return '<span class="task-file">'+content+(details?'<button type="button" class="file-remove" data-file-remove="'+esc(file.id)+'" data-file-task="'+esc(t.id)+'" aria-label="'+esc(tr('remove_file').replace('{name}',file.name))+'">'+closeIcon+'</button>':'')+'</span>';
  }).join('');
  return '<div class="task-files">'+items+(!details&&files.length>2?'<span>+'+(files.length-2)+'</span>':'')+(details?'<label class="btn ghost">'+esc(tr('attach_files'))+'<input type="file" data-file-add="'+esc(t.id)+'" multiple hidden></label>':'')+'</div>';
 }
@@ -406,7 +413,7 @@ function buildRow(t,s,data,proposal){
   +'<span class="row-grip">'+handle+'</span>'
   +'<button type="button" class="check" data-id="'+t.id+'" data-action="done" aria-label="'+label(tr('complete'))+'" title="'+esc(tr('complete'))+'"'+(off?' disabled':'')+'><span class="box">'+checkIcon+'</span></button>'
   +'<div class="row-text">'+suggestionReason(t,data)+titleCell(t,data)+taskFiles(t)+'<span class="row-meta">'+rowMeta(t,data,proposal,s)+'</span></div>'
-  +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+(t.nextUp?'★':'☆')+'</button>':'')+priorityButton(t,off)+''
+  +'<div class="row-actions">'+(['todo','snoozed'].includes(t.state)&&!t.startedAt&&!t.lastActiveAt?'<button type="button" class="ib" data-id="'+t.id+'" data-action="next-up" aria-pressed="'+!!t.nextUp+'" aria-label="'+label(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'" title="'+esc(tr(t.nextUp?'next_up_remove':'next_up_mark'))+'"'+(off?' disabled':'')+'>'+starIcon+'</button>':'')+priorityButton(t,off)+''
   +state+'<button type="button" class="ib" data-id="'+t.id+'" data-action="snooze" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('snooze'))+'" title="'+esc(tr('snooze'))+'"'+(off?' disabled':'')+'>'+clockIcon+'</button>'
   +'<button type="button" class="ib more" data-id="'+t.id+'" data-action="more" aria-haspopup="menu" aria-expanded="false" aria-label="'+label(tr('more_actions'))+'" title="'+esc(tr('more_actions_hint'))+'">'+moreIcon+'</button></div>'
   +'<span class="port-slot">'+(off?'':'<button type="button" class="port" data-id="'+t.id+'" aria-label="'+esc(tr('port_hint'))+'" title="'+esc(tr('port_hint'))+'"></button>')+'</span></div>'+suggestionBubble(t,data)+(open?expandView(t,data):'')+'</article>'}
@@ -813,7 +820,7 @@ function richText(value){
 let formatLinkOpen=false;
 function formatInput(input){
  const bar=document.createElement('span');bar.className='format-bar';bar.hidden=true;bar.setAttribute('role','toolbar');bar.setAttribute('aria-label',tr('format_text'));
- for(const [kind,label] of [['bold','B'],['italic','I'],['link','↗']]){const b=document.createElement('button');b.type='button';b.dataset.format=kind;b.textContent=label;b.setAttribute('aria-label',tr('format_'+kind));bar.append(b)}
+ for(const [kind,label] of [['bold','B'],['italic','I'],['link','link']]){const b=document.createElement('button');b.type='button';b.dataset.format=kind;if(kind==='link')b.innerHTML=externalIcon;else b.textContent=label;b.setAttribute('aria-label',tr('format_'+kind));bar.append(b)}
  input.after(bar);
  const update=()=>{bar.hidden=document.activeElement!==input||input.selectionStart===input.selectionEnd};
  input.addEventListener('select',update);input.addEventListener('focus',update);input.addEventListener('keyup',update);input.addEventListener('pointerup',update);
@@ -854,7 +861,7 @@ function zonedInstant(y,mo,d,h,mi){let guess=Date.UTC(y,mo-1,d,h,mi);for(let i=0
 function reminderText(item){if(item.kind==='before'){const m=item.minutes;return m===1440?tr('reminder_one_day_before'):m%1440===0?tr('reminder_days_before').replace('{n}',m/1440):m%60===0?tr('reminder_hours_before').replace('{n}',m/60):tr('reminder_minutes_before').replace('{n}',m)}
  if(item.kind==='day_before')return tr('reminder_day_before').replace('{time}',item.time);return tr('reminder_at').replace('{time}',short(item.at))}
 function scheduleChip(t,data){const s=scheduleOf(t,data);if(!s)return '';const n=(s.reminders||[]).length;
- return '<span class="sched-chip" data-anon-safe="text" title="'+esc([s.repeat?repeatText(s.repeat):'',n?tr('reminders_count').replace('{n}',n):''].filter(Boolean).join(' · '))+'">'+(s.repeat?'<span aria-hidden="true">↻</span> '+esc(repeatText(s.repeat)):'')+(s.repeat&&n?' · ':'')+(n?BELL+n:'')+'</span>'}
+ return '<span class="sched-chip" data-anon-safe="text" title="'+esc([s.repeat?repeatText(s.repeat):'',n?tr('reminders_count').replace('{n}',n):''].filter(Boolean).join(' · '))+'">'+(s.repeat?repeatIcon+' '+esc(repeatText(s.repeat)):'')+(s.repeat&&n?' · ':'')+(n?BELL+n:'')+'</span>'}
 function scheduleFields(t,data){const s=scheduleOf(t,data)||{},r=s.repeat||null,off=data.readOnly||t.pending||['done','retired'].includes(t.state)?' disabled':'',every=r?.every||'';
  const opt=(v,label)=>'<option value="'+v+'"'+(every===v?' selected':'')+'>'+esc(tr(label))+'</option>';
  const days=every==='week'?'<div class="sched-days" role="group" aria-label="'+esc(tr('repeat_on_days'))+'">'+WEEK.map((k,i)=>'<button type="button" class="sched-day" data-sched-day="'+i+'" data-sched-task="'+t.id+'" aria-pressed="'+(r.days.includes(i))+'"'+off+'>'+esc(tr('weekday_'+k)).slice(0,2)+'</button>').join('')+'</div>':'';
@@ -903,17 +910,17 @@ function toggleExpand(id,open=expanded!==id){const t=task(id);if(open&&(!t||t.pe
 const checklistOf=t=>Array.isArray(t?.checklist)?t.checklist:[];
 const checklistCount=t=>{const l=checklistOf(t);return {done:l.filter(i=>i.done).length,n:l.length}};
 function checklistChip(t){const {done,n}=checklistCount(t);if(!n)return '';const all=done===n;
- return '<button type="button" class="check-count'+(all?' all':'')+'" data-cl-open="'+t.id+'" title="'+esc(tr('checklist_open'))+'" aria-label="'+esc(formatted('checklist_progress_aria',{done,n}))+'"><span aria-hidden="true">☑</span> '+done+'/'+n+'<span class="cl-mini" aria-hidden="true"><span style="width:'+Math.round(100*done/n)+'%"></span></span></button>'}
+ return '<button type="button" class="check-count'+(all?' all':'')+'" data-cl-open="'+t.id+'" title="'+esc(tr('checklist_open'))+'" aria-label="'+esc(formatted('checklist_progress_aria',{done,n}))+'">'+listCheckIcon+' '+done+'/'+n+'<span class="cl-mini" aria-hidden="true"><span style="width:'+Math.round(100*done/n)+'%"></span></span></button>'}
 let clEdit=null,clFocus=null,clDrag=null,clMenuItem=null;
 function checklistField(t,off){const l=checklistOf(t),{done,n}=checklistCount(t),lid='cl-label-'+t.id,dis=off?' disabled':'';
  const item=(i,k)=>'<li class="cl-item'+(i.done?' done':'')+'" data-cl-item="'+esc(i.id)+'" data-cl-task="'+t.id+'"'+(off?'':' draggable="true"')+'>'
-  +'<span class="cl-grip" aria-hidden="true" title="'+esc(tr('checklist_drag'))+'">⋮⋮</span>'
+  +'<span class="cl-grip" aria-hidden="true" title="'+esc(tr('checklist_drag'))+'">'+gripIcon+'</span>'
   +'<input type="checkbox" class="cl-check" id="cl-'+t.id+'-'+esc(i.id)+'" data-cl-toggle="'+esc(i.id)+'"'+(i.done?' checked':'')+dis+' aria-describedby="'+lid+'">'
   +(clEdit&&clEdit.task===t.id&&clEdit.item===i.id
     ?'<input type="text" class="cl-edit" data-cl-editing="'+esc(i.id)+'" maxlength="300" value="'+esc(i.text)+'" aria-label="'+esc(tr('checklist_edit_aria'))+'">'
     :'<label class="cl-text" for="cl-'+t.id+'-'+esc(i.id)+'" data-cl-text="'+esc(i.id)+'" data-anon-private="text" title="'+esc(tr('checklist_edit_hint'))+'">'+esc(i.text)+'</label>')
-  +(off?'':'<button type="button" class="cl-btn" data-cl-convert="'+esc(i.id)+'" aria-haspopup="menu" title="'+esc(tr('checklist_convert'))+'" aria-label="'+esc(tr('checklist_convert'))+': '+esc(i.text)+'">↗</button>'
-   +'<button type="button" class="cl-btn" data-cl-remove="'+esc(i.id)+'" title="'+esc(tr('checklist_remove'))+'" aria-label="'+esc(tr('checklist_remove'))+': '+esc(i.text)+'">✕</button>')+'</li>';
+  +(off?'':'<button type="button" class="cl-btn" data-cl-convert="'+esc(i.id)+'" aria-haspopup="menu" title="'+esc(tr('checklist_convert'))+'" aria-label="'+esc(tr('checklist_convert'))+': '+esc(i.text)+'">'+externalIcon+'</button>'
+   +'<button type="button" class="cl-btn" data-cl-remove="'+esc(i.id)+'" title="'+esc(tr('checklist_remove'))+'" aria-label="'+esc(tr('checklist_remove'))+': '+esc(i.text)+'">'+closeIcon+'</button>')+'</li>';
  return '<div class="xfield checklist" data-checklist="'+t.id+'"><span class="xlabel" id="'+lid+'">'+esc(tr('checklist_label'))+(n?' · '+done+'/'+n:'')+'</span>'
   +(n?'<div class="cl-bar" role="progressbar" aria-labelledby="'+lid+'" aria-valuemin="0" aria-valuemax="'+n+'" aria-valuenow="'+done+'"><span style="width:'+Math.round(100*done/n)+'%"></span></div>':'')
   +(n?'<ul class="cl-list" aria-labelledby="'+lid+'">'+l.map(item).join('')+'</ul>':'')
@@ -1044,12 +1051,12 @@ function groupMenu(t,data,selected){const off=data.readOnly||t.pending,groups=ra
   +'<div class="menu-form"><input type="text" class="menu-input" data-menu-input="group" maxlength="120" autocomplete="off" placeholder="'+esc(tr('group_search_create'))+'" aria-label="'+esc(tr('group_search_create'))+'"'+(off?' disabled':'')+'></div>'
   +'<div class="menu-scroll">'+groups.map(g=>menuItem('group-toggle',groupDot(g)+esc(groupName(g)),{value:g,checked:taskGroups(t).some(x=>groupKey(x)===groupKey(g)),disabled:off}).replace('menuitemradio','menuitemcheckbox')).join('')+'</div><p class="menu-error" role="alert" hidden></p>'
   +(current?'<div class="menu-sep" role="separator"></div><p class="menu-title">'+esc(tr('group_color_of').replace('{group}',current))+'</p><div class="swatches">'+Object.keys(GROUP_COLORS).map(c=>'<button type="button" class="swatch" role="menuitemradio" aria-checked="'+(groupColor(current)===c)+'" data-menu-act="group-color" data-group-name="'+esc(current)+'" data-value="'+c+'" style="--c:'+GROUP_COLORS[c]+'" aria-label="'+esc(tr('color_'+c))+'"'+(off?' disabled':'')+'></button>').join('')+'</div>':'')}
-function groupDialog(title,body,origin){const d=document.createElement('dialog');d.className='group-dialog';d.innerHTML='<form class="modal-form"><header class="modal-header"><h2>'+esc(title)+'</h2><button type="button" class="btn ghost" data-dismiss aria-label="'+esc(tr('close'))+'">×</button></header><div class="modal-body">'+body+'<p class="error" role="alert" hidden></p></div></form>';document.body.append(d);registerDialog(d);d.querySelector('[data-dismiss]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());openDialog(d,origin);return d}
+function groupDialog(title,body,origin){const d=document.createElement('dialog');d.className='group-dialog';d.innerHTML='<form class="modal-form"><header class="modal-header"><h2>'+esc(title)+'</h2><button type="button" class="btn ghost" data-dismiss aria-label="'+esc(tr('close'))+'">'+closeIcon+'</button></header><div class="modal-body">'+body+'<p class="error" role="alert" hidden></p></div></form>';document.body.append(d);registerDialog(d);d.querySelector('[data-dismiss]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());openDialog(d,origin);return d}
 function attachmentPicker(host,pasteTarget){
  const box=document.createElement('div'),input=document.createElement('input'),button=document.createElement('button'),list=document.createElement('div'),error=document.createElement('p');
- box.className='capture-files';input.type='file';input.multiple=true;input.hidden=true;button.type='button';button.className='btn ghost';button.textContent=tr('attach_files');error.className='error';error.setAttribute('role','alert');box.append(button,input,list,error);host.append(box);
+ box.className='capture-files';input.type='file';input.multiple=true;input.hidden=true;button.type='button';button.className='btn ghost';button.innerHTML=attachIcon+'<span>'+esc(tr('attach_files'))+'</span>';button.setAttribute('aria-label',tr('attach_files'));error.className='error';error.setAttribute('role','alert');box.append(button,input,list,error);host.append(box);
  let files=[],pending=0;
- const draw=()=>{list.replaceChildren();for(const file of files){const row=document.createElement('span');row.className='capture-file';row.append(document.createTextNode(file.name+' '));const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label',tr('remove_file').replace('{name}',file.name));remove.onclick=()=>{files=files.filter(f=>f!==file);draw()};row.append(remove);list.append(row)}};
+ const draw=()=>{list.replaceChildren();for(const file of files){const row=document.createElement('span');row.className='capture-file';row.append(document.createTextNode(file.name+' '));const remove=document.createElement('button');remove.type='button';remove.innerHTML=closeIcon;remove.setAttribute('aria-label',tr('remove_file').replace('{name}',file.name));remove.onclick=()=>{files=files.filter(f=>f!==file);draw()};row.append(remove);list.append(row)}};
  const add=async selected=>{error.textContent='';pending++;button.disabled=true;try{for(const file of selected){
   if(file.size>20*1024*1024)throw Error(tr('file_too_large'));
   const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file)});
@@ -1238,7 +1245,7 @@ $('board').addEventListener('click',e=>{const day=e.target.closest('[data-sched-
 // A repeating task finished here moves to its next date instead of closing.
 $('board').addEventListener('click',e=>{const b=e.target.closest('[data-action="done"]');if(!b)return;const data=flow.snapshot(),t=data.tasks.find(x=>x.id===b.dataset.id);const r=t&&scheduleOf(t,data)?.repeat;if(!r)return;
  setTimeout(()=>{const n=flow.snapshot().tasks.find(x=>x.id===t.id);if(n?.due&&n.due!==t.due)announceRepeat(t.title,n.due)},1200)},true);
-function announceRepeat(title,due){const text=tr('repeat_done').replace('{title}',title).replace('{date}',short(due));announceStatus(text);let box=$('repeat-toast');if(!box){box=document.createElement('div');box.id='repeat-toast';box.className='toast repeat-toast';box.setAttribute('role','status');document.body.append(box)}box.textContent='↻ '+text;box.hidden=false;clearTimeout(box._t);box._t=setTimeout(()=>{box.hidden=true},6000)}
+function announceRepeat(title,due){const text=tr('repeat_done').replace('{title}',title).replace('{date}',short(due));announceStatus(text);let box=$('repeat-toast');if(!box){box=document.createElement('div');box.id='repeat-toast';box.className='toast repeat-toast';box.setAttribute('role','status');document.body.append(box)}box.innerHTML=repeatIcon+'<span>'+esc(text)+'</span>';box.hidden=false;clearTimeout(box._t);box._t=setTimeout(()=>{box.hidden=true},6000)}
 $('reviews').onclick=async e=>{const summary=e.target.closest('summary');if(summary){const d=summary.parentElement;if(d.open)collapsedProposals.add(d.dataset.proposal);else collapsedProposals.delete(d.dataset.proposal);}const b=e.target.closest('[data-review-action]');if(!b)return;const p=flow.snapshot().proposals.find(p=>p.id===b.dataset.proposal);if(!p)return;if(Number(b.dataset.generation)!==p.generation){notice(tr("the_review_changed_read_the_current_state"));return;}const action=b.dataset.reviewAction;if(action==='cancel'){await flow.cancel(p.id);announceStatus(tr("change_canceled_the_responsibility_keeps_its"))}if(action==='retry')safely(()=>flow.retry(p.id));if(action==='continue')safely(()=>flow.commit(p.id,{generation:p.generation}))};
 $('reviews').addEventListener('toggle',e=>{if(!e.target.matches('details'))return;const id=e.target.dataset.proposal;if(e.target.open){collapsedProposals.delete(id);expandedProposal=id}else collapsedProposals.add(id)},true);
 $('raised-undo').onclick=()=>{const fact=$('raised-row').dataset.fact;hideRaised();if(fact&&$('undo').dataset.event===fact)$('undo').click()};$('raised-close').onclick=hideRaised;
@@ -1528,7 +1535,7 @@ safely(boot);
 function poll(){safely(()=>flow.poll()).finally(()=>setTimeout(poll,document.hidden?5000:900))}
 setTimeout(poll,900);document.addEventListener('visibilitychange',()=>{if(!document.hidden)safely(()=>flow.poll())});
 globalThis.daySnapshot=()=>structuredClone(flow.snapshot());
-globalThis.dayUI={formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
+globalThis.dayUI={icons:{close:closeIcon,check:checkIcon,attach:attachIcon},formatInput,richText,attachmentPicker,short,taskGroups,groupKey,rankedGroups,groupInventory,api,deliver,flow,openDialog,expandTask:id=>toggleExpand(id,true),editTitle:startTitleEdit,registerDialog,tr,esc,full,localValue,parseLocal,ambiguous,notice,safely,translateChrome,localizedDates,zoneReady,formatted,creates,showProposal,groupDot};
 const diagnosticsDialog = document.querySelector('#diagnostics-dialog');
 document.querySelector('#diagnostics-open').addEventListener('click', async () => {
   diagnosticsDialog.showModal();
