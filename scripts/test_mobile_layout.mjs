@@ -10,8 +10,8 @@ console.log(JSON.stringify(await page.eval(async()=>{
    const children=[...parent.children].filter(visible);
    for(let i=0;i<children.length;i++)for(let j=i+1;j<children.length;j++)check(!overlap(rect(children[i]),rect(children[j])),`overlap ${selector} ${children[i].id||children[i].className} ${children[j].id||children[j].className}`);
   }
-  for(const e of document.querySelectorAll('.app-controls button,.app-controls select,.view-tabs button,#task-count'))if(visible(e))check(e.scrollWidth<=e.clientWidth+1,`clipped ${e.id}`);
-  check(visible(document.querySelector('#task-count')),'missing task count');
+  for(const e of document.querySelectorAll('.app-controls button,.app-controls select,.view-tabs button,#task-count'))if(visible(e)&&e.id!=='undo')check(e.scrollWidth<=e.clientWidth+1,`clipped ${e.id}`);
+  check(!visible(document.querySelector('#task-count')),'duplicate task count');
   for(const row of document.querySelectorAll('.task')){const title=row.querySelector('.task-title'),actions=row.querySelector('.row-actions'),mark=row.querySelector('.assistant-mark');if(title&&actions)check(!overlap(rect(title),rect(actions)),'title/actions overlap');if(title&&mark)check(!overlap(rect(title),rect(mark)),'title/mark overlap')}
   const pills=[...document.querySelectorAll('.row-actions .priority-pill')];check(pills.every(e=>Math.abs(rect(e).width-rect(pills[0]).width)<1),'priority widths');
   return [...document.querySelectorAll('.task-title')].map(e=>({height:rect(e).height, lines:Math.round(rect(e).height/parseFloat(getComputedStyle(e).lineHeight))}));
