@@ -154,6 +154,13 @@ the review state under `review`. `board accept ID` applies a suggested change as
 request, with Undo; `board dismiss ID` hides it for good. Neither the review nor a
 suggestion ever changes a task by itself.
 
+Chat receives the current tasks, events, saved schedules, notification policy and a
+compact capability contract on every turn, identically for Codex and Claude. The
+contract separates product support, representable chat actions and current execution
+availability. Queries use those saved values without proposing a change. The model
+has no arbitrary API, source, file or external-system access. Notification settings
+and scheduler status do not prove delivery or that a person read an alert.
+
 ## Settings and notification policy
 
 ```sh

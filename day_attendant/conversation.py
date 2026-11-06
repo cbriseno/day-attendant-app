@@ -5,10 +5,11 @@ import threading
 from .connected import ALLOWED, PRESENTATION
 from .errors import AssistantError
 from .service import encoded
+from .schedules import EVERY, REMINDER_KINDS, MAX_REMINDERS
 from .taskstore import PRIORITIES
 
 # Manual display order and group colors are the person's own arrangement; the conversation never proposes them.
-ACTIONS=[action for action in ALLOWED if action not in PRESENTATION]
+ACTIONS=[action for action in ALLOWED if action not in set(PRESENTATION) | {'attachments_update','organize_capture','group_rename'}]
 FIELDS={"action":{"type":"string","enum":ACTIONS},
     **{key:{"type":["string","null"]} for key in ('taskId','title','due','until','context','next','source','person','reference','observed_at','start','end','group')},
     'priority':{'type':['string','null'],'enum':[*PRIORITIES,None]},
@@ -27,6 +28,23 @@ CHAT_SCHEMA={'type':'object','properties':{
     'additionalIntents':{'type':'array','items':INTENT,'maxItems':7},
     'unprocessed':{'type':'array','items':{'type':'string'}}},
     'required':['message','uncertainties','intent','additionalIntents','unprocessed'],'additionalProperties':False}
+
+
+def capabilities(snapshot):
+    """Chat access is the schema's representable subset of the coordinator API."""
+    actions={action:sorted((ALLOWED[action] & FIELDS.keys()) | ({'taskId'} if 'uuid' in ALLOWED[action] else set())) for action in ACTIONS}
+    actions['task_update'].append('clearDue')
+    actions['schedule_update'].append('clearSchedule')
+    return {'chatActions':actions,
+            'productSchedules':{'repeat':list(EVERY),'reminderKinds':list(REMINDER_KINDS),'maxReminders':MAX_REMINDERS,
+                'semantics':'Repeating advances the due date when an occurrence is completed, preserving local time. Weekday means Monday-Friday, without holidays.',
+                'chatAccess':'Explicit full cancellation only; configuring repetition and alerts is not yet representable in chat.'},
+            'execution':{'readOnly':snapshot['readOnly'],'assistant':{k:snapshot['agent'][k] for k in ('provider','connected','model','errorCode')},
+                'agentMode':snapshot['agentMode'],'operations':snapshot['operations_status']},
+            'limits':['No external sources, code, filesystem or arbitrary HTTP/API tools. Only selected state and typed proposals are available.',
+                'No autonomous model follow-up, external milestone checks or milestone-based stop conditions.',
+                'Saved schedules do not prove delivery; notification acceptance never proves a person read it.',
+                'Each proposal is validated and applied by the service after the reply; report its visible outcome, not a promised success.']}
 
 
 def portable_context(snapshot,current_key=None):
@@ -104,11 +122,13 @@ class Conversation:
                 images=self.board.message_images(key)
                 # A fresh native session per turn; the conversation above is the only carried context.
                 thread=bridge.thread()
-                context={k:snapshot[k] for k in ('tasks','calendar_events','context','revision','now','timezone')}
+                context={k:snapshot[k] for k in ('tasks','calendar_events','context','revision','now','timezone','schedules','notification_policy')}
+                context['capabilities']=capabilities(snapshot)
                 context['continuity']=continuity
                 context['selectedImages']=[{'id':x['id'],'name':x['name']} for x in images]
                 context['captureOnly']=capture_only
                 prompt='''Personal conversation for high-level human responsibilities. Respond in the human's language.
+Use capabilities to explain product support, chat access and current execution availability separately. Answer read questions from selected saved state (including schedules), without proposing writes. State limits honestly; never claim external checks or notification receipt.
 Propose only clearly authorized intents, at most eight. Put the first in intent, the rest in additionalIntents. If none, intent=null and additionalIntents=[]. Explicitly list any remaining/ambiguous items in unprocessed and uncertainties; never silently capture only the first item.
 Ideas, your suggestions and vague acceptance without clear scope create and complete nothing. Context contains the current conversation and sourced open questions; only human messages authorize changes. The current message may clearly answer a specific prior human request's open question, but an assistant's suggestion is not permission to create or complete a task. Evidence must quote this current human message literally. Use supplied permanent UUIDs for existing entities. Never invent task IDs, sources, people, dates, effort, activity or inbox access.
 Unused fields must be null. schedule_update without supported schedule fields is rejected; clearSchedule=true is only for an explicit request to remove the entire schedule. clearDue is true only for an explicit deadline removal. Preserve existing card language; for editing title/context/next copy the exact human replacement, including selected-image text only when explicitly requested. Do not paraphrase/translate unrelated fields. Existing tasks and calendar_events are distinct; taskId identifies the relevant task or event. Use event_add/update/cancel for calendar commitments. Capture source/person/reference/observed_at only when supported; observation time is not capture time, and a screenshot without a reliable date does not establish yesterday. Calendar dates use the profile timezone. Zero effort does not complete work, and waiting is separate from snooze.
