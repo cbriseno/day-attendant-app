@@ -12,12 +12,13 @@ console.log(JSON.stringify(await page.eval(async()=>{
   }
   for(const e of document.querySelectorAll('.app-controls button,.app-controls select,.view-tabs button,#task-count'))if(visible(e)&&e.id!=='undo')check(e.scrollWidth<=e.clientWidth+1,`clipped ${e.id}`);
   check(!visible(document.querySelector('#task-count')),'duplicate task count');
-  for(const row of document.querySelectorAll('.task')){const title=row.querySelector('.task-title'),actions=row.querySelector('.row-actions'),mark=row.querySelector('.assistant-mark');if(title&&actions)check(!overlap(rect(title),rect(actions)),'title/actions overlap');if(title&&mark)check(!overlap(rect(title),rect(mark)),'title/mark overlap')}
+  for(const row of document.querySelectorAll('.task')){const title=row.querySelector('.task-title'),actions=row.querySelector('.row-actions'),mark=row.querySelector('.assistant-mark'),checkBox=row.querySelector('.check');if(title&&checkBox)check(!overlap(rect(title),rect(checkBox)),'title/checkbox overlap');if(title&&actions)check(!overlap(rect(title),rect(actions)),'title/actions overlap');if(title&&mark)check(!overlap(rect(title),rect(mark)),'title/mark overlap')}
   const pills=[...document.querySelectorAll('.row-actions .priority-pill')];check(pills.every(e=>Math.abs(rect(e).width-rect(pills[0]).width)<1),'priority widths');
   return [...document.querySelectorAll('.task-title')].map(e=>({height:rect(e).height, lines:Math.round(rect(e).height/parseFloat(getComputedStyle(e).lineHeight))}));
  };
  await dayAnonymize.setActive(false);const before=measure();await dayAnonymize.setActive(true);await dayAnonymize.ready;const after=measure();
  check(before.length===after.length,'title count');before.forEach((v,i)=>check(v.lines===after[i].lines&&Math.abs(v.height-after[i].height)<=Math.max(1,v.height*.02),'title geometry'));
  for(const e of document.querySelectorAll('.task-title span span'))check(getComputedStyle(e).letterSpacing==='normal','stretched letters');
+ for(const view of ['board','list']){document.getElementById(view+'-view').click();measure()}
  await dayAnonymize.setActive(false);return {titles:before.length,checked:true};
 })));
