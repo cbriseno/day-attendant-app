@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory(prefix='day-dependency-ui-') as state:
         axi('resize', '1440', '1000')
         axi('run', script="await page.wait('[data-task-id]');await page.eval(()=>{const e=document.querySelector('#locale-choice');e.value='es';e.dispatchEvent(new Event('change',{bubbles:true}))});")
         desktop, phone = (ROOT / 'scripts/test_dependency_ui.mjs').read_text().split('// PHONE\n')
+        phone, relations = phone.split('// RELATIONS\n')
         report['desktop'] = json.loads(axi('run', script=desktop).strip().splitlines()[-1])
         axi('run', script="await page.eval(()=>u8test.el(u8ids[1]).dispatchEvent(new PointerEvent('pointerover',{bubbles:true,pointerType:'mouse'})));")
         axi('screenshot', str(out / 'dependencies-1440.png'))
@@ -69,8 +70,34 @@ with tempfile.TemporaryDirectory(prefix='day-dependency-ui-') as state:
         axi('screenshot', str(out / 'relationships-390.png'))
         axi('run', script="await page.click('[data-menu-act=\"connect-needs\"]');")
         axi('screenshot', str(out / 'connect-390.png'))
+        axi('run', script="await page.click('[data-connect-cancel]');")
+        axi('resize', '1440', '1000')
+        report['relations'] = axi('run', script=relations).strip().splitlines()
+        ids = json.loads(report['relations'][0])['ids']
+        axi('open', 'about:blank')
+        apply('continuity_update', {'uuid': ids[3], 'blockReason': ''}, 'away-unblock')
+        axi('open', server.origin)
+        axi('run', script="await page.wait('[data-unblocked-go]');await page.eval(()=>{if(document.querySelectorAll('[data-unblocked-go]').length<2)throw Error('away unblock missing')});")
+        report['away_unblock'] = True
+        for theme in ('light', 'dark'):
+            for width, height in ((1440, 1000), (390, 844)):
+                axi('resize', str(width), str(height))
+                axi('run', script="if(await page.eval(()=>document.querySelector('#chat-dialog').open))await page.click('#chat-close');")
+                axi('eval', f"document.documentElement.dataset.theme='{theme}'")
+                axi('eval', 'window.scrollTo(0,0)')
+                axi('screenshot', str(out / f'unblocked-{theme}-{width}.png'))
+                axi('run', script="await page.eval(()=>{const [a,b,c,d]=JSON.parse(sessionStorage.getItem('relations-test-ids'));document.querySelector('[data-task-id=\"'+b+'\"] .port').click();document.querySelector('[data-task-id=\"'+d+'\"] [data-action=title]').click()});")
+                axi('screenshot', str(out / f'relation-choice-{theme}-{width}.png'))
+                axi('run', script="await page.click('[data-menu-act=keep]');")
+        axi('run', script="await page.eval(()=>{document.querySelector('[data-unblocked-close]').click();if(!document.querySelector('.unblock-notice').hidden||document.querySelector('.just-unblocked'))throw Error('dismiss failed')});")
+        axi('run', script="await page.eval(()=>location.reload());await page.wait('[data-task-id]');await page.eval(()=>{if(!document.querySelector('.unblock-notice').hidden)throw Error('dismissed notice replayed')});")
         report['passed'] = True
     except BaseException as error:
+        try:
+            axi('screenshot', str(out / 'failure.png'))
+            (out / 'failure-dom.txt').write_text(axi('snapshot'))
+        except Exception:
+            pass
         report['passed'] = False
         report['error'] = str(error)
         raise

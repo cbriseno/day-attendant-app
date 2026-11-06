@@ -111,4 +111,9 @@ assert.deepEqual(plain(context.dayOrdering.focus([],now)),{activeTotal:0,active:
 // The approved views give starred work precedence without changing its stored priority.
 const starred=context.dayOrdering.focus([f('urgent',{priority:'urgent'}),f('star',{priority:'low',nextUp:true})],now);
 assert.equal(starred.next[0].id,'star');assert.equal(selection.activeTotal,3);
+// A manual block hides in-progress work from Focus without losing its state.
+const held=f('held',{state:'active',blockReason:'Waiting for a synthetic reply'});
+assert.equal(context.dayOrdering.focus([held],now).active.length,0);
+assert.equal(held.state,'active');
+assert.equal(context.dayOrdering.focus([{...held,blockReason:''}],now).active[0].id,'held');
 console.log('Focus selection rules passed');
